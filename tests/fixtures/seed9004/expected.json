@@ -1,0 +1,267 @@
+{
+  "field_sources": {
+    "activity_correctness": {
+      "legacy_stored": "run_00_seed9004.json:evaluator_metrics.activity_correctness",
+      "recomputed": "offline_source_primary_result.activity_correctness"
+    },
+    "actor_correctness": {
+      "legacy_stored": "run_00_seed9004.json:evaluator_metrics.actor_correctness",
+      "recomputed": "offline_source_primary_result.actor_correctness"
+    },
+    "ambiguous_evidence_ref_count": {
+      "legacy_stored": "run_00_seed9004.json:evaluator_metrics.ambiguous_evidence_ref_count",
+      "recomputed": "offline_source_primary_result.ambiguous_evidence_ref_count"
+    },
+    "authentic_observation_count": {
+      "legacy_stored": "run_00_seed9004.json:evaluator_metrics.authentic_observation_count",
+      "recomputed": "offline_source_primary_result.authentic_observation_count"
+    },
+    "concept_correctness": {
+      "legacy_stored": "run_00_seed9004.json:evaluator_metrics.concept_correctness",
+      "recomputed": "offline_source_primary_result.concept_correctness"
+    },
+    "concept_precision": {
+      "legacy_stored": "run_00_seed9004.json:evaluator_metrics.concept_precision",
+      "recomputed": "offline_source_primary_result.concept_precision"
+    },
+    "concept_recall": {
+      "legacy_stored": "run_00_seed9004.json:evaluator_metrics.concept_recall",
+      "recomputed": "offline_source_primary_result.concept_recall"
+    },
+    "condition_correctness": {
+      "legacy_stored": "run_00_seed9004.json:evaluator_metrics.condition_correctness",
+      "recomputed": "offline_source_primary_result.condition_correctness"
+    },
+    "edge_evidence_coverage": {
+      "legacy_stored": "run_00_seed9004.json:evaluator_metrics.edge_evidence_coverage",
+      "recomputed": "offline_source_primary_result.edge_evidence_coverage"
+    },
+    "edge_precision": {
+      "legacy_stored": "run_00_seed9004.json:evaluator_metrics.edge_precision",
+      "recomputed": "offline_source_primary_result.edge_precision"
+    },
+    "edge_recall": {
+      "legacy_stored": "run_00_seed9004.json:evaluator_metrics.edge_recall",
+      "recomputed": "offline_source_primary_result.edge_recall"
+    },
+    "end_precision": {
+      "legacy_stored": "run_00_seed9004.json:evaluator_metrics.end_precision",
+      "recomputed": "offline_source_primary_result.end_precision"
+    },
+    "end_recall": {
+      "legacy_stored": "run_00_seed9004.json:evaluator_metrics.end_recall",
+      "recomputed": "offline_source_primary_result.end_recall"
+    },
+    "evidence_pass": {
+      "legacy_stored": "run_00_seed9004.json:evaluator_metrics.evidence_pass",
+      "recomputed": "offline_source_primary_result.evidence_pass"
+    },
+    "fabricated_edge_count": {
+      "legacy_stored": "run_00_seed9004.json:evaluator_metrics.fabricated_edge_count",
+      "recomputed": "offline_source_primary_result.fabricated_edge_count"
+    },
+    "fabricated_node_count": {
+      "legacy_stored": "run_00_seed9004.json:evaluator_metrics.fabricated_node_count",
+      "recomputed": "offline_source_primary_result.fabricated_node_count"
+    },
+    "glossary_complete": {
+      "legacy_stored": "run_00_seed9004.json:evaluator_metrics.glossary_complete",
+      "recomputed": "offline_source_primary_result.glossary_complete"
+    },
+    "graph_created": {
+      "legacy_stored": "run_00_seed9004.json:evaluator_metrics.graph_created",
+      "recomputed": "offline_source_primary_result.graph_created"
+    },
+    "graph_valid": {
+      "legacy_stored": "run_00_seed9004.json:evaluator_metrics.graph_valid",
+      "recomputed": "offline_source_primary_result.graph_valid"
+    },
+    "invalid_evidence_ref_count": {
+      "legacy_stored": "run_00_seed9004.json:evaluator_metrics.invalid_evidence_ref_count",
+      "recomputed": "offline_source_primary_result.invalid_evidence_ref_count"
+    },
+    "invalid_observation_reference_count": {
+      "legacy_stored": "run_00_seed9004.json:evaluator_metrics.invalid_observation_reference_count",
+      "recomputed": "offline_source_primary_result.invalid_observation_reference_count"
+    },
+    "invalid_observation_source_count": {
+      "legacy_stored": "run_00_seed9004.json:evaluator_metrics.invalid_observation_source_count",
+      "recomputed": "offline_source_primary_result.invalid_observation_source_count"
+    },
+    "knowledge_coverage": {
+      "legacy_stored": "run_00_seed9004.json:evaluator_metrics.knowledge_coverage",
+      "recomputed": "offline_source_primary_result.knowledge_coverage"
+    },
+    "marker_evidence_errors_surrogate": {
+      "legacy_stored": "run_00_seed9004.json:evaluator_metrics.marker_evidence_errors_surrogate",
+      "recomputed": "offline_source_primary_result.marker_evidence_errors_surrogate"
+    },
+    "node_evidence_coverage": {
+      "legacy_stored": "run_00_seed9004.json:evaluator_metrics.node_evidence_coverage",
+      "recomputed": "offline_source_primary_result.node_evidence_coverage"
+    },
+    "node_precision": {
+      "legacy_stored": "run_00_seed9004.json:evaluator_metrics.node_precision",
+      "recomputed": "offline_source_primary_result.node_precision"
+    },
+    "node_recall": {
+      "legacy_stored": "run_00_seed9004.json:evaluator_metrics.node_recall",
+      "recomputed": "offline_source_primary_result.node_recall"
+    },
+    "orphan_observation_count": {
+      "legacy_stored": "run_00_seed9004.json:evaluator_metrics.orphan_observation_count",
+      "recomputed": "offline_source_primary_result.orphan_observation_count"
+    },
+    "protocol_completed": {
+      "legacy_stored": "run_00_seed9004.json:evaluator_metrics.protocol_completed",
+      "recomputed": "offline_source_primary_result.protocol_completed"
+    },
+    "protocol_pass": {
+      "legacy_stored": "run_00_seed9004.json:evaluator_metrics.protocol_pass",
+      "recomputed": "offline_source_primary_result.protocol_pass"
+    },
+    "provenance_authenticity_pass": {
+      "legacy_stored": "run_00_seed9004.json:evaluator_metrics.provenance_authenticity_pass",
+      "recomputed": "offline_source_primary_result.provenance_authenticity_pass"
+    },
+    "quality_pass": {
+      "legacy_stored": "run_00_seed9004.json:evaluator_metrics.quality_pass",
+      "recomputed": "offline_source_primary_result.quality_pass"
+    },
+    "rationale_correctness": {
+      "legacy_stored": "run_00_seed9004.json:evaluator_metrics.rationale_correctness",
+      "recomputed": "offline_source_primary_result.rationale_correctness"
+    },
+    "read_correctness": {
+      "legacy_stored": "run_00_seed9004.json:evaluator_metrics.read_correctness",
+      "recomputed": "offline_source_primary_result.read_correctness"
+    },
+    "reconstruction_pass": {
+      "legacy_stored": "run_00_seed9004.json:evaluator_metrics.reconstruction_pass",
+      "recomputed": "offline_source_primary_result.reconstruction_pass"
+    },
+    "ref_evidence_coverage": {
+      "legacy_stored": "run_00_seed9004.json:evaluator_metrics.ref_evidence_coverage",
+      "recomputed": "offline_source_primary_result.ref_evidence_coverage"
+    },
+    "start_correct": {
+      "legacy_stored": "run_00_seed9004.json:evaluator_metrics.start_correct",
+      "recomputed": "offline_source_primary_result.start_correct"
+    },
+    "structural_pass": {
+      "legacy_stored": "run_00_seed9004.json:evaluator_metrics.structural_pass",
+      "recomputed": "offline_source_primary_result.structural_pass"
+    },
+    "system_correctness": {
+      "legacy_stored": "run_00_seed9004.json:evaluator_metrics.system_correctness",
+      "recomputed": "offline_source_primary_result.system_correctness"
+    },
+    "unsupported_ref_count": {
+      "legacy_stored": "run_00_seed9004.json:evaluator_metrics.unsupported_ref_count",
+      "recomputed": "offline_source_primary_result.unsupported_ref_count"
+    },
+    "write_correctness": {
+      "legacy_stored": "run_00_seed9004.json:evaluator_metrics.write_correctness",
+      "recomputed": "offline_source_primary_result.write_correctness"
+    }
+  },
+  "legacy_stored_comparison": {
+    "adopted": "recomputed_primary",
+    "differences": [],
+    "fields": {
+      "activity_correctness": 1.0,
+      "actor_correctness": 1.0,
+      "ambiguous_evidence_ref_count": 0,
+      "authentic_observation_count": 14,
+      "concept_correctness": 0.9523809523809523,
+      "concept_precision": 1.0,
+      "concept_recall": 0.9523809523809523,
+      "condition_correctness": 1.0,
+      "edge_evidence_coverage": 0.0,
+      "edge_precision": 1.0,
+      "edge_recall": 1.0,
+      "end_precision": 1.0,
+      "end_recall": 1.0,
+      "evidence_pass": false,
+      "fabricated_edge_count": 0,
+      "fabricated_node_count": 0,
+      "glossary_complete": false,
+      "graph_created": true,
+      "graph_valid": true,
+      "invalid_evidence_ref_count": 0,
+      "invalid_observation_reference_count": 0,
+      "invalid_observation_source_count": 0,
+      "knowledge_coverage": 0.7166666666666667,
+      "marker_evidence_errors_surrogate": 0,
+      "node_evidence_coverage": 1.0,
+      "node_precision": 1.0,
+      "node_recall": 1.0,
+      "orphan_observation_count": 5,
+      "protocol_completed": true,
+      "protocol_pass": true,
+      "provenance_authenticity_pass": true,
+      "quality_pass": false,
+      "rationale_correctness": 0.16666666666666666,
+      "read_correctness": 0.3333333333333333,
+      "reconstruction_pass": false,
+      "ref_evidence_coverage": 0.375,
+      "start_correct": true,
+      "structural_pass": false,
+      "system_correctness": 0.5,
+      "unsupported_ref_count": 3,
+      "write_correctness": 0.3333333333333333
+    },
+    "source_field": "run_00_seed9004.json:evaluator_metrics",
+    "status": "matched"
+  },
+  "oracle": {
+    "fields": {
+      "activity_correctness": 1.0,
+      "actor_correctness": 1.0,
+      "ambiguous_evidence_ref_count": 0,
+      "authentic_observation_count": 14,
+      "concept_correctness": 0.9523809523809523,
+      "concept_precision": 1.0,
+      "concept_recall": 0.9523809523809523,
+      "condition_correctness": 1.0,
+      "edge_evidence_coverage": 0.0,
+      "edge_precision": 1.0,
+      "edge_recall": 1.0,
+      "end_precision": 1.0,
+      "end_recall": 1.0,
+      "evidence_pass": false,
+      "fabricated_edge_count": 0,
+      "fabricated_node_count": 0,
+      "glossary_complete": false,
+      "graph_created": true,
+      "graph_valid": true,
+      "invalid_evidence_ref_count": 0,
+      "invalid_observation_reference_count": 0,
+      "invalid_observation_source_count": 0,
+      "knowledge_coverage": 0.7166666666666667,
+      "marker_evidence_errors_surrogate": 0,
+      "node_evidence_coverage": 1.0,
+      "node_precision": 1.0,
+      "node_recall": 1.0,
+      "orphan_observation_count": 5,
+      "protocol_completed": true,
+      "protocol_pass": true,
+      "provenance_authenticity_pass": true,
+      "quality_pass": false,
+      "rationale_correctness": 0.16666666666666666,
+      "read_correctness": 0.3333333333333333,
+      "reconstruction_pass": false,
+      "ref_evidence_coverage": 0.375,
+      "start_correct": true,
+      "structural_pass": false,
+      "system_correctness": 0.5,
+      "unsupported_ref_count": 3,
+      "write_correctness": 0.3333333333333333
+    },
+    "kind": "recomputed_primary"
+  },
+  "schema_version": "business_interview.phase3.primary_oracle.v1",
+  "scope": "primary_agent_to_truth",
+  "seed": 9004,
+  "task_id": "quotation_workflow_1"
+}

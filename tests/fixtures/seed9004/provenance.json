@@ -1,0 +1,197 @@
+{
+  "fixture": {
+    "deterministic_file_sha256": {
+      "agent.json": "74b102519454c81834b96dc6e0d1eb0ed8d4815594245e33a5826c0b51738f56",
+      "expected.json": "d4f595863bd10d41f2de25a964c7e153ca474a418ac627d20d8fffe1f8ac1727",
+      "truth.json": "951f70fe924d760ee10b3d366076022e9acbabfc5336455a62f8e6579f75615e"
+    },
+    "files": {
+      "agent": "agent.json",
+      "expected": "expected.json",
+      "provenance": "provenance.json",
+      "truth": "truth.json"
+    },
+    "seed": 9004,
+    "task_id": "quotation_workflow_1"
+  },
+  "generated_fields": {
+    "agent.json": {
+      "normalization": [
+        "copy the episode-complete saved final Agent graph, not the transcript",
+        "map legacy Node/Edge shape to AgentNode/AgentEdge mechanically",
+        "map unset/absent/dont_know marker objects to explicit target four-state values without collapsing them",
+        "preserve concept references, confidence, evidence, endpoints, and evidence quotes"
+      ],
+      "source": "run_00_seed9004.json:final_graph"
+    },
+    "expected.json": {
+      "legacy_comparison": "run_00_seed9004.json:evaluator_metrics",
+      "recomputed_source": "offline source evaluator PrimaryEvaluationResult fields",
+      "selection_rule": "adopt recomputed primary fields; record every stored-vs-recomputed discrepancy instead of silently choosing one"
+    },
+    "truth.json": {
+      "normalization": [
+        "copy Truth concept/node/edge semantic values mechanically",
+        "drop legacy serializer-only fields such as is_valid, validation_errors, terminology_agreements, display_label, and mentions",
+        "use legacy start_node_id/end_node_ids as explicit entry/exit inputs to canonicalize_truth_graph()",
+        "add only target-owned protected SOURCE/SINK nodes and unconditional boundary edges"
+      ],
+      "oracle_semantics": "quotation_truth() from scenario.py",
+      "source": "run_00_seed9004.json:truth_graph"
+    }
+  },
+  "generation": {
+    "generated_at": "2026-08-27T17:55:51Z",
+    "input_selection": "only existing seed 9004 public/private/diagnostics artifacts are considered; the private sidecar is read for source oracle recomputation and never copied",
+    "method": "migration/scripts/build_seed9004_fixture.py",
+    "target_phase2_checkpoint": "9bd4713647ba7eff2df4ebb6181743351c257ee2"
+  },
+  "generation_method": "migration/scripts/build_seed9004_fixture.py",
+  "intentionally_omitted": [
+    {
+      "reason": "full conversation/evidence ledger is not needed for the graph-semantic parity fixture and would expand the public artifact surface; evidence metrics remain an oracle snapshot",
+      "source_paths": [
+        "conversation",
+        "db_messages_ledger",
+        "observations"
+      ]
+    },
+    {
+      "reason": "private semantic annotations are not primary Agent-to-Truth inputs",
+      "source_paths": [
+        "run_00_seed9004.private.json:annotations_by_turn",
+        "alignments_by_turn",
+        "terminology_by_turn"
+      ]
+    },
+    {
+      "reason": "stakeholder-local IDs, hidden Truth mappings, and private knowledge are not required for this Agent/Truth fixture and are not copied",
+      "source_paths": [
+        "run_00_seed9004.private.json:knowledge"
+      ]
+    },
+    {
+      "reason": "runtime/provider metadata is not a primary evaluator oracle",
+      "source_paths": [
+        "agent_model",
+        "user_model",
+        "llm_args",
+        "elapsed_seconds",
+        "llm_call_metrics",
+        "reward_info",
+        "provider_errors"
+      ]
+    },
+    {
+      "reason": "diagnostic-only traces are provenance material, not expected primary metrics",
+      "source_paths": [
+        "run_00_seed9004.diagnostics.json:evaluation",
+        "metrics",
+        "root_cause_attributions",
+        "joint_concept_disagreement_audit"
+      ]
+    }
+  ],
+  "phase4_entry": {
+    "first_component": "deterministic AgentGraph-to-TruthGraph alignment/comparison against the primary oracle fields",
+    "minimum_input": [
+      "truth.json",
+      "agent.json",
+      "expected.json"
+    ],
+    "not_started": [
+      "comparison.py port",
+      "evaluation.py port",
+      "matching/scoring implementation",
+      "stakeholder reference evaluation",
+      "evidence/diagnostics replay"
+    ]
+  },
+  "public_repository_hygiene": {
+    "credentials_or_provider_secrets_copied": false,
+    "normalized_files_contain_serialized_python_class_paths": false,
+    "raw_private_artifact_copied": false,
+    "raw_public_artifact_copied": false
+  },
+  "schema_version": "business_interview.phase3.normalized_fixture.v1",
+  "seed": 9004,
+  "source": {
+    "artifacts": [
+      {
+        "git_blob_sha": "eb1e2a8e9b902666c49aec6fe15b85d52c028179",
+        "path": "artifacts/business_interview_real_llm/run_00_seed9004.json",
+        "role": "legacy public run artifact",
+        "sha256": "9afd62785751f232d69c98fa5fd0232c794db38cf9b23dd8dc76c79ab5b3f83b"
+      },
+      {
+        "git_blob_sha": "f49b5aa8feee0cfb196cc98210678387c36a8876",
+        "path": "artifacts/business_interview_real_llm/run_00_seed9004.private.json",
+        "role": "legacy evaluator-private sidecar used only for oracle recomputation",
+        "sha256": "de3fe7b4a1a84e5d9ede9305e218b0ec151b2729f428a45808688b0b915b6879"
+      },
+      {
+        "git_blob_sha": "deb582d0107b4ce91cf1518d628f9c7012c98f7e",
+        "path": "artifacts/business_interview_real_llm/run_00_seed9004.diagnostics.json",
+        "role": "legacy diagnostics artifact retained for provenance only",
+        "sha256": "73c627d2cc555ee94f400d27ab7ae4a45d80f3d3aeb809ee67ff031173f2c839"
+      }
+    ],
+    "branch": "business-interview",
+    "commit_sha": "00a98a5efbe9db2ccc3aaf2f04529ef50c323bb0",
+    "oracle_sources": [
+      {
+        "git_blob_sha": "0840267d2369b4193e0be0e2cfcd8324d6e9fdbc",
+        "path": "src/tau2/domains/business_interview/scenario.py",
+        "sha256": "5f22b4f45a468bbbc89876a955817e0d17a05ac5b664ab4e0b979b145681309d"
+      },
+      {
+        "git_blob_sha": "ca1fc7661a0e6da110b8dbd38edaa00386b9c8f0",
+        "path": "src/tau2/domains/business_interview/graph.py",
+        "sha256": "9e594f25c99bcecece22bf5f3092777911e2518755efca3428e62a53a1c4fcf7"
+      },
+      {
+        "git_blob_sha": "27a03c3a4e6288ed1dd74593e038f79160a7f42c",
+        "path": "src/tau2/domains/business_interview/artifact_provenance.py",
+        "sha256": "754dd2963685c99c39ce871b9540c472da2b33674d5926dffbe77e87755eb0b0"
+      },
+      {
+        "git_blob_sha": "422f56450f6f1d947f0f7b20376117d104f74aa2",
+        "path": "src/tau2/domains/business_interview/evaluation.py",
+        "sha256": "33992349eded6bd501d98c2b9cb9813458920add9796b2a2d98f11dba6acd5b1"
+      },
+      {
+        "git_blob_sha": "7dd7e38391217ddf443892b9bf11d1441adaace6",
+        "path": "src/tau2/domains/business_interview/comparison.py",
+        "sha256": "7e9ee665b1839f235e8ce55f72ab88aa0423c186f78227213f845c5cf5485410"
+      }
+    ],
+    "repository": "nakata0705/tau2-bench",
+    "working_tree_clean": true
+  },
+  "source_artifact_paths": [
+    "artifacts/business_interview_real_llm/run_00_seed9004.json",
+    "artifacts/business_interview_real_llm/run_00_seed9004.private.json",
+    "artifacts/business_interview_real_llm/run_00_seed9004.diagnostics.json"
+  ],
+  "source_artifact_sha256": {
+    "artifacts/business_interview_real_llm/run_00_seed9004.diagnostics.json": "73c627d2cc555ee94f400d27ab7ae4a45d80f3d3aeb809ee67ff031173f2c839",
+    "artifacts/business_interview_real_llm/run_00_seed9004.json": "9afd62785751f232d69c98fa5fd0232c794db38cf9b23dd8dc76c79ab5b3f83b",
+    "artifacts/business_interview_real_llm/run_00_seed9004.private.json": "de3fe7b4a1a84e5d9ede9305e218b0ec151b2729f428a45808688b0b915b6879"
+  },
+  "source_branch": "business-interview",
+  "source_commit_sha": "00a98a5efbe9db2ccc3aaf2f04529ef50c323bb0",
+  "source_oracle": {
+    "comparison_scope": "primary Agent-to-Truth fields only; stakeholder reference scores and diagnostics are excluded",
+    "evaluator_entry_point": "tau2.domains.business_interview.evaluation.evaluate",
+    "execution": "offline deterministic recomputation; no LLM, provider, network, or simulator call",
+    "result_type": "PrimaryEvaluationResult",
+    "source_package_version": "1.0.1",
+    "truth_constructor": {
+      "meaning": "the artifact truth_graph is the equivalent deterministic legacy payload; canonical boundary elements are rebuilt by the target model contract",
+      "path": "src/tau2/domains/business_interview/scenario.py",
+      "symbol": "quotation_truth"
+    }
+  },
+  "source_repository": "nakata0705/tau2-bench",
+  "task_id": "quotation_workflow_1"
+}

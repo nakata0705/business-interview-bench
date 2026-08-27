@@ -1,0 +1,527 @@
+{
+  "concepts": {
+    "act_approve_high_value": {
+      "description": "",
+      "display_label": "approve the high-value quotation",
+      "id": "act_approve_high_value",
+      "kind": "activity",
+      "mentions": []
+    },
+    "act_check_customer_info": {
+      "description": "",
+      "display_label": "check the customer information",
+      "id": "act_check_customer_info",
+      "kind": "activity",
+      "mentions": []
+    },
+    "act_create_quotation": {
+      "description": "",
+      "display_label": "create the quotation",
+      "id": "act_create_quotation",
+      "kind": "activity",
+      "mentions": []
+    },
+    "act_receive_request": {
+      "description": "",
+      "display_label": "receive the customer's quotation request",
+      "id": "act_receive_request",
+      "kind": "activity",
+      "mentions": []
+    },
+    "act_send_month_end_summary": {
+      "description": "",
+      "display_label": "send the month-end summary to Accounting",
+      "id": "act_send_month_end_summary",
+      "kind": "activity",
+      "mentions": []
+    },
+    "act_send_quotation_customer": {
+      "description": "",
+      "display_label": "send the quotation to the customer",
+      "id": "act_send_quotation_customer",
+      "kind": "activity",
+      "mentions": []
+    },
+    "actor_manager": {
+      "description": "",
+      "display_label": "manager",
+      "id": "actor_manager",
+      "kind": "actor",
+      "mentions": []
+    },
+    "actor_sales_employee": {
+      "description": "",
+      "display_label": "sales employee",
+      "id": "actor_sales_employee",
+      "kind": "actor",
+      "mentions": []
+    },
+    "cond_high_value": {
+      "description": "",
+      "display_label": "amount over 1,000,000 yen",
+      "id": "cond_high_value",
+      "kind": "condition",
+      "mentions": []
+    },
+    "cond_low_value": {
+      "description": "",
+      "display_label": "amount at or below 1,000,000 yen",
+      "id": "cond_low_value",
+      "kind": "condition",
+      "mentions": []
+    },
+    "cond_month_end": {
+      "description": "",
+      "display_label": "month-end",
+      "id": "cond_month_end",
+      "kind": "condition",
+      "mentions": []
+    },
+    "data_customer_information": {
+      "description": "",
+      "display_label": "customer information",
+      "id": "data_customer_information",
+      "kind": "data",
+      "mentions": []
+    },
+    "data_month_end_summary": {
+      "description": "",
+      "display_label": "month-end summary",
+      "id": "data_month_end_summary",
+      "kind": "data",
+      "mentions": []
+    },
+    "data_pricing_information": {
+      "description": "",
+      "display_label": "pricing information",
+      "id": "data_pricing_information",
+      "kind": "data",
+      "mentions": []
+    },
+    "data_quotation": {
+      "description": "",
+      "display_label": "quotation",
+      "id": "data_quotation",
+      "kind": "data",
+      "mentions": []
+    },
+    "data_quotation_request": {
+      "description": "",
+      "display_label": "customer's quotation request",
+      "id": "data_quotation_request",
+      "kind": "data",
+      "mentions": []
+    },
+    "rationale_credit_risk": {
+      "description": "",
+      "display_label": "credit risk management",
+      "id": "rationale_credit_risk",
+      "kind": "rationale",
+      "mentions": []
+    },
+    "system_crm": {
+      "description": "",
+      "display_label": "CRM",
+      "id": "system_crm",
+      "kind": "system",
+      "mentions": []
+    },
+    "system_email": {
+      "description": "",
+      "display_label": "email",
+      "id": "system_email",
+      "kind": "system",
+      "mentions": []
+    },
+    "system_quoting_system": {
+      "description": "",
+      "display_label": "quoting system",
+      "id": "system_quoting_system",
+      "kind": "system",
+      "mentions": []
+    }
+  },
+  "edges": {
+    "edge_approve_to_send_customer": {
+      "condition": {
+        "evidence": [],
+        "state": "absent"
+      },
+      "evidence": [],
+      "from_node": "node_approve_high_value",
+      "id": "edge_approve_to_send_customer",
+      "to_node": "node_send_quotation_customer"
+    },
+    "edge_check_to_create": {
+      "condition": {
+        "evidence": [],
+        "state": "absent"
+      },
+      "evidence": [],
+      "from_node": "node_check_customer_info",
+      "id": "edge_check_to_create",
+      "to_node": "node_create_quotation"
+    },
+    "edge_create_to_approve": {
+      "condition": {
+        "concept_id": "cond_high_value",
+        "confidence": 1.0,
+        "evidence": [],
+        "state": "value"
+      },
+      "evidence": [],
+      "from_node": "node_create_quotation",
+      "id": "edge_create_to_approve",
+      "to_node": "node_approve_high_value"
+    },
+    "edge_create_to_month_end": {
+      "condition": {
+        "concept_id": "cond_month_end",
+        "confidence": 1.0,
+        "evidence": [],
+        "state": "value"
+      },
+      "evidence": [],
+      "from_node": "node_create_quotation",
+      "id": "edge_create_to_month_end",
+      "to_node": "node_send_month_end_summary"
+    },
+    "edge_create_to_send_customer": {
+      "condition": {
+        "concept_id": "cond_low_value",
+        "confidence": 1.0,
+        "evidence": [],
+        "state": "value"
+      },
+      "evidence": [],
+      "from_node": "node_create_quotation",
+      "id": "edge_create_to_send_customer",
+      "to_node": "node_send_quotation_customer"
+    },
+    "edge_receive_to_check": {
+      "condition": {
+        "evidence": [],
+        "state": "absent"
+      },
+      "evidence": [],
+      "from_node": "node_receive_request",
+      "id": "edge_receive_to_check",
+      "to_node": "node_check_customer_info"
+    }
+  },
+  "end_node_ids": [
+    "node_send_quotation_customer",
+    "node_send_month_end_summary"
+  ],
+  "id": "graph",
+  "name": "",
+  "nodes": {
+    "node_approve_high_value": {
+      "activity": {
+        "concept_id": "act_approve_high_value",
+        "confidence": 1.0,
+        "evidence": [],
+        "state": "value"
+      },
+      "actor": {
+        "concept_id": "actor_manager",
+        "confidence": 1.0,
+        "evidence": [],
+        "state": "value"
+      },
+      "id": "node_approve_high_value",
+      "necessity_rationale": {
+        "concept_id": "rationale_credit_risk",
+        "confidence": 1.0,
+        "evidence": [
+          {
+            "observation_id": "obs_62",
+            "occurrence": 0,
+            "quote": "for credit risk management"
+          }
+        ],
+        "state": "value"
+      },
+      "reads": [
+        {
+          "concept_id": "data_quotation",
+          "confidence": 1.0,
+          "evidence": [
+            {
+              "observation_id": "obs_33",
+              "occurrence": 0,
+              "quote": "the high-value quotation"
+            }
+          ],
+          "state": "value"
+        }
+      ],
+      "system": {
+        "state": "unset"
+      },
+      "writes": {
+        "state": "unset"
+      }
+    },
+    "node_check_customer_info": {
+      "activity": {
+        "concept_id": "act_check_customer_info",
+        "confidence": 1.0,
+        "evidence": [],
+        "state": "value"
+      },
+      "actor": {
+        "concept_id": "actor_sales_employee",
+        "confidence": 1.0,
+        "evidence": [],
+        "state": "value"
+      },
+      "id": "node_check_customer_info",
+      "necessity_rationale": {
+        "evidence": [
+          {
+            "observation_id": "obs_71",
+            "occurrence": 0,
+            "quote": "I don't know why checking the customer information is necessary"
+          }
+        ],
+        "state": "dont_know"
+      },
+      "reads": [
+        {
+          "concept_id": "data_customer_information",
+          "confidence": 1.0,
+          "evidence": [
+            {
+              "observation_id": "obs_14",
+              "occurrence": 0,
+              "quote": "check the customer information in the CRM"
+            }
+          ],
+          "state": "value"
+        }
+      ],
+      "system": {
+        "concept_id": "system_crm",
+        "confidence": 1.0,
+        "evidence": [],
+        "state": "value"
+      },
+      "writes": {
+        "state": "unset"
+      }
+    },
+    "node_create_quotation": {
+      "activity": {
+        "concept_id": "act_create_quotation",
+        "confidence": 1.0,
+        "evidence": [],
+        "state": "value"
+      },
+      "actor": {
+        "concept_id": "actor_sales_employee",
+        "confidence": 1.0,
+        "evidence": [],
+        "state": "value"
+      },
+      "id": "node_create_quotation",
+      "necessity_rationale": {
+        "evidence": [
+          {
+            "observation_id": "obs_67",
+            "occurrence": 0,
+            "quote": "I don't know why creating the quotation is necessary"
+          }
+        ],
+        "state": "dont_know"
+      },
+      "reads": [
+        {
+          "concept_id": "data_customer_information",
+          "confidence": 1.0,
+          "evidence": [
+            {
+              "observation_id": "obs_23",
+              "occurrence": 0,
+              "quote": "using the customer information"
+            }
+          ],
+          "state": "value"
+        },
+        {
+          "concept_id": "data_pricing_information",
+          "confidence": 1.0,
+          "evidence": [
+            {
+              "observation_id": "obs_23",
+              "occurrence": 0,
+              "quote": "the pricing information"
+            }
+          ],
+          "state": "value"
+        }
+      ],
+      "system": {
+        "concept_id": "system_quoting_system",
+        "confidence": 1.0,
+        "evidence": [],
+        "state": "value"
+      },
+      "writes": [
+        {
+          "concept_id": "data_quotation",
+          "confidence": 1.0,
+          "evidence": [
+            {
+              "observation_id": "obs_23",
+              "occurrence": 0,
+              "quote": "create the quotation"
+            }
+          ],
+          "state": "value"
+        }
+      ]
+    },
+    "node_receive_request": {
+      "activity": {
+        "concept_id": "act_receive_request",
+        "confidence": 1.0,
+        "evidence": [],
+        "state": "value"
+      },
+      "actor": {
+        "concept_id": "actor_sales_employee",
+        "confidence": 1.0,
+        "evidence": [],
+        "state": "value"
+      },
+      "id": "node_receive_request",
+      "necessity_rationale": {
+        "evidence": [
+          {
+            "observation_id": "obs_3",
+            "occurrence": 0,
+            "quote": "The process starts when the sales employee receives the customer's quotation request"
+          }
+        ],
+        "state": "dont_know"
+      },
+      "reads": [
+        {
+          "concept_id": "data_quotation_request",
+          "confidence": 1.0,
+          "evidence": [
+            {
+              "observation_id": "obs_3",
+              "occurrence": 0,
+              "quote": "receives the customer's quotation request"
+            }
+          ],
+          "state": "value"
+        }
+      ],
+      "system": {
+        "state": "unset"
+      },
+      "writes": {
+        "state": "unset"
+      }
+    },
+    "node_send_month_end_summary": {
+      "activity": {
+        "concept_id": "act_send_month_end_summary",
+        "confidence": 1.0,
+        "evidence": [],
+        "state": "value"
+      },
+      "actor": {
+        "concept_id": "actor_sales_employee",
+        "confidence": 1.0,
+        "evidence": [],
+        "state": "value"
+      },
+      "id": "node_send_month_end_summary",
+      "necessity_rationale": {
+        "evidence": [
+          {
+            "observation_id": "obs_81",
+            "occurrence": 0,
+            "quote": "I don't know why sending the month-end summary to Accounting is necessary"
+          }
+        ],
+        "state": "dont_know"
+      },
+      "reads": {
+        "state": "unset"
+      },
+      "system": {
+        "state": "unset"
+      },
+      "writes": [
+        {
+          "concept_id": "data_month_end_summary",
+          "confidence": 1.0,
+          "evidence": [
+            {
+              "observation_id": "obs_33",
+              "occurrence": 0,
+              "quote": "send the month-end summary to Accounting"
+            }
+          ],
+          "state": "value"
+        }
+      ]
+    },
+    "node_send_quotation_customer": {
+      "activity": {
+        "concept_id": "act_send_quotation_customer",
+        "confidence": 1.0,
+        "evidence": [],
+        "state": "value"
+      },
+      "actor": {
+        "concept_id": "actor_sales_employee",
+        "confidence": 1.0,
+        "evidence": [],
+        "state": "value"
+      },
+      "id": "node_send_quotation_customer",
+      "necessity_rationale": {
+        "evidence": [
+          {
+            "observation_id": "obs_77",
+            "occurrence": 0,
+            "quote": "I don't know why sending the quotation to the customer is necessary"
+          }
+        ],
+        "state": "dont_know"
+      },
+      "reads": {
+        "state": "unset"
+      },
+      "system": {
+        "concept_id": "system_email",
+        "confidence": 1.0,
+        "evidence": [],
+        "state": "value"
+      },
+      "writes": [
+        {
+          "concept_id": "data_quotation",
+          "confidence": 1.0,
+          "evidence": [
+            {
+              "observation_id": "obs_33",
+              "occurrence": 0,
+              "quote": "send the quotation to the customer"
+            }
+          ],
+          "state": "value"
+        }
+      ]
+    }
+  },
+  "start_node_ids": [
+    "node_receive_request"
+  ]
+}

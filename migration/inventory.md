@@ -267,19 +267,113 @@ than copied wholesale. The additional `data/simulations/**/results.json`
 outputs and real-LLM private files are diagnostic material and should not be
 mass-copied into this project.
 
-## Phase 3 preparation
+## Phase 3 result: seed 9004 normalized fixture
 
-The Phase 2 public model seam is `business_interview.models`: construct a
-`BusinessProcessGraph` in legacy-style form, call
-`canonicalize_truth_graph()`, then use `model_dump_json()` /
-`model_validate_json()` and `validate_canonical_graph()`. For Agent data,
-construct an `AgentGraph` with explicit four-state slots and serialize it the
-same way. The boundary helpers `business_node_ids()`,
-`business_edge_ids()`, `business_entry_node_ids()`, and
-`business_exit_node_ids()` are available without tau2.
+Phase 3 uses exactly one case, the completed
+`quotation_workflow_1` run with seed 9004. It has 34 Agent calls, 14 accepted
+observations, six saved business nodes, six saved business edges, and both
+business exits. It was selected over seed 9003 because 9003 stops at
+`max_steps`, and over seed 9002 as the stronger completed first candidate.
+No seed 9002/9003 fixture or Phase 4 implementation was added.
 
-Phase 3 can use this seam to introduce a narrowly scoped adapter for seed 9004
-and then the deterministic comparison/evaluator path. It must first normalize
-the legacy split artifact into explicit canonical Truth/Agent inputs; no
-artifacts were copied in Phase 2. Do not begin with tools, environment,
-simulator, LLM calls, or a compatibility layer.
+The curated fixture is:
+
+```text
+tests/fixtures/seed9004/
+├── truth.json
+├── agent.json
+├── expected.json
+└── provenance.json
+```
+
+`migration/scripts/build_seed9004_fixture.py` is the one-shot generator. It
+reads only source files that exist, checks the source branch/HEAD/clean state
+against `migration/source.json`, and uses the source checkout only as a
+read-only generation dependency. It writes no raw artifact and has no runtime
+import from tau2. The deterministic JSON portion is written with sorted object
+keys; the only intentionally non-deterministic field is the provenance
+`generation.generated_at` timestamp (a fixed `--generated-at` can be supplied
+for a byte-identical rerun).
+
+### Truth source and normalization
+
+The source of Truth semantics is the legacy public artifact field
+`truth_graph`, which is the saved deterministic data corresponding to
+`src/tau2/domains/business_interview/scenario.py::quotation_truth()` at source
+commit `00a98a5efbe9db2ccc3aaf2f04529ef50c323bb0`. The generator copies its
+concept descriptions/terms, node slots, edge endpoints, and edge conditions
+mechanically. It does not infer Truth from conversation text. The legacy
+`start_node_id` and `end_node_ids` are passed as explicit entry/exit inputs to
+the target `canonicalize_truth_graph()`, which adds only the protected
+structural SOURCE/SINK nodes and boundary edges. `truth.json` therefore loads
+as a `BusinessProcessGraph` and passes `validate_canonical_graph()`.
+
+The legacy Truth payload omits the target's explicit boundary metadata and
+contains serializer fields (`is_valid`, `validation_errors`, empty
+`terminology_agreements`, and concept `display_label`/`mentions`) that are not
+Truth semantics. Boundary metadata is deterministically generated; those
+non-semantic fields are dropped.
+
+### Agent source and normalization
+
+`agent.json` comes directly from `run_00_seed9004.json:final_graph`, the
+state saved at episode completion. It is not reconstructed from the natural
+language transcript, tool-call sequence, or private annotation sidecar.
+Legacy `Node`/`Edge` structures are mechanically mapped to the Phase 2
+`AgentNode`/`AgentEdge` models; `start_node_id` becomes the one-element
+`start_node_ids` list. Concept IDs, labels, confidence, evidence IDs/quotes,
+endpoints, and list order are retained.
+
+A significant legacy schema hazard is that empty source marker models do not
+make `unset`, `absent`, and `dont_know` self-describing after permissive
+Pydantic validation. The generator reads the raw marker keys explicitly and
+emits target states `state=unset`, `state=absent`, and `state=dont_know`, so
+none of the four Agent states are collapsed. The resulting `AgentGraph` is
+validated and dump/reload semantic equality is tested.
+
+### Expected oracle and discrepancy policy
+
+`expected.json` is limited to the source evaluator's 41
+`PrimaryEvaluationResult` fields for the primary Agent-to-Truth lane. The
+source entry point is `tau2.domains.business_interview.evaluation.evaluate`.
+The generator invokes it offline using the normalized Agent graph, source
+`quotation_truth()`, and the legacy public observations/ledger plus private
+knowledge object. This is source execution, not an evaluator port, and makes
+no LLM/provider/network/simulator call.
+
+The stored legacy field `run_00_seed9004.json:evaluator_metrics` was compared
+field-by-field with the recomputation. All 41 fields matched exactly
+(including `rationale_correctness=0.16666666666666666`), so the recomputed
+fields are adopted and `legacy_stored_comparison.differences` is empty. The
+private sidecar is used only during generation to supply the source evaluator's
+exact knowledge input; its stakeholder-reference score is not copied. The
+source diagnostics artifact is hashed and recorded in provenance but is not
+used as an expected-metric source.
+
+### Omitted data and public hygiene
+
+The fixture intentionally omits the raw public/private artifacts, complete
+conversation and message ledger, observation text, private annotation and
+terminology ledgers, stakeholder knowledge graph/local IDs/Truth mappings,
+tool/runtime state, reward/provider/LLM metrics, and diagnostic traces. The
+final Agent's evidence IDs and quotes are retained because they are part of
+its saved state; the expected evidence/protocol values remain a snapshot, not
+a copied transcript. No API key, token, cookie, Authorization header, `.env`
+content, credential, or provider secret is included.
+
+`provenance.json` records the fixture schema/seed/task, source repository,
+branch, exact source commit, artifact Git blob SHA-1 and SHA-256 values, source
+oracle file hashes, generation method, field-level origins, omission reasons,
+and generation timestamp. It also records hashes for the three deterministic
+fixture files, while avoiding absolute paths as fixture contract data.
+
+### Phase 4 entry point
+
+Phase 4 can start from `truth.json`, `agent.json`, and the primary oracle
+fields in `expected.json`; `provenance.json` pins the source and legacy inputs.
+The smallest first component is deterministic AgentGraph-to-TruthGraph
+alignment/comparison against the expected primary fields. A future evidence
+or stakeholder-knowledge replay needs a separately designed normalized input
+contract because those source inputs were intentionally not made public here.
+Evaluator/comparison/matching/scoring, stakeholder knowledge, diagnostics,
+simulator, runtime tools, and LLM integration remain unimplemented.
