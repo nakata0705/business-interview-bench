@@ -1,4 +1,4 @@
-"""Small, offline-only checks for the Phase 1 migration scaffold."""
+"""Small, offline-only checks for the standalone migration project."""
 
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ PROVENANCE_PATH = PROJECT_ROOT / "migration" / "source.json"
 
 
 def test_package_import_smoke() -> None:
-    assert business_interview.__version__ == "0.1.0"
+    assert business_interview.__version__ == "0.2.0"
 
 
 def test_source_provenance_has_required_metadata() -> None:

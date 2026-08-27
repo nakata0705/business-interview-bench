@@ -1,4 +1,4 @@
-# Phase 1 source inventory and dependency boundary
+# Migration source inventory and dependency boundary
 
 ## Snapshot
 
@@ -15,6 +15,35 @@ it:
 The machine-readable copy of this provenance is
 [`source.json`](source.json). The source checkout is an oracle, not a
 submodule or runtime dependency of this project.
+
+## Phase 2 implementation update
+
+Phase 2 now implements only the standalone graph/domain model under
+`src/business_interview/models/`:
+
+- `concepts.py`: `ConceptKind`, `ConceptRef`, and `EvidenceRef`;
+- `epistemic.py`: explicit Agent `UNSET`, `ABSENT`, and `DONT_KNOW` states;
+- `graph.py`: `TruthConcept`/`TruthNode`/`TruthEdge`/`BusinessProcessGraph` and
+  `AgentConcept`/`AgentNode`/`AgentEdge`/`AgentGraph`;
+- `canonical.py`: canonical SOURCE/SINK validation, business node/edge and
+  boundary helpers, and deterministic canonicalization.
+
+The implementation uses only the standard library and Pydantic. No tau2
+import exists under the new project's `src/` tree. JSON round-trip tests cover
+both a canonicalized Truth graph and all four Agent slot states. Focused
+oracle-derived tests cover the contract cases listed below; evaluator,
+matching, stakeholder knowledge, simulator, runtime tools, and artifacts were
+not migrated.
+
+### Responsibilities intentionally omitted from source `graph.py`
+
+The source `graph.py` also contains `InterviewDB` (a tau2 `DB` subclass),
+`InterviewResult`, `Observation` storage, and runtime-oriented state helpers.
+Phase 2 intentionally did not port those responsibilities. It also did not
+port the source's generic `Node`/`Edge` naming, the full semantic-ID inventory,
+or any evaluator-facing graph projection. The new model keeps only direct
+Truth/Agent graph semantics, concept references, diagnostic evidence values,
+and the canonical boundary contract.
 
 ## Current source shape
 
@@ -100,17 +129,15 @@ runtime shell
   `data/tau2/domains/business_interview/{policy.md,tasks.json,split_tasks.json}`
   are source assets, not Python dependencies.
 
-### Recommended new-project boundary
+### Implemented new-project boundary
 
-1. Keep Pydantic as the only runtime dependency for the first domain model and
-   evaluator slice.
-2. Replace `DB`, `Environment`, `ToolKitBase`, tau2 message classes, registry,
-   CLI, and `UserSimulator` with direct project interfaces only when their
-   behavior is actually required.
-3. Do not preserve tau2 import paths or generic evaluator/tool abstractions
-   with a compatibility layer.
-4. Keep LLM/API, voice, `loguru`, pandas, FastAPI, LiteLLM, and the rest of the
-   tau2 dependency graph outside Phase 1.
+1. Phase 2 keeps Pydantic as the only runtime dependency and exposes the graph
+   API through `business_interview.models`.
+2. `DB`, `Environment`, `ToolKitBase`, tau2 message classes, registry, CLI,
+   and `UserSimulator` are absent from the core model.
+3. No tau2 import or compatibility layer is used by the new `src/` tree.
+4. LLM/API, voice, `loguru`, pandas, FastAPI, LiteLLM, evaluator, matching,
+   and stakeholder-knowledge code remain outside Phase 2.
 
 ## Semantic contracts to preserve
 
@@ -240,19 +267,19 @@ than copied wholesale. The additional `data/simulations/**/results.json`
 outputs and real-LLM private files are diagnostic material and should not be
 mass-copied into this project.
 
-## Phase 2 recommendation
+## Phase 3 preparation
 
-Start with one small, offline vertical slice:
+The Phase 2 public model seam is `business_interview.models`: construct a
+`BusinessProcessGraph` in legacy-style form, call
+`canonicalize_truth_graph()`, then use `model_dump_json()` /
+`model_validate_json()` and `validate_canonical_graph()`. For Agent data,
+construct an `AgentGraph` with explicit four-state slots and serialize it the
+same way. The boundary helpers `business_node_ids()`,
+`business_edge_ids()`, `business_entry_node_ids()`, and
+`business_exit_node_ids()` are available without tau2.
 
-1. implement a direct Pydantic canonical Truth/Agent graph model (the
-   semantic subset of `graph.py`, without `DB` or tau2 imports), including
-   explicit SOURCE/SINK validation and JSON round-trip;
-2. add a narrowly scoped adapter for one saved 9004 public/private pair (or a
-   hand-reduced fixture) and run the deterministic
-   `align_agent_to_truth()`/comparison semantics against it;
-3. only after that contract is stable, port the primary evaluator's score DTOs.
-
-Do **not** begin with `tools.py`, `environment.py`, `user_simulator.py`, a
-full scenario/task loader, or a compatibility layer. This order gives the new
-project its first meaningful parity signal while keeping Phase 2 small and
-leaving LLM behavior for a later phase.
+Phase 3 can use this seam to introduce a narrowly scoped adapter for seed 9004
+and then the deterministic comparison/evaluator path. It must first normalize
+the legacy split artifact into explicit canonical Truth/Agent inputs; no
+artifacts were copied in Phase 2. Do not begin with tools, environment,
+simulator, LLM calls, or a compatibility layer.
