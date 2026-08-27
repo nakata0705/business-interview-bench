@@ -274,7 +274,8 @@ Phase 3 uses exactly one case, the completed
 observations, six saved business nodes, six saved business edges, and both
 business exits. It was selected over seed 9003 because 9003 stops at
 `max_steps`, and over seed 9002 as the stronger completed first candidate.
-No seed 9002/9003 fixture or Phase 4 implementation was added.
+No seed 9002/9003 fixture was added; Phase 4 comparison work is described
+below.
 
 The curated fixture is:
 
@@ -367,13 +368,64 @@ oracle file hashes, generation method, field-level origins, omission reasons,
 and generation timestamp. It also records hashes for the three deterministic
 fixture files, while avoiding absolute paths as fixture contract data.
 
-### Phase 4 entry point
+## Phase 4 result: deterministic comparison core
 
-Phase 4 can start from `truth.json`, `agent.json`, and the primary oracle
-fields in `expected.json`; `provenance.json` pins the source and legacy inputs.
-The smallest first component is deterministic AgentGraph-to-TruthGraph
-alignment/comparison against the expected primary fields. A future evidence
-or stakeholder-knowledge replay needs a separately designed normalized input
-contract because those source inputs were intentionally not made public here.
-Evaluator/comparison/matching/scoring, stakeholder knowledge, diagnostics,
-simulator, runtime tools, and LLM integration remain unimplemented.
+The comparison package is split into five small modules:
+
+```text
+src/business_interview/comparison/
+├── __init__.py       # public API
+├── projection.py     # immutable business-only Truth view
+├── concepts.py       # lexical identity and concept assignment
+├── assignment.py     # deterministic Hungarian assignment
+├── alignment.py      # Node then business-Edge alignment
+└── scoring.py        # aligned graph/content metrics and slot rules
+```
+
+The public entry points are `business_graph_projection()`,
+`align_agent_to_truth()`, and `compare_aligned_graphs()`. The projection
+validates canonical Truth, deep-copies business nodes/edges/concepts behind
+read-only mappings, and retains boundary-derived business entry/exit IDs while
+excluding structural SOURCE/SINK elements from all comparison denominators.
+
+The implementation preserves the source identity/scoring boundary: concept
+matching is NFKC/lowercase, stop/generic-token filtered lexical matching with
+CJK bigrams, exact canonical-label priority, Dice similarity, per-kind
+thresholded one-to-one assignment; Node matching requires asserted aligned
+activity and uses actor/system/read/write/rationale reinforcement plus soft
+WL-style topology; topology mismatch never rejects an activity candidate;
+ambiguous equal optima stay unmatched; Edges are matched only after Nodes by
+mapped endpoints and one-to-one condition-aware assignment. Truth absence is
+scored only by Agent `ABSENT`, never by `UNSET` or `DONT_KNOW`, and lists use
+source recall*precision plus unsupported-reference counting.
+
+### Terminology extras audit
+
+Using seed 9004's source final Agent state and source Truth, the audit compared
+source alignment with the 21 terminology terms from stakeholder knowledge
+against alignment with `{}`. Concept, Node, and Edge mappings and every Phase 4
+metric were identical. No private knowledge was added to the target.
+
+### Seed 9004 parity
+
+`tests/test_comparison_core.py` loads only the checked-in Truth/Agent fixture;
+it never imports or accesses the sibling source checkout. It compares these 23
+fields exactly to `expected.json`: graph validity/creation, node and edge
+precision/recall, start/end precision/recall, activity/actor/system/read/write/
+rationale/condition correctness, concept correctness/recall/precision,
+unsupported/fabricated counts, and glossary completeness. The parity result is
+23 fields matched, zero differences, with no floating-point tolerance.
+
+The Phase 3 snapshot's evidence coverage/authenticity, observation/protocol
+fields, `knowledge_coverage`, reconstruction/quality facade, stakeholder
+reference evaluation, diagnostics, and runtime/simulator fields remain
+intentionally unimplemented. `expected.json` still contains the broader
+Phase 3 oracle snapshot; Phase 4 consumes only the graph/content subset.
+
+## Phase 5 boundary
+
+Phase 5 may add a minimal evaluator facade over this comparison core and define
+safe normalized inputs for any evidence/protocol behavior. It must not copy
+`evaluation.py` wholesale or silently reintroduce stakeholder knowledge,
+observation replay, runtime tools, or LLM dependencies. No Phase 5 code was
+started.

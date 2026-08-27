@@ -1,6 +1,6 @@
 # Migration notes
 
-## Phase 1–3 contract
+## Phase 1–4 contract
 
 - `tau2-bench` on the `business-interview` branch is the **migration oracle**.
 - The source repository and `migration/source.json` are read-only migration
@@ -96,13 +96,71 @@ oracle snapshot are not a transcript substitute. No credentials, API keys,
 authentication material, or provider secrets are present in the normalized
 files.
 
-### Phase 4 entry point
+## Phase 4 status: deterministic comparison core
 
-Phase 4 can begin with `truth.json`, `agent.json`, and the primary oracle
-fields in `expected.json`, using `provenance.json` to pin the source commit and
-artifact hashes. The minimum first component is deterministic
-AgentGraph-to-TruthGraph alignment/comparison against those fields. A future
-full evidence/knowledge replay would require separately designing safe
-normalized observation and stakeholder-input contracts; it is not part of
-Phase 3. No evaluator, comparison, matcher, scoring, stakeholder, simulator,
-or runtime implementation has been started here.
+Phase 4 adds only the tau2-free comparison package under
+`src/business_interview/comparison/`. Its public API is:
+
+```python
+from business_interview.comparison import (
+    align_agent_to_truth,
+    business_graph_projection,
+    compare_aligned_graphs,
+)
+```
+
+`business_graph_projection()` creates a pure business-only view of canonical
+Truth. Structural SOURCE/SINK nodes and protected boundary edges are removed
+from concepts, topology, endpoint checks, alignment, and every scoring
+denominator. The input Truth is never mutated.
+
+The core retains source deterministic semantics: NFKC/lowercase lexical
+normalization, Latin token and CJK bigram signatures, stop/generic-token
+filtering, exact canonical-label matching, Dice similarity, per-kind
+thresholded one-to-one assignment, activity-gated Node alignment with
+reinforcement attributes and soft WL-style topology, conservative ambiguous
+optima, endpoint-first one-to-one Edge alignment, and source four-state slot
+scoring. Truth absence is correct only for Agent `ABSENT`; `UNSET` and
+`DONT_KNOW` are not absence answers.
+
+### Terminology extras audit
+
+On seed 9004, the source alignment was run with the 21 saved stakeholder
+terminology terms and again with `{}`. Concept mapping, Node mapping, Edge
+mapping, and all Phase 4 comparison metrics were identical. The target
+therefore does not reintroduce private stakeholder knowledge or infer
+terminology extras.
+
+### Seed 9004 parity boundary
+
+`tests/test_comparison_core.py` loads only the checked-in `truth.json` and
+`agent.json`, runs the target comparison, and compares exact values with
+`expected.json`. The 23 parity fields are:
+
+- graph/node/edge counts and precision/recall;
+- start/end correctness;
+- activity, actor, system, read, write, rationale, and condition correctness;
+- concept correctness/recall/precision;
+- unsupported and fabricated counts; and glossary completeness.
+
+All 23 fields match the source oracle exactly. No tolerance is used.
+Correctness tests also cover lexical generic-token behavior, CJK/NFKC,
+one-to-one assignment, local-ID renaming, insertion order, symmetric Node
+ambiguity, topology mismatch, parallel Edges, epistemic states, and
+unsupported list references.
+
+The following source evaluator fields remain intentionally unported:
+evidence coverage/authenticity, observation and protocol fields,
+`knowledge_coverage`, reconstruction/quality facade behavior, stakeholder
+reference evaluation, diagnostics, and all simulator/runtime integration.
+The 41-field Phase 3 snapshot remains an oracle artifact; Phase 4 implements
+only its graph/content subset.
+
+## Phase 5 boundary
+
+Phase 5 may add the smallest evaluator facade around this comparison core and
+explicitly decide how to normalize evidence/protocol inputs. It must not
+silently add stakeholder knowledge, observation replay, or runtime/LLM
+dependencies. `evaluation.py`/`EvaluationResult`/`PrimaryEvaluationResult`
+facades, diagnostics, stakeholder models, simulator, tools, and environment
+remain outside Phase 4.
