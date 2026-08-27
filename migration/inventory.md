@@ -422,10 +422,54 @@ reference evaluation, diagnostics, and runtime/simulator fields remain
 intentionally unimplemented. `expected.json` still contains the broader
 Phase 3 oracle snapshot; Phase 4 consumes only the graph/content subset.
 
-## Phase 5 boundary
+## Phase 5 result: minimal graph evaluator facade
 
-Phase 5 may add a minimal evaluator facade over this comparison core and define
-safe normalized inputs for any evidence/protocol behavior. It must not copy
-`evaluation.py` wholesale or silently reintroduce stakeholder knowledge,
-observation replay, runtime tools, or LLM dependencies. No Phase 5 code was
-started.
+Phase 5 implements the smallest evaluator seam that needs no runtime state:
+
+```text
+src/business_interview/evaluation/
+├── __init__.py
+├── evaluator.py
+└── result.py
+```
+
+`business_interview.evaluation.evaluate_graph(agent, truth, *,
+terminology_terms=None) -> GraphEvaluation` accepts only an `AgentGraph` and a
+canonical `BusinessProcessGraph`/`TruthGraph`. It is pure and non-mutating. Its
+implementation is orchestration and result assembly over the existing
+projection, alignment, comparison, and completeness functions; it does not
+reimplement scoring, concept matching, or node/edge matching. Explicit
+`terminology_terms` are passed to the deterministic comparison matcher and do
+not introduce a `StakeholderKnowledge` dependency.
+
+`GraphEvaluation` contains exactly 26 fields: the 23 Phase 4 graph/content
+fields plus `structural_pass`, `reconstruction_pass`, and `quality_pass`.
+The source's current relationship is retained dynamically: one
+`reconstruction_complete(comparison)` predicate supplies `structural_pass`,
+and the other two pass fields alias that value. The predicate requires graph
+creation/validity, all node and edge recall/precision, start/end correctness,
+all activity/actor/system/read/write/rationale/condition scores, concept
+recall/precision/correctness, and glossary completeness. It intentionally
+does not add unsupported/fabricated counts because the source predicate does
+not test them.
+
+The 15 unavailable legacy fields are
+`protocol_completed`, `protocol_pass`, `node_evidence_coverage`,
+`ref_evidence_coverage`, `edge_evidence_coverage`,
+`invalid_evidence_ref_count`, `ambiguous_evidence_ref_count`,
+`marker_evidence_errors_surrogate`, `invalid_observation_reference_count`,
+`authentic_observation_count`, `invalid_observation_source_count`,
+`orphan_observation_count`, `provenance_authenticity_pass`, `evidence_pass`,
+and `knowledge_coverage`. They are absent rather than dummy-valued because
+they require a future explicit observation/message ledger, protocol state,
+evidence/provenance rules, and stakeholder-knowledge mapping contract.
+The legacy 41-field `PrimaryEvaluationResult` is therefore not copied.
+
+Seed 9004 facade parity is exact at 26/26 using only the checked-in normalized
+fixture files; tests do not import the source checkout. Correctness tests
+cover perfect, invalid, incomplete, wrong-slot, concept, terminology, and
+mutation cases. The source checkout, `migration/source.json`, and all Phase 3
+fixture files remain migration inputs and are not modified. Phase 6 starts
+with the separately specified observation/protocol input contract; no runtime,
+evidence, knowledge, diagnostics, stakeholder-reference, tool, DB, simulator,
+or tau2 compatibility work belongs to Phase 5.

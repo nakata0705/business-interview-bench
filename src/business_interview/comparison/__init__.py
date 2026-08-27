@@ -19,6 +19,7 @@ from .projection import BusinessGraphView, business_graph_projection
 from .scoring import (
     AlignedGraphComparison,
     compare_aligned_graphs,
+    reconstruction_complete,
     score_list_slot,
     score_scalar_slot,
 )
@@ -36,6 +37,7 @@ __all__ = [
     "business_graph_projection",
     "compare_aligned_graphs",
     "concept_similarity",
+    "reconstruction_complete",
     "dice_similarity",
     "max_weight_assignment",
     "normalize_text",

@@ -325,9 +325,41 @@ def compare_aligned_graphs(
     )
 
 
+def reconstruction_complete(metrics: AlignedGraphComparison) -> bool:
+    """Return whether all current graph reconstruction requirements pass.
+
+    This is the source comparison contract for the structural, reconstruction,
+    and quality pass lanes.  Evidence, protocol, and stakeholder knowledge are
+    intentionally outside this graph-only predicate.
+    """
+    return bool(
+        metrics.graph_created
+        and metrics.graph_valid
+        and metrics.node_recall == 1.0
+        and metrics.node_precision == 1.0
+        and metrics.edge_recall == 1.0
+        and metrics.edge_precision == 1.0
+        and metrics.start_correct
+        and metrics.end_recall == 1.0
+        and metrics.end_precision == 1.0
+        and metrics.activity_correctness == 1.0
+        and metrics.actor_correctness == 1.0
+        and metrics.system_correctness == 1.0
+        and metrics.read_correctness == 1.0
+        and metrics.write_correctness == 1.0
+        and metrics.rationale_correctness == 1.0
+        and metrics.condition_correctness == 1.0
+        and metrics.concept_recall == 1.0
+        and metrics.concept_precision == 1.0
+        and metrics.concept_correctness == 1.0
+        and metrics.glossary_complete
+    )
+
+
 __all__ = [
     "AlignedGraphComparison",
     "compare_aligned_graphs",
+    "reconstruction_complete",
     "score_list_slot",
     "score_scalar_slot",
     "slot_value",

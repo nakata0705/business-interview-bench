@@ -149,18 +149,80 @@ one-to-one assignment, local-ID renaming, insertion order, symmetric Node
 ambiguity, topology mismatch, parallel Edges, epistemic states, and
 unsupported list references.
 
-The following source evaluator fields remain intentionally unported:
-evidence coverage/authenticity, observation and protocol fields,
-`knowledge_coverage`, reconstruction/quality facade behavior, stakeholder
-reference evaluation, diagnostics, and all simulator/runtime integration.
-The 41-field Phase 3 snapshot remains an oracle artifact; Phase 4 implements
-only its graph/content subset.
+The following source evaluator fields remain intentionally unported at the
+Phase 4 boundary: evidence coverage/authenticity, observation and protocol
+fields, `knowledge_coverage`, stakeholder reference evaluation, diagnostics,
+and all simulator/runtime integration. The 41-field Phase 3 snapshot remains
+an oracle artifact; Phase 4 implements only its graph/content subset.
 
-## Phase 5 boundary
+## Phase 5 status: graph evaluation facade
 
-Phase 5 may add the smallest evaluator facade around this comparison core and
-explicitly decide how to normalize evidence/protocol inputs. It must not
-silently add stakeholder knowledge, observation replay, or runtime/LLM
-dependencies. `evaluation.py`/`EvaluationResult`/`PrimaryEvaluationResult`
-facades, diagnostics, stakeholder models, simulator, tools, and environment
-remain outside Phase 4.
+Phase 5 adds a small tau2-free evaluation package around the Phase 4 core:
+
+```text
+src/business_interview/evaluation/
+├── __init__.py
+├── evaluator.py  # orchestration and result assembly only
+└── result.py     # frozen GraphEvaluation value object
+```
+
+The public API is:
+
+```python
+from business_interview.evaluation import evaluate_graph
+
+result = evaluate_graph(
+    agent_graph,
+    canonical_truth_graph,
+    terminology_terms={"truth_concept_id": ["explicit extra term"]},
+)
+```
+
+`evaluate_graph()` is a pure function of `AgentGraph` and canonical
+`BusinessProcessGraph` (`TruthGraph`). It performs only
+`business_graph_projection()` → `align_agent_to_truth()` →
+`compare_aligned_graphs()` → reconstruction completeness → result assembly.
+The projection protects the SOURCE/SINK denominator boundary, and neither
+input graph is mutated. `terminology_terms` is an optional deterministic
+pass-through to the existing comparison matcher; no `StakeholderKnowledge`
+object is accepted.
+
+`GraphEvaluation` has exactly 26 fields: the 23 Phase 4 graph/content metrics
+plus `structural_pass`, `reconstruction_pass`, and `quality_pass`. The source
+predicate is preserved exactly: all three current pass values share
+`reconstruction_complete(comparison)`, which requires graph creation and
+validity, node/edge recall and precision, start/end correctness, every
+activity/actor/system/read/write/rationale/condition score, concept
+recall/precision/correctness, and `glossary_complete`. Unsupported and
+fabricated counts are reported but are not independently added to that
+predicate because the source predicate does not include them.
+
+The legacy `PrimaryEvaluationResult` has 41 fields. It was not copied: the
+other 15 values require inputs that a pure Agent/Truth graph function does not
+have, and no unavailable value is represented by `0`, `False`, `None`, or a
+dummy field. The intentionally unavailable fields are:
+
+- `protocol_completed`, `protocol_pass`;
+- `node_evidence_coverage`, `ref_evidence_coverage`,
+  `edge_evidence_coverage`;
+- `invalid_evidence_ref_count`, `ambiguous_evidence_ref_count`,
+  `marker_evidence_errors_surrogate`;
+- `invalid_observation_reference_count`, `authentic_observation_count`,
+  `invalid_observation_source_count`, `orphan_observation_count`;
+- `provenance_authenticity_pass`, `evidence_pass`, `knowledge_coverage`.
+
+Those fields must wait for a separately designed Phase 6 input contract: an
+explicit observation/message ledger and protocol-completion state for the
+observation/evidence/provenance lanes, plus an explicit stakeholder-knowledge
+contract for knowledge coverage. That contract is not inferred from graph
+slots and is not part of Phase 5.
+
+`tests/test_evaluation.py` compares the facade against only the checked-in
+seed 9004 `truth.json`, `agent.json`, and `expected.json`; the source checkout
+is not imported at test runtime. All 26 fields match the oracle exactly
+(26/26). Additional tests cover perfect graphs, invalid graphs, missing nodes,
+wrong slot values, incomplete concept precision/recall, input immutability,
+and deterministic terminology pass-through. Phase 6 begins at the independent
+observation/protocol input contract; no runtime interview evaluator,
+evidence validator, stakeholder reference evaluator, diagnostics, tools,
+DB, simulator, or tau2 compatibility facade is included here.
