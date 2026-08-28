@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from dataclasses import asdict
+
 from business_interview.comparison import (
     align_agent_to_truth,
     business_graph_projection,
@@ -18,7 +20,8 @@ from business_interview.models import (
     InterviewEvaluationContext,
 )
 
-from .result import GraphEvaluation, InterviewEvaluation
+from .coverage import KnowledgeCoverageView, evaluate_knowledge_coverage
+from .result import GraphEvaluation, InterviewEvaluation, PrimaryEvaluation
 
 
 def evaluate_graph(
@@ -276,4 +279,30 @@ def evaluate_interview(
     )
 
 
-__all__ = ["evaluate_graph", "evaluate_interview"]
+def evaluate_primary(
+    agent: AgentGraph,
+    truth: BusinessProcessGraph,
+    context: InterviewEvaluationContext,
+    knowledge: KnowledgeCoverageView,
+    *,
+    terminology_terms: dict[str, list[str]] | None = None,
+) -> PrimaryEvaluation:
+    """Return the complete 41-field primary result.
+
+    The first 40 fields are produced only by ``evaluate_interview``.  This
+    facade adds the independent, informational knowledge coverage value and
+    does not feed it into any graph, evidence, or protocol pass predicate.
+    """
+    interview = evaluate_interview(
+        agent,
+        truth,
+        context,
+        terminology_terms=terminology_terms,
+    )
+    return PrimaryEvaluation(
+        **asdict(interview),
+        knowledge_coverage=evaluate_knowledge_coverage(truth, knowledge),
+    )
+
+
+__all__ = ["evaluate_graph", "evaluate_interview", "evaluate_primary"]

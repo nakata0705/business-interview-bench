@@ -10,15 +10,33 @@ from business_interview.models import (
     ObservationRecord,
 )
 
-from .evaluator import evaluate_graph, evaluate_interview
-from .result import GraphEvaluation, InterviewEvaluation
+from .coverage import (
+    CoverageEdge,
+    CoverageListSlot,
+    CoverageNode,
+    CoverageScalarState,
+    KnowledgeCoverageView,
+    evaluate_knowledge_coverage,
+    knowledge_coverage,
+)
+from .evaluator import evaluate_graph, evaluate_interview, evaluate_primary
+from .result import GraphEvaluation, InterviewEvaluation, PrimaryEvaluation
 
 __all__ = [
+    "CoverageEdge",
+    "CoverageListSlot",
+    "CoverageNode",
+    "CoverageScalarState",
     "GraphEvaluation",
     "InterviewEvaluation",
     "InterviewEvaluationContext",
+    "KnowledgeCoverageView",
     "LedgerMessage",
     "ObservationRecord",
+    "PrimaryEvaluation",
     "evaluate_graph",
     "evaluate_interview",
+    "evaluate_knowledge_coverage",
+    "evaluate_primary",
+    "knowledge_coverage",
 ]

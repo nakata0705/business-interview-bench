@@ -1,0 +1,131 @@
+{
+  "edges_by_truth_id": {
+    "e1": {
+      "condition": "dont_know",
+      "truth_edge_id": "e1"
+    },
+    "e2": {
+      "condition": "dont_know",
+      "truth_edge_id": "e2"
+    },
+    "e3": {
+      "condition": "known",
+      "truth_edge_id": "e3"
+    },
+    "e4": {
+      "condition": "known",
+      "truth_edge_id": "e4"
+    },
+    "e5": {
+      "condition": "dont_know",
+      "truth_edge_id": "e5"
+    },
+    "e6": {
+      "condition": "known",
+      "truth_edge_id": "e6"
+    }
+  },
+  "nodes_by_truth_id": {
+    "ap": {
+      "activity": "known",
+      "actor": "known",
+      "rationale": "known",
+      "reads": {
+        "state": "dont_know",
+        "truth_concept_ids": []
+      },
+      "system": "dont_know",
+      "truth_node_id": "ap",
+      "writes": {
+        "state": "dont_know",
+        "truth_concept_ids": []
+      }
+    },
+    "cc": {
+      "activity": "known",
+      "actor": "known",
+      "rationale": "dont_know",
+      "reads": {
+        "state": "known_values",
+        "truth_concept_ids": [
+          "tc_customer"
+        ]
+      },
+      "system": "known",
+      "truth_node_id": "cc",
+      "writes": {
+        "state": "dont_know",
+        "truth_concept_ids": []
+      }
+    },
+    "cq": {
+      "activity": "known",
+      "actor": "known",
+      "rationale": "dont_know",
+      "reads": {
+        "state": "known_values",
+        "truth_concept_ids": [
+          "tc_customer",
+          "tc_pricing"
+        ]
+      },
+      "system": "known",
+      "truth_node_id": "cq",
+      "writes": {
+        "state": "known_values",
+        "truth_concept_ids": [
+          "tc_quote"
+        ]
+      }
+    },
+    "me": {
+      "activity": "known",
+      "actor": "known",
+      "rationale": "dont_know",
+      "reads": {
+        "state": "dont_know",
+        "truth_concept_ids": []
+      },
+      "system": "known",
+      "truth_node_id": "me",
+      "writes": {
+        "state": "known_values",
+        "truth_concept_ids": [
+          "tc_excel_summary"
+        ]
+      }
+    },
+    "r": {
+      "activity": "known",
+      "actor": "known",
+      "rationale": "dont_know",
+      "reads": {
+        "state": "dont_know",
+        "truth_concept_ids": []
+      },
+      "system": "dont_know",
+      "truth_node_id": "r",
+      "writes": {
+        "state": "known_values",
+        "truth_concept_ids": [
+          "tc_request"
+        ]
+      }
+    },
+    "sq": {
+      "activity": "known",
+      "actor": "known",
+      "rationale": "dont_know",
+      "reads": {
+        "state": "dont_know",
+        "truth_concept_ids": []
+      },
+      "system": "known",
+      "truth_node_id": "sq",
+      "writes": {
+        "state": "dont_know",
+        "truth_concept_ids": []
+      }
+    }
+  }
+}

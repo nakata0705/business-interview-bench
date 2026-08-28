@@ -311,8 +311,80 @@ Focused tests cover valid spans, unknown IDs, invalid quotes and occurrences,
 role/text/missing-turn provenance failures, orphan observations, marker and
 edge coverage, condition-evidence orphan tracking, false protocol completion,
 independence of graph reconstruction from evidence, and input immutability.
-No StakeholderKnowledge, knowledge coverage, terminology extraction from
-private knowledge, stakeholder reference evaluator, diagnostics, tools, DB,
-simulator, LLM, Inspect AI, seed 9002/9003, or legacy compatibility result is
-implemented. Phase 7 starts only with a separate explicit stakeholder-knowledge
-input contract; it is not started by this phase.
+No StakeholderKnowledge, terminology extraction from private knowledge,
+stakeholder reference evaluator, diagnostics, tools, DB, simulator, LLM,
+Inspect AI, seed 9002/9003, or legacy compatibility result is implemented in
+Phase 6. Phase 7 is described below.
+
+## Phase 7 result: minimal knowledge coverage and complete primary parity
+
+Phase 7 ports only the input surface actually read by source
+`comparison.py::knowledge_coverage()`. `KnowledgeCoverageView` is a
+Truth-addressed, read-only evaluator view with:
+
+```text
+KnowledgeCoverageView
+  nodes_by_truth_id: dict[str, CoverageNode]
+  edges_by_truth_id: dict[str, CoverageEdge]
+
+CoverageNode
+  truth_node_id, activity, actor, system, reads, writes, rationale
+
+CoverageEdge
+  truth_edge_id, condition
+```
+
+Scalar slots are only `known` or `dont_know`, because source coverage does not
+inspect scalar concept identity. List slots use `CoverageListSlot` with
+`known_absent`, `dont_know`, or `known_values` containing Truth concept IDs.
+Missing node/edge entries mean unknown existence. This is intentionally not a
+copy of `StakeholderKnowledge`: there are no `skn_*`/`ske_*`/`skc_*` IDs,
+local-to-Truth mapping tables, descriptions, terminology, annotations,
+forgetting configuration, or shortcut provenance in the runtime contract.
+The Truth-addressed form is selected because coverage needs mapping results,
+not the stakeholder projection machinery that produced them.
+
+`evaluate_knowledge_coverage(truth, knowledge)` is an independent pure
+function. It iterates only `business_node_ids(truth)` and
+`business_edge_ids(truth)`, so SOURCE/SINK and boundary elements never enter
+the denominator. For every Truth node it counts node existence, six property
+slots, and one address for every expected reads/writes element. A missing node
+still contributes those reads/writes element addresses. A known-absent list
+(source `None`) counts the slot and every expected element as known; a
+known-values list counts only mapped Truth concept IDs; `dont_know` counts
+neither the slot nor its elements. Every present node scalar except
+`dont_know` is known. For every Truth edge it counts existence and condition
+separately; a present edge with a known condition counts both, while a
+`dont_know` condition counts only existence. Condition identity is not used.
+Extra knowledge entries are ignored by Truth iteration.
+
+The `terminology_terms` input remains separate and explicit. It is passed only
+to the deterministic Agent/Truth comparison matcher through
+`evaluate_interview()`; `KnowledgeCoverageView` contains no terms or private
+knowledge description. The seed 9004 terminology audit remains unchanged.
+
+`evaluate_primary(agent, truth, context, knowledge)` reuses the complete
+`evaluate_interview()` 40-field result and adds only the computed
+`knowledge_coverage` field. `PrimaryEvaluation` therefore has exactly 41
+fields. Coverage is informational and does not affect structural,
+reconstruction, quality, evidence, or protocol passes.
+
+`migration/scripts/build_seed9004_knowledge_coverage.py` loads the persisted
+source private knowledge object only during generation, resolves its local
+node/edge/concept references to Truth IDs, filters to business Truth
+addresses, and writes only the normalized coverage states. The checked-in
+`knowledge_coverage.json` contains no private sidecar content and regenerates
+byte-identically.
+
+`tests/test_knowledge_coverage.py` covers node/edge existence, scalar and list
+states, source's missing-node list denominator, known-absent special case,
+condition knownness, structural exclusion, extra entries, input immutability,
+and isolation of all other 40 fields. Using only the five checked-in inputs
+`truth.json`, `agent.json`, `evaluation_context.json`,
+`knowledge_coverage.json`, and `expected.json`, seed 9004 achieves exact
+primary parity 41/41 (including `knowledge_coverage =
+0.7166666666666667`); graph and interview parity remain 26/26 and 40/40.
+
+Primary migration is complete at Phase 7. Phase 8 is the next boundary for
+runtime/integration work and any broader stakeholder-knowledge or compatibility
+surface; it is not started here.

@@ -95,4 +95,11 @@ class InterviewEvaluation:
     quality_pass: bool
 
 
-__all__ = ["GraphEvaluation", "InterviewEvaluation"]
+@dataclass(frozen=True, slots=True)
+class PrimaryEvaluation(InterviewEvaluation):
+    """The complete 41-field primary result, including knowledge coverage."""
+
+    knowledge_coverage: float
+
+
+__all__ = ["GraphEvaluation", "InterviewEvaluation", "PrimaryEvaluation"]

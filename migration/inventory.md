@@ -513,4 +513,37 @@ transcript. Phase 6 parity is exact 40/40 using only `truth.json`,
 `agent.json`, `evaluation_context.json`, and `expected.json`; Phase 5 graph
 parity remains 26/26. Focused tests cover span, provenance, marker, edge and
 condition evidence, orphan, protocol, graph-pass isolation, and immutability.
-Phase 7 is not started.
+Phase 7 is described below.
+
+## Phase 7 result: coverage-only knowledge view and 41-field parity
+
+Phase 7 adds `KnowledgeCoverageView` rather than the full
+`StakeholderKnowledge` model. Its Truth-addressed maps contain only
+`CoverageNode` (`truth_node_id`, scalar known/DONT_KNOW slots, and list
+known-absent/DONT_KNOW/known-Truth-concept values) and `CoverageEdge`
+(`truth_edge_id`, condition known/DONT_KNOW). Missing entries mean unknown
+node/edge existence. Stakeholder-local IDs, mapping tables, descriptions,
+terms, forgetting, shortcut provenance, and simulator-facing state remain
+outside the contract.
+
+`evaluate_knowledge_coverage()` follows source arithmetic exactly: Truth
+business node/edge iteration only; node existence plus six slots plus expected
+reads/writes elements; missing nodes still add list-element denominator
+addresses; known-absent lists count all expected elements; known-values lists
+use Truth concept IDs; DONT_KNOW counts nothing. Edge existence and condition
+are separate addresses, and a known condition counts only when the edge exists.
+Structural boundaries and extra knowledge entries do not affect the score.
+
+`evaluate_primary()` reuses `evaluate_interview()` without recalculating its 40
+fields and adds only informational `knowledge_coverage`. The explicit
+`terminology_terms` path remains separate from the coverage view. The source
+private knowledge artifact is read only by
+`migration/scripts/build_seed9004_knowledge_coverage.py` during deterministic
+fixture generation; the normalized fixture has no private metadata and
+regenerates byte-identically.
+
+Seed 9004 now has exact 41/41 primary parity, including
+`knowledge_coverage=0.7166666666666667`, while 26/26 graph and 40/40 interview
+parity remain green. Phase 7 completes primary evaluator migration. Phase 8
+starts at broader runtime/integration and any intentionally deferred
+compatibility or full stakeholder-knowledge responsibilities.
