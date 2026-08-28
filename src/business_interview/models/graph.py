@@ -1,15 +1,15 @@
-"""Pure Truth and Agent graph models.
+"""Pure Truth, Agent, and explicit evaluation-context models.
 
-This module intentionally contains no tau2 runtime state. Conversation state,
-tools, simulation, and evaluator integration will be designed separately in
-later phases.
+This module intentionally contains no tau2 runtime state, tools, simulation,
+or database integration.  The context models at the end are data-only inputs
+for the standalone evaluator.
 """
 
 from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from .concepts import ConceptKind, ConceptRef, EvidenceRef
 from .epistemic import (
@@ -246,3 +246,44 @@ class AgentGraph(BaseModel):
     @property
     def is_valid(self) -> bool:
         return not self.structure_errors()
+
+
+class ObservationRecord(BaseModel):
+    """The evaluator-required portion of one accepted stakeholder observation.
+
+    ``text`` is the raw stakeholder utterance stored by the environment.  The
+    Agent-visible ``[Observation ...]`` decoration is intentionally not part of
+    this contract.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    id: str
+    text: str
+    turn: int
+
+
+class LedgerMessage(BaseModel):
+    """One immutable role/content entry from the raw conversation ledger."""
+
+    model_config = ConfigDict(frozen=True)
+
+    role: str
+    content: str | None = None
+
+
+class InterviewEvaluationContext(BaseModel):
+    """Minimal explicit context required by the evidence/protocol evaluator.
+
+    ``messages_by_turn`` may be sparse: only turns needed to establish
+    observation authenticity need to be present.  A missing turn is therefore
+    distinguishable from an authentic message and fails source provenance
+    validation.  The context contains no tau2 DB, runtime state, or full
+    transcript.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    observations: tuple[ObservationRecord, ...] = Field(default_factory=tuple)
+    messages_by_turn: dict[int, LedgerMessage] = Field(default_factory=dict)
+    protocol_completed: bool = False

@@ -1,0 +1,133 @@
+{
+  "messages_by_turn": {
+    "1": {
+      "content": "Sure, that's fine. What would you like to know?",
+      "role": "user"
+    },
+    "12": {
+      "content": "After that, I check the customer information in the CRM.",
+      "role": "user"
+    },
+    "14": {
+      "content": "Yes, I'm the sales employee. I check the customer information in the CRM.",
+      "role": "user"
+    },
+    "23": {
+      "content": "Next, I create the quotation in the quoting system using the customer information and the pricing information.",
+      "role": "user"
+    },
+    "3": {
+      "content": "Sure. The process starts when the sales employee receives the customer's quotation request. That's the trigger. As for the intended outcome, I don't know.",
+      "role": "user"
+    },
+    "33": {
+      "content": "After I create the quotation, if the amount is over 1,000,000 yen, the manager approves the high-value quotation; if it is at or below 1,000,000 yen, I send the quotation to the customer; and if it is month-end, I send the month-end summary to Accounting.",
+      "role": "user"
+    },
+    "51": {
+      "content": "I don't know whether the month-end summary is sent in addition to the amount-based path or instead of it. What I do know is that after I create the quotation, if the amount is over 1,000,000 yen the manager approves it, if it's at or below 1,000,000 yen I send the quotation to the customer, and if it's month-end I send the month-end summary to Accounting.",
+      "role": "user"
+    },
+    "53": {
+      "content": "After that, I send the quotation to the customer by email.",
+      "role": "user"
+    },
+    "60": {
+      "content": "Yes, after the manager approves the high-value quotation, I send the quotation to the customer by email. And yes, it's the same step as the low-value path — whether the amount is over 1,000,000 yen and the manager approves, or it's at or below 1,000,000 yen, the send step is the same. After that, I don't know of anything else happening.",
+      "role": "user"
+    },
+    "62": {
+      "content": "The manager's approval is needed for high-value quotations for credit risk management.",
+      "role": "user"
+    },
+    "67": {
+      "content": "I don't know why creating the quotation is necessary.",
+      "role": "user"
+    },
+    "71": {
+      "content": "I don't know why checking the customer information is necessary.",
+      "role": "user"
+    },
+    "77": {
+      "content": "I don't know why sending the quotation to the customer is necessary.",
+      "role": "user"
+    },
+    "81": {
+      "content": "I don't know why sending the month-end summary to Accounting is necessary.",
+      "role": "user"
+    }
+  },
+  "observations": [
+    {
+      "id": "obs_1",
+      "text": "Sure, that's fine. What would you like to know?",
+      "turn": 1
+    },
+    {
+      "id": "obs_3",
+      "text": "Sure. The process starts when the sales employee receives the customer's quotation request. That's the trigger. As for the intended outcome, I don't know.",
+      "turn": 3
+    },
+    {
+      "id": "obs_12",
+      "text": "After that, I check the customer information in the CRM.",
+      "turn": 12
+    },
+    {
+      "id": "obs_14",
+      "text": "Yes, I'm the sales employee. I check the customer information in the CRM.",
+      "turn": 14
+    },
+    {
+      "id": "obs_23",
+      "text": "Next, I create the quotation in the quoting system using the customer information and the pricing information.",
+      "turn": 23
+    },
+    {
+      "id": "obs_33",
+      "text": "After I create the quotation, if the amount is over 1,000,000 yen, the manager approves the high-value quotation; if it is at or below 1,000,000 yen, I send the quotation to the customer; and if it is month-end, I send the month-end summary to Accounting.",
+      "turn": 33
+    },
+    {
+      "id": "obs_51",
+      "text": "I don't know whether the month-end summary is sent in addition to the amount-based path or instead of it. What I do know is that after I create the quotation, if the amount is over 1,000,000 yen the manager approves it, if it's at or below 1,000,000 yen I send the quotation to the customer, and if it's month-end I send the month-end summary to Accounting.",
+      "turn": 51
+    },
+    {
+      "id": "obs_53",
+      "text": "After that, I send the quotation to the customer by email.",
+      "turn": 53
+    },
+    {
+      "id": "obs_60",
+      "text": "Yes, after the manager approves the high-value quotation, I send the quotation to the customer by email. And yes, it's the same step as the low-value path — whether the amount is over 1,000,000 yen and the manager approves, or it's at or below 1,000,000 yen, the send step is the same. After that, I don't know of anything else happening.",
+      "turn": 60
+    },
+    {
+      "id": "obs_62",
+      "text": "The manager's approval is needed for high-value quotations for credit risk management.",
+      "turn": 62
+    },
+    {
+      "id": "obs_67",
+      "text": "I don't know why creating the quotation is necessary.",
+      "turn": 67
+    },
+    {
+      "id": "obs_71",
+      "text": "I don't know why checking the customer information is necessary.",
+      "turn": 71
+    },
+    {
+      "id": "obs_77",
+      "text": "I don't know why sending the quotation to the customer is necessary.",
+      "turn": 77
+    },
+    {
+      "id": "obs_81",
+      "text": "I don't know why sending the month-end summary to Accounting is necessary.",
+      "turn": 81
+    }
+  ],
+  "protocol_completed": true
+}

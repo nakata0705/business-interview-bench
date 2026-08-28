@@ -473,3 +473,44 @@ fixture files remain migration inputs and are not modified. Phase 6 starts
 with the separately specified observation/protocol input contract; no runtime,
 evidence, knowledge, diagnostics, stakeholder-reference, tool, DB, simulator,
 or tau2 compatibility work belongs to Phase 5.
+
+## Phase 6 result: explicit context and 40-field interview evaluation
+
+Phase 6 adds `ObservationRecord(id, text, turn)`, frozen `LedgerMessage(role,
+content)`, and frozen `InterviewEvaluationContext(observations,
+messages_by_turn, protocol_completed)` to the standalone model API. The
+context is intentionally sparse and stores raw stakeholder text only; it does
+not port `InterviewDB`, source-only observation metadata, the complete
+conversation, or Agent-visible `[Observation obs_N]` markers.
+
+`evaluate_graph()` remains the independent 26-field graph-only API.
+`evaluate_interview(agent, truth, context, *, terminology_terms=None)` calls
+that facade and assembles `InterviewEvaluation`, whose 40 fields are exactly
+the legacy `PrimaryEvaluationResult` boundary excluding `knowledge_coverage`.
+Graph pass fields remain the Phase 5 reconstruction predicate and are not
+mixed with evidence or protocol pass values. `knowledge_coverage` is not
+represented by a placeholder; it is the sole remaining primary field and the
+Phase 7 boundary.
+
+Evidence validation preserves source occurrence and counting behavior:
+missing observation IDs are invalid references, quote spans must resolve, and
+repeated references are counted at every validation visit. Node coverage uses
+asserted-reference valid evidence or valid absence/unknown marker evidence;
+reference coverage requires all evidence on an asserted reference; edge
+coverage uses only edge-level evidence. Orphan tracking includes node refs,
+node markers, edge refs, and value-bearing condition refs, exactly as the
+source helper does. Source-defined `ambiguous_evidence_ref_count=0` and
+`marker_evidence_errors_surrogate=0` are reproduced as documented constants.
+Authenticity requires a user-role ledger message at the observation turn with
+exact raw content equality. Protocol pass is exactly
+`context.protocol_completed`, while graph reconstruction remains independent.
+
+`migration/scripts/build_seed9004_evaluation_context.py` mechanically extracts
+the 14 observations, their 14 required ledger messages, and
+`interview_complete` from the persisted seed 9004 public artifact. The
+checked-in `evaluation_context.json` is stable and contains no raw full
+transcript. Phase 6 parity is exact 40/40 using only `truth.json`,
+`agent.json`, `evaluation_context.json`, and `expected.json`; Phase 5 graph
+parity remains 26/26. Focused tests cover span, provenance, marker, edge and
+condition evidence, orphan, protocol, graph-pass isolation, and immutability.
+Phase 7 is not started.

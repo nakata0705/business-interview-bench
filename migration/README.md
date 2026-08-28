@@ -222,7 +222,97 @@ seed 9004 `truth.json`, `agent.json`, and `expected.json`; the source checkout
 is not imported at test runtime. All 26 fields match the oracle exactly
 (26/26). Additional tests cover perfect graphs, invalid graphs, missing nodes,
 wrong slot values, incomplete concept precision/recall, input immutability,
-and deterministic terminology pass-through. Phase 6 begins at the independent
-observation/protocol input contract; no runtime interview evaluator,
-evidence validator, stakeholder reference evaluator, diagnostics, tools,
-DB, simulator, or tau2 compatibility facade is included here.
+and deterministic terminology pass-through.
+
+## Phase 6 result: explicit observation/provenance/protocol contract
+
+Phase 6 adds a deliberately small tau2-free context model:
+
+```text
+ObservationRecord       id, raw text, source message turn
+LedgerMessage           role, raw content
+InterviewEvaluationContext
+                        observations, sparse messages_by_turn, protocol_completed
+```
+
+`ObservationRecord` and `LedgerMessage` are frozen value models. The context
+contains only evaluator-required raw stakeholder text and the corresponding
+role/content ledger entries; it does not contain `source_id`, observation
+order/locale, a tau2 `InterviewDB`, runtime state, or the Agent-visible
+`[Observation obs_N]` marker. `messages_by_turn` may be sparse because source
+authenticity only indexes the message at each observation's `turn`. A full raw
+transcript is not persisted: the evaluator needs only those observation texts
+and turn-indexed messages, while copying the rest would expand the public
+artifact surface without adding evaluator semantics.
+
+The new public API is:
+
+```python
+from business_interview.evaluation import evaluate_interview
+
+result = evaluate_interview(agent, truth, context, terminology_terms=None)
+```
+
+`evaluate_graph(agent, truth)` remains the graph-only 26-field API. The new
+`InterviewEvaluation` is assembled from that result and adds the source
+observation/evidence/protocol lanes; it has exactly 40 fields and deliberately
+has no `knowledge_coverage`. Thus the Phase 6 boundary is 40/40 of the legacy
+41-field `PrimaryEvaluationResult`; `knowledge_coverage` is the sole remaining
+primary field and is reserved for Phase 7.
+
+### Evidence and provenance semantics
+
+The evaluator preserves the source evaluator's current rules rather than
+turning evidence into a graph-validity gate. A missing observation ID is an
+invalid evidence reference and a quoted reference is valid only when
+`EvidenceRef.resolve_span()` finds the requested occurrence. Every validation
+visit counts: identical EvidenceRefs are not deduplicated. Node coverage is a
+node hit when an asserted ConceptRef has any valid evidence or an
+`ABSENT`/`DONT_KNOW` marker has valid evidence. Asserted-reference coverage
+requires non-empty evidence with every evidence item valid. Edge coverage uses
+only `AgentEdge.evidence`; condition evidence is not added to that denominator.
+
+Orphan tracking follows `_referenced_observations()`'s source surface: node
+reference evidence, node absence/unknown marker evidence, edge evidence, and
+value-bearing edge-condition evidence are included. Condition marker evidence
+is not added because it is not included by the source function. The source
+result currently defines `ambiguous_evidence_ref_count` and
+`marker_evidence_errors_surrogate` as literal zero fields; they are reproduced
+as source-contract constants, not unknown/dummy values. `evidence_pass` is
+provenance authenticity plus all three coverage values equal to 1.0.
+
+For each observation, provenance requires a ledger entry at its turn with
+`role == "user"` and exact equality between raw ledger content and raw
+observation text. This yields authentic/invalid-source counts and the source
+orphan count. `protocol_completed` is copied from the context and
+`protocol_pass` is exactly the same boolean. `structural_pass`,
+`reconstruction_pass`, and `quality_pass` remain the Phase 5 graph predicate;
+evidence/protocol failures never alter graph reconstruction.
+
+### Seed 9004 context normalization and parity
+
+`migration/scripts/build_seed9004_evaluation_context.py` mechanically extracts
+only `observations`, `db_messages_ledger[observation.turn]`, and
+`interview_complete` from the persisted seed 9004 public artifact. It checks
+the source branch/HEAD/clean state against `migration/source.json`, writes
+stable JSON, and changes neither the source checkout nor the four Phase 3
+fixture files. The script does not reinterpret transcript language and never
+copies the raw public/private artifact. The checked-in context has 14
+observations and 14 sparse authenticity messages; its text is raw stakeholder
+text with no markers.
+
+`tests/test_interview_evaluation.py` compares only
+`truth.json`, `agent.json`, `evaluation_context.json`, and `expected.json` at
+runtime. It selects the 40 non-knowledge fields from the existing source oracle
+and requires exact 40/40 equality; the existing graph-only test continues to
+require exact 26/26. The source checkout is not needed for pytest.
+
+Focused tests cover valid spans, unknown IDs, invalid quotes and occurrences,
+role/text/missing-turn provenance failures, orphan observations, marker and
+edge coverage, condition-evidence orphan tracking, false protocol completion,
+independence of graph reconstruction from evidence, and input immutability.
+No StakeholderKnowledge, knowledge coverage, terminology extraction from
+private knowledge, stakeholder reference evaluator, diagnostics, tools, DB,
+simulator, LLM, Inspect AI, seed 9002/9003, or legacy compatibility result is
+implemented. Phase 7 starts only with a separate explicit stakeholder-knowledge
+input contract; it is not started by this phase.

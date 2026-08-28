@@ -4,7 +4,21 @@
 # modules; project-level ``uv run pyright`` remains the authoritative check.
 # pyright: reportMissingImports=false
 
-from .evaluator import evaluate_graph
-from .result import GraphEvaluation
+from business_interview.models import (
+    InterviewEvaluationContext,
+    LedgerMessage,
+    ObservationRecord,
+)
 
-__all__ = ["GraphEvaluation", "evaluate_graph"]
+from .evaluator import evaluate_graph, evaluate_interview
+from .result import GraphEvaluation, InterviewEvaluation
+
+__all__ = [
+    "GraphEvaluation",
+    "InterviewEvaluation",
+    "InterviewEvaluationContext",
+    "LedgerMessage",
+    "ObservationRecord",
+    "evaluate_graph",
+    "evaluate_interview",
+]
