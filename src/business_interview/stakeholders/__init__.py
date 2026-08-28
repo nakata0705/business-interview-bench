@@ -1,0 +1,81 @@
+"""Public tau2-free stakeholder configuration and private world-model API."""
+
+# The workspace-level auxiliary Pyright runner can miss freshly added sibling
+# modules; project-level ``uv run pyright`` remains the authoritative check.
+# pyright: reportMissingImports=false
+
+from .addressing import (
+    AddressKind,
+    InvalidSemanticAddressError,
+    NodeAddressProperty,
+    ParsedSemanticAddress,
+    ResolvedSemanticAddress,
+    SemanticAddressError,
+    UnknownSemanticAddressError,
+    parse_semantic_address,
+    resolve_semantic_address,
+    try_resolve_semantic_address,
+)
+from .config import (
+    ConceptKnowledgeOverride,
+    EdgeProperty,
+    ForgettingConfig,
+    NodeProperty,
+    StakeholderFilter,
+    StakeholderForgettingConfig,
+    StakeholderProfile,
+)
+from .knowledge import (
+    DONT_KNOW,
+    KnowledgeConceptRef,
+    KnowledgeDontKnowType,
+    KnowledgeEdgeKind,
+    KnowledgeListSlot,
+    KnowledgeSlot,
+    ShortcutProvenance,
+    StakeholderEdge,
+    StakeholderKnowledge,
+    StakeholderKnowledgeConcept,
+    StakeholderKnowledgeGraph,
+    StakeholderNode,
+    is_dont_know,
+    is_known_absent,
+    validate_stakeholder_knowledge,
+    validate_stakeholder_knowledge_graph,
+)
+
+__all__ = [
+    "AddressKind",
+    "ConceptKnowledgeOverride",
+    "DONT_KNOW",
+    "EdgeProperty",
+    "ForgettingConfig",
+    "InvalidSemanticAddressError",
+    "KnowledgeConceptRef",
+    "KnowledgeDontKnowType",
+    "KnowledgeEdgeKind",
+    "KnowledgeListSlot",
+    "KnowledgeSlot",
+    "NodeAddressProperty",
+    "NodeProperty",
+    "ParsedSemanticAddress",
+    "ResolvedSemanticAddress",
+    "SemanticAddressError",
+    "ShortcutProvenance",
+    "StakeholderEdge",
+    "StakeholderFilter",
+    "StakeholderForgettingConfig",
+    "StakeholderKnowledge",
+    "StakeholderKnowledgeConcept",
+    "StakeholderKnowledgeGraph",
+    "StakeholderNode",
+    "StakeholderProfile",
+    "UnknownSemanticAddressError",
+    "is_dont_know",
+    "is_known_absent",
+    "parse_semantic_address",
+    "resolve_semantic_address",
+    "try_resolve_semantic_address",
+    "validate_stakeholder_knowledge",
+    "validate_stakeholder_knowledge_graph",
+]

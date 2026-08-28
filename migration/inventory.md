@@ -589,7 +589,47 @@ separate.
 No `StakeholderFilter`, `StakeholderKnowledge`, `StakeholderKnowledgeGraph`,
 Phase 7 `KnowledgeCoverageView` runtime state, local knowledge IDs, private
 annotations, simulator, LLM, Agent runtime, Environment, InterviewDB, tools,
-diagnostics, Inspect AI, or seed 9002/9003 expansion is included. Phase 9 is
-the next minimal boundary: define the stakeholder-simulator input that
-combines public `ScenarioDefinition` with separately constructed private
-knowledge and message/observation runtime state.
+diagnostics, Inspect AI, or seed 9002/9003 expansion is included in Phase 8.
+Phase 9 is described below.
+
+## Phase 9 result: stakeholder profile and private world model
+
+Phase 9 adds the standalone `business_interview.stakeholders` domain core.
+`StakeholderProfile` (with `StakeholderFilter` as a descriptive alias) carries
+stable `stakeholder_id`/`name`/`role`, visible business node and edge IDs,
+per-node property visibility (`activity`, `actor`, `system`, `reads`,
+`writes`, `rationale`), edge condition visibility, independent per-concept
+description/terminology overrides, optional local terminology, and a bounded
+`ForgettingConfig`. Probability bounds, positive `max_retries`, and the
+safe-shortcut allow/deny flag are validated, but no stochastic behavior is
+implemented.
+
+`StakeholderKnowledge` is the future simulator's private semantic world model,
+separate from Phase 7 `KnowledgeCoverageView`. Its local graph stores opaque
+stakeholder-local node, edge, and concept IDs; value references; known absence
+(`None`); explicit `DONT_KNOW`; local descriptions/terms; structural
+SOURCE/SINK nodes and protected boundary edges; private local-to-Truth maps;
+and shortcut edge/provenance metadata. The contract does not render these
+private mappings into a public prompt and does not include the Truth graph as a
+substitute for the local world model.
+
+`resolve_semantic_address()` is a pure deterministic resolver for
+`node:<local>`, node property/list-element, `edge:<local>`, edge condition, and
+bare local concept addresses. Malformed syntax raises
+`InvalidSemanticAddressError`; valid but missing objects raise
+`UnknownSemanticAddressError`; `try_resolve_semantic_address()` returns
+`None` for either case. No response plan, sidecar, annotation, or generated
+speech layer is present.
+
+All Phase 9 models are frozen Pydantic value objects with JSON round-trip
+support. Profile and knowledge collection inputs are normalized so map/list
+insertion order does not change semantics or serialized output. Focused tests
+cover all required configuration, epistemic-state, structural metadata,
+private mapping, shortcut, address, error, and ordering invariants. Existing
+Phase 1--8 tests and seed 9004 evaluator parity are unchanged.
+
+Phase 10 is the next migration boundary: project canonical Truth through a
+`StakeholderProfile` into a `StakeholderKnowledge` world model, including any
+explicit deterministic/stochastic forgetting and safe shortcut policy. LLM,
+simulator loop, Inspect AI, Agent runtime, Environment, InterviewDB, tools,
+diagnostics, and provider integration remain unimplemented.

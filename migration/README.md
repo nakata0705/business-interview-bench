@@ -477,3 +477,65 @@ separately constructed private knowledge and a message/observation runtime.
 The simulator, knowledge projection, LLM API, Agent runtime, Environment,
 InterviewDB, tools, diagnostics, and Inspect AI integration are not started by
 Phase 8.
+
+## Phase 9 result: private stakeholder runtime input contract
+
+Phase 9 adds `src/business_interview/stakeholders/` without adding a runtime
+loop. The public configuration contract is `StakeholderProfile` (also exposed
+as the source-shaped `StakeholderFilter` alias):
+
+```text
+stakeholder_id, name, role
+visible_node_ids, visible_edge_ids
+visible_node_attributes: activity/actor/system/reads/writes/rationale
+visible_edge_attributes: condition
+concept_overrides:
+  description_known, terms_known, optional local_terms
+forgetting:
+  baseline/node/edge/property probabilities
+  max_retries, allow_shortcut_contraction
+```
+
+`ForgettingConfig` validates all probabilities in `[0, 1]` and retries as
+positive. Its effective probabilities are descriptive accessors only. Phase 9
+intentionally does not implement `project_knowledge()`, stochastic sampling,
+rejection retries, or shortcut contraction.
+
+`StakeholderKnowledge` is a separate private world model, not an evaluator
+view. It contains `StakeholderKnowledgeGraph` with stakeholder-local opaque
+node/edge/concept IDs, value references, known absence (`None`), explicit
+`DONT_KNOW`, local concept descriptions and terminology, structural SOURCE/SINK
+metadata, protected structural boundary edges, local-to-Truth mappings, and
+shortcut metadata/provenance (`is_shortcut`, `contracted_nodes`,
+`derived_from_edges`). Truth IDs and canonical terminology are private mapping
+metadata and are not included in `ScenarioDefinition.prompt` or any public
+scenario API.
+
+The local graph's pure address contract is implemented by
+`resolve_semantic_address()` and `StakeholderKnowledgeGraph.resolve()`. It
+supports node/slot/list-element addresses, edge/condition addresses, and bare
+local concept IDs. `InvalidSemanticAddressError` distinguishes malformed
+syntax from `UnknownSemanticAddressError` for valid-but-missing local objects;
+`try_resolve_semantic_address()` is the non-raising convenience form. No
+Semantic Response Plan, sidecar parser, realization, or annotation validator
+is included.
+
+All Phase 9 value models are frozen Pydantic models with JSON round trips.
+Profile maps, local graph maps, concept terms, and reads/writes references are
+normalized so construction order does not change meaning or
+`model_dump_json()` output. `StakeholderKnowledge` and
+`KnowledgeCoverageView` remain deliberately separate: the former constrains
+future stakeholder speech, while the latter is only the reduced evaluator
+coverage input introduced in Phase 7.
+
+`tests/test_stakeholders.py` covers configuration and override round trips,
+probability/retry bounds, value/absence/unknown distinctions, local reference
+resolution, invalid/unknown address rejection, structural and shortcut
+metadata, private mappings, ordering-independent serialization, and the
+absence of fixture/source runtime dependencies. Existing Phase 1--8 tests and
+seed 9004 graph/interview/primary parity remain unchanged.
+
+Phase 10 is reserved for deterministic/stochastic Truth + StakeholderProfile
+projection into `StakeholderKnowledge`. LLM realization, simulator loop,
+Inspect AI, Environment, InterviewDB, Agent runtime, tools, diagnostics, and
+provider configuration remain out of scope.
