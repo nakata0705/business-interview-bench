@@ -1,0 +1,339 @@
+{
+  "concepts": {
+    "tc_accessioned_sample": {
+      "canonical_terms": [
+        "accessioned sample"
+      ],
+      "description": "The accessioned sample.",
+      "id": "tc_accessioned_sample",
+      "kind": "data"
+    },
+    "tc_activity_accession": {
+      "canonical_terms": [
+        "specimen accession"
+      ],
+      "description": "Accession the specimen.",
+      "id": "tc_activity_accession",
+      "kind": "activity"
+    },
+    "tc_activity_batch_approval": {
+      "canonical_terms": [
+        "approve the conditioned batch"
+      ],
+      "description": "Approve the conditioned batch.",
+      "id": "tc_activity_batch_approval",
+      "kind": "activity"
+    },
+    "tc_activity_conditioning": {
+      "canonical_terms": [
+        "conditioning cycle"
+      ],
+      "description": "Run the conditioning cycle on the samples.",
+      "id": "tc_activity_conditioning",
+      "kind": "activity"
+    },
+    "tc_activity_seasoning": {
+      "canonical_terms": [
+        "chamber seasoning"
+      ],
+      "description": "Season the environment chamber to prepare it.",
+      "id": "tc_activity_seasoning",
+      "kind": "activity"
+    },
+    "tc_actor_lab_supervisor": {
+      "canonical_terms": [
+        "lab supervisor"
+      ],
+      "description": "The lab supervisor.",
+      "id": "tc_actor_lab_supervisor",
+      "kind": "actor"
+    },
+    "tc_actor_lab_tech": {
+      "canonical_terms": [
+        "lab technician"
+      ],
+      "description": "The lab technician.",
+      "id": "tc_actor_lab_tech",
+      "kind": "actor"
+    },
+    "tc_batch_approval": {
+      "canonical_terms": [
+        "batch approval"
+      ],
+      "description": "The batch approval.",
+      "id": "tc_batch_approval",
+      "kind": "data"
+    },
+    "tc_conditioned_sample": {
+      "canonical_terms": [
+        "conditioned sample"
+      ],
+      "description": "The conditioned sample.",
+      "id": "tc_conditioned_sample",
+      "kind": "data"
+    },
+    "tc_sample": {
+      "canonical_terms": [
+        "sample"
+      ],
+      "description": "The raw sample.",
+      "id": "tc_sample",
+      "kind": "data"
+    },
+    "tc_seasoned_chamber": {
+      "canonical_terms": [
+        "seasoned chamber"
+      ],
+      "description": "The seasoned chamber.",
+      "id": "tc_seasoned_chamber",
+      "kind": "data"
+    },
+    "tc_system_chamber": {
+      "canonical_terms": [
+        "environment chamber"
+      ],
+      "description": "The environment chamber.",
+      "id": "tc_system_chamber",
+      "kind": "system"
+    }
+  },
+  "edges": {
+    "__tau2_structural_boundary__sink_001": {
+      "condition": null,
+      "contracted_nodes": [],
+      "derived_from_edges": [],
+      "edge_kind": "structural_boundary",
+      "from_node": "n4",
+      "id": "__tau2_structural_boundary__sink_001",
+      "is_shortcut": false,
+      "protected": true,
+      "structural_only": true,
+      "to_node": "__tau2_structural_sink__"
+    },
+    "__tau2_structural_boundary__source_001": {
+      "condition": null,
+      "contracted_nodes": [],
+      "derived_from_edges": [],
+      "edge_kind": "structural_boundary",
+      "from_node": "__tau2_structural_source__",
+      "id": "__tau2_structural_boundary__source_001",
+      "is_shortcut": false,
+      "protected": true,
+      "structural_only": true,
+      "to_node": "n1"
+    },
+    "l1": {
+      "condition": null,
+      "contracted_nodes": [],
+      "derived_from_edges": [],
+      "edge_kind": "business",
+      "from_node": "n1",
+      "id": "l1",
+      "is_shortcut": false,
+      "protected": false,
+      "structural_only": false,
+      "to_node": "n2"
+    },
+    "l2": {
+      "condition": null,
+      "contracted_nodes": [],
+      "derived_from_edges": [],
+      "edge_kind": "business",
+      "from_node": "n2",
+      "id": "l2",
+      "is_shortcut": false,
+      "protected": false,
+      "structural_only": false,
+      "to_node": "n3"
+    },
+    "l3": {
+      "condition": null,
+      "contracted_nodes": [],
+      "derived_from_edges": [],
+      "edge_kind": "business",
+      "from_node": "n3",
+      "id": "l3",
+      "is_shortcut": false,
+      "protected": false,
+      "structural_only": false,
+      "to_node": "n4"
+    }
+  },
+  "id": "lab",
+  "name": "Lab sample conditioning",
+  "nodes": {
+    "__tau2_structural_sink__": {
+      "activity": null,
+      "actor": null,
+      "id": "__tau2_structural_sink__",
+      "necessity_rationale": null,
+      "protected": true,
+      "reads": null,
+      "structural": true,
+      "structural_role": "sink",
+      "system": null,
+      "writes": null
+    },
+    "__tau2_structural_source__": {
+      "activity": null,
+      "actor": null,
+      "id": "__tau2_structural_source__",
+      "necessity_rationale": null,
+      "protected": true,
+      "reads": null,
+      "structural": true,
+      "structural_role": "source",
+      "system": null,
+      "writes": null
+    },
+    "n1": {
+      "activity": {
+        "concept_id": "tc_activity_accession",
+        "confidence": 1.0,
+        "evidence": [],
+        "state": "value"
+      },
+      "actor": {
+        "concept_id": "tc_actor_lab_tech",
+        "confidence": 1.0,
+        "evidence": [],
+        "state": "value"
+      },
+      "id": "n1",
+      "necessity_rationale": null,
+      "protected": false,
+      "reads": [
+        {
+          "concept_id": "tc_sample",
+          "confidence": 1.0,
+          "evidence": [],
+          "state": "value"
+        }
+      ],
+      "structural": false,
+      "structural_role": null,
+      "system": null,
+      "writes": [
+        {
+          "concept_id": "tc_accessioned_sample",
+          "confidence": 1.0,
+          "evidence": [],
+          "state": "value"
+        }
+      ]
+    },
+    "n2": {
+      "activity": {
+        "concept_id": "tc_activity_seasoning",
+        "confidence": 1.0,
+        "evidence": [],
+        "state": "value"
+      },
+      "actor": {
+        "concept_id": "tc_actor_lab_tech",
+        "confidence": 1.0,
+        "evidence": [],
+        "state": "value"
+      },
+      "id": "n2",
+      "necessity_rationale": null,
+      "protected": false,
+      "reads": null,
+      "structural": false,
+      "structural_role": null,
+      "system": {
+        "concept_id": "tc_system_chamber",
+        "confidence": 1.0,
+        "evidence": [],
+        "state": "value"
+      },
+      "writes": [
+        {
+          "concept_id": "tc_seasoned_chamber",
+          "confidence": 1.0,
+          "evidence": [],
+          "state": "value"
+        }
+      ]
+    },
+    "n3": {
+      "activity": {
+        "concept_id": "tc_activity_conditioning",
+        "confidence": 1.0,
+        "evidence": [],
+        "state": "value"
+      },
+      "actor": {
+        "concept_id": "tc_actor_lab_tech",
+        "confidence": 1.0,
+        "evidence": [],
+        "state": "value"
+      },
+      "id": "n3",
+      "necessity_rationale": null,
+      "protected": false,
+      "reads": [
+        {
+          "concept_id": "tc_accessioned_sample",
+          "confidence": 1.0,
+          "evidence": [],
+          "state": "value"
+        }
+      ],
+      "structural": false,
+      "structural_role": null,
+      "system": {
+        "concept_id": "tc_system_chamber",
+        "confidence": 1.0,
+        "evidence": [],
+        "state": "value"
+      },
+      "writes": [
+        {
+          "concept_id": "tc_conditioned_sample",
+          "confidence": 1.0,
+          "evidence": [],
+          "state": "value"
+        }
+      ]
+    },
+    "n4": {
+      "activity": {
+        "concept_id": "tc_activity_batch_approval",
+        "confidence": 1.0,
+        "evidence": [],
+        "state": "value"
+      },
+      "actor": {
+        "concept_id": "tc_actor_lab_supervisor",
+        "confidence": 1.0,
+        "evidence": [],
+        "state": "value"
+      },
+      "id": "n4",
+      "necessity_rationale": null,
+      "protected": false,
+      "reads": [
+        {
+          "concept_id": "tc_conditioned_sample",
+          "confidence": 1.0,
+          "evidence": [],
+          "state": "value"
+        }
+      ],
+      "structural": false,
+      "structural_role": null,
+      "system": null,
+      "writes": [
+        {
+          "concept_id": "tc_batch_approval",
+          "confidence": 1.0,
+          "evidence": [],
+          "state": "value"
+        }
+      ]
+    }
+  },
+  "sink_node_id": "__tau2_structural_sink__",
+  "source_node_id": "__tau2_structural_source__"
+}

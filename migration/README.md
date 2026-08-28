@@ -385,6 +385,95 @@ and isolation of all other 40 fields. Using only the five checked-in inputs
 primary parity 41/41 (including `knowledge_coverage =
 0.7166666666666667`); graph and interview parity remain 26/26 and 40/40.
 
-Primary migration is complete at Phase 7. Phase 8 is the next boundary for
-runtime/integration work and any broader stakeholder-knowledge or compatibility
-surface; it is not started here.
+Primary evaluator migration is complete at Phase 7. Phase 8 is described
+below.
+
+## Phase 8 result: standalone scenario/task catalog
+
+Phase 8 establishes the runtime input contract for selecting an interview
+without importing tau2. The public models are:
+
+```text
+ScenarioDefinition
+  id, canonical_scenario_id, locale, truth, prompt, initial_messages
+
+StakeholderPrompt
+  persona, reason_for_call, task_instructions
+
+InitialMessage
+  role, content
+```
+
+`ScenarioDefinition` intentionally stops at scenario identity, locale,
+canonical Truth, public stakeholder/task prompt metadata, and ordered initial
+conversation messages. It is not stakeholder simulator state. In particular,
+it does not contain `StakeholderFilter`, `StakeholderKnowledge`, a
+`StakeholderKnowledgeGraph`, local knowledge IDs, mapping tables, private
+annotations, forgetting/masking, or LLM/runtime state. Phase 7's
+`KnowledgeCoverageView` is evaluator-only and is not used as scenario runtime
+knowledge.
+
+The explicit catalog contains exactly these IDs, in deterministic order:
+
+```text
+quotation_workflow_1
+quotation_workflow_1_ja
+lab_sample_flow
+```
+
+`get_scenario(id)` accepts only those concrete IDs and raises
+`UnknownScenarioError` for anything else; it does not infer or transform a
+locale from a suffix. `list_scenarios()` and `get_scenario()` create fresh
+nested definitions, so callers do not receive a mutable shared singleton.
+
+Truth resources and task metadata are separate package data under
+`src/business_interview/scenarios/data/`. The quotation English and Japanese
+records point to the same canonical quotation Truth while carrying different
+`locale`, public prompt text, and initial message history. The canonical Truth
+is not translated for Japanese: Japanese vocabulary remains a future
+stakeholder-realization concern. `lab_sample_flow` is included to demonstrate
+that the catalog contract is not a quotation-specific special case; its lab
+Truth and prompt have no quotation data.
+
+The catalog's Truth resources validate with the standalone
+`validate_canonical_graph()` contract. Quotation retains the source's six
+business nodes (`r`, `cc`, `cq`, `ap`, `sq`, `me`), six business edges
+(`e1`--`e6`), explicit protected SOURCE/SINK boundaries, entry `r`, exits
+`sq`/`me`, and 22 non-rationale Truth concepts plus the source rationale
+concept. (The graph model therefore has 23 `TruthConcept` records in total.)
+Its catalog Truth is semantically
+equal to the Phase 3 `truth.json`; lab Truth is migrated independently from
+source `lab_sample_flow`.
+
+Only `persona`, `reason_for_call`, `task_instructions`, and ordered role/content
+initial messages are extracted from `tasks.json`. Tau2 task wrappers and
+non-runtime fields (`description.notes`, `evaluation_criteria.env_assertions`,
+`reward_basis`, `env_type`, `func_name`, `known_info`, and `unknown_info`) are
+not copied. Prompt text is data, not a second Truth source; Truth remains the
+canonical business-fact source.
+
+The public API is:
+
+```python
+from business_interview.scenarios import get_scenario
+
+scenario = get_scenario("quotation_workflow_1")
+scenario.truth
+scenario.locale
+scenario.prompt
+scenario.initial_messages
+```
+
+`tests/test_scenario_catalog.py` verifies catalog IDs/order, unknown-ID
+behavior, canonical validation, quotation fixture equality and boundaries,
+EN/JA Truth sharing and prompt/message differences, lab isolation, fresh
+objects, omitted task-wrapper/private fields, and direct connection from
+catalog Truth into the existing 41-field evaluator. Normal pytest does not
+read the source checkout or tests/fixtures as runtime catalog data.
+
+Phase 9 is the smallest next boundary for a separately specified stakeholder
+simulator input contract: combining a public `ScenarioDefinition` with
+separately constructed private knowledge and a message/observation runtime.
+The simulator, knowledge projection, LLM API, Agent runtime, Environment,
+InterviewDB, tools, diagnostics, and Inspect AI integration are not started by
+Phase 8.

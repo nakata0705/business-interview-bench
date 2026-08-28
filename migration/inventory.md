@@ -545,5 +545,51 @@ regenerates byte-identically.
 Seed 9004 now has exact 41/41 primary parity, including
 `knowledge_coverage=0.7166666666666667`, while 26/26 graph and 40/40 interview
 parity remain green. Phase 7 completes primary evaluator migration. Phase 8
-starts at broader runtime/integration and any intentionally deferred
-compatibility or full stakeholder-knowledge responsibilities.
+is described below.
+
+## Phase 8 result: tau2-free scenario/task catalog
+
+Phase 8 adds `src/business_interview/scenarios/`, a package-data-backed
+catalog that answers only which interview scenario is selected. Its public
+`ScenarioDefinition` contains `id`, `canonical_scenario_id`, `locale`,
+canonical `truth`, public `prompt`, and ordered `initial_messages`.
+`StakeholderPrompt` contains only `persona`, `reason_for_call`, and
+`task_instructions`; `InitialMessage` contains only `role` and `content`.
+
+The supported IDs are explicit and deterministic:
+
+```text
+quotation_workflow_1
+quotation_workflow_1_ja
+lab_sample_flow
+```
+
+`get_scenario()` performs exact ID lookup and raises `UnknownScenarioError`
+for unknown IDs; it does not dynamically infer a scenario or translate a
+suffix. `list_scenarios()` preserves catalog order. Both APIs return fresh
+nested definitions rather than a mutable shared singleton. The package never
+reads the source checkout or `tests/fixtures` at runtime.
+
+Quotation EN/JA definitions share one canonical Truth resource and differ only
+in locale-specific public prompt/initial history. Truth concepts and canonical
+terms remain unchanged for JA. The quotation Truth retains the source's
+business IDs `r`, `cc`, `cq`, `ap`, `sq`, `me`, edges `e1`--`e6`, explicit
+SOURCE/SINK, entry `r`, exits `sq`/`me`, and canonical text. It is semantically
+equal to `tests/fixtures/seed9004/truth.json`. `lab_sample_flow` is loaded
+from its own Truth resource and verifies that the catalog is not a
+quotation-specific shortcut.
+
+The catalog data extracts only the public persona, reason, task instructions,
+and initial role/content history from source `tasks.json`. Tau2 Task wrappers,
+`description.notes`, `evaluation_criteria.env_assertions`, `reward_basis`,
+`env_type`, `func_name`, `known_info`, and `unknown_info` are intentionally
+absent. Prompt metadata is not a business-fact source; canonical Truth stays
+separate.
+
+No `StakeholderFilter`, `StakeholderKnowledge`, `StakeholderKnowledgeGraph`,
+Phase 7 `KnowledgeCoverageView` runtime state, local knowledge IDs, private
+annotations, simulator, LLM, Agent runtime, Environment, InterviewDB, tools,
+diagnostics, Inspect AI, or seed 9002/9003 expansion is included. Phase 9 is
+the next minimal boundary: define the stakeholder-simulator input that
+combines public `ScenarioDefinition` with separately constructed private
+knowledge and message/observation runtime state.

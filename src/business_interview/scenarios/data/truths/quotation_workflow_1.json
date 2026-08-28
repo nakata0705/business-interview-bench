@@ -1,0 +1,541 @@
+{
+  "concepts": {
+    "tc_activity_approve_quotation": {
+      "canonical_terms": [
+        "approve the high-value quotation"
+      ],
+      "description": "Approve the quotation.",
+      "id": "tc_activity_approve_quotation",
+      "kind": "activity"
+    },
+    "tc_activity_check_customer": {
+      "canonical_terms": [
+        "check the customer information"
+      ],
+      "description": "Check the customer information.",
+      "id": "tc_activity_check_customer",
+      "kind": "activity"
+    },
+    "tc_activity_create_quotation": {
+      "canonical_terms": [
+        "create the quotation"
+      ],
+      "description": "Create the quotation document.",
+      "id": "tc_activity_create_quotation",
+      "kind": "activity"
+    },
+    "tc_activity_receive_request": {
+      "canonical_terms": [
+        "receive the quotation request"
+      ],
+      "description": "Receive the customer's quotation request.",
+      "id": "tc_activity_receive_request",
+      "kind": "activity"
+    },
+    "tc_activity_send_month_end_summary": {
+      "canonical_terms": [
+        "send the month-end summary to Accounting"
+      ],
+      "description": "Send the month-end summary of quotation information.",
+      "id": "tc_activity_send_month_end_summary",
+      "kind": "activity"
+    },
+    "tc_activity_send_quotation": {
+      "canonical_terms": [
+        "send the quotation to the customer"
+      ],
+      "description": "Send the quotation to the customer.",
+      "id": "tc_activity_send_quotation",
+      "kind": "activity"
+    },
+    "tc_actor_manager": {
+      "canonical_terms": [
+        "manager"
+      ],
+      "description": "The manager who approves.",
+      "id": "tc_actor_manager",
+      "kind": "actor"
+    },
+    "tc_actor_sales": {
+      "canonical_terms": [
+        "sales employee"
+      ],
+      "description": "The sales employee.",
+      "id": "tc_actor_sales",
+      "kind": "actor"
+    },
+    "tc_approval": {
+      "canonical_terms": [
+        "approval"
+      ],
+      "description": "The approval record.",
+      "id": "tc_approval",
+      "kind": "data"
+    },
+    "tc_cond_at_or_below_1m": {
+      "canonical_terms": [
+        "at or below 1,000,000 yen"
+      ],
+      "description": "The quotation amount is at or below 1,000,000 yen.",
+      "id": "tc_cond_at_or_below_1m",
+      "kind": "condition"
+    },
+    "tc_cond_month_end": {
+      "canonical_terms": [
+        "month-end"
+      ],
+      "description": "It is the end of the month.",
+      "id": "tc_cond_month_end",
+      "kind": "condition"
+    },
+    "tc_cond_over_1m": {
+      "canonical_terms": [
+        "over 1,000,000 yen"
+      ],
+      "description": "The quotation amount is over 1,000,000 yen.",
+      "id": "tc_cond_over_1m",
+      "kind": "condition"
+    },
+    "tc_customer": {
+      "canonical_terms": [
+        "customer information"
+      ],
+      "description": "The customer's information.",
+      "id": "tc_customer",
+      "kind": "data"
+    },
+    "tc_excel_summary": {
+      "canonical_terms": [
+        "summary of the quotation information"
+      ],
+      "description": "The quotation information summary.",
+      "id": "tc_excel_summary",
+      "kind": "data"
+    },
+    "tc_pricing": {
+      "canonical_terms": [
+        "pricing information"
+      ],
+      "description": "The pricing information.",
+      "id": "tc_pricing",
+      "kind": "data"
+    },
+    "tc_quote": {
+      "canonical_terms": [
+        "quotation"
+      ],
+      "description": "The quotation document.",
+      "id": "tc_quote",
+      "kind": "data"
+    },
+    "tc_rationale_credit_risk": {
+      "canonical_terms": [
+        "credit risk management"
+      ],
+      "description": "Credit risk management.",
+      "id": "tc_rationale_credit_risk",
+      "kind": "rationale"
+    },
+    "tc_request": {
+      "canonical_terms": [
+        "quotation request"
+      ],
+      "description": "The customer's quotation request.",
+      "id": "tc_request",
+      "kind": "data"
+    },
+    "tc_sent_quote": {
+      "canonical_terms": [
+        "sent quotation"
+      ],
+      "description": "The sent quotation.",
+      "id": "tc_sent_quote",
+      "kind": "data"
+    },
+    "tc_system_crm": {
+      "canonical_terms": [
+        "CRM"
+      ],
+      "description": "The customer relationship management system.",
+      "id": "tc_system_crm",
+      "kind": "system"
+    },
+    "tc_system_email": {
+      "canonical_terms": [
+        "email"
+      ],
+      "description": "The email system.",
+      "id": "tc_system_email",
+      "kind": "system"
+    },
+    "tc_system_excel": {
+      "canonical_terms": [
+        "Excel"
+      ],
+      "description": "The spreadsheet application.",
+      "id": "tc_system_excel",
+      "kind": "system"
+    },
+    "tc_system_quoting": {
+      "canonical_terms": [
+        "quoting system"
+      ],
+      "description": "The quoting system.",
+      "id": "tc_system_quoting",
+      "kind": "system"
+    }
+  },
+  "edges": {
+    "__tau2_structural_boundary__sink_001": {
+      "condition": null,
+      "contracted_nodes": [],
+      "derived_from_edges": [],
+      "edge_kind": "structural_boundary",
+      "from_node": "me",
+      "id": "__tau2_structural_boundary__sink_001",
+      "is_shortcut": false,
+      "protected": true,
+      "structural_only": true,
+      "to_node": "__tau2_structural_sink__"
+    },
+    "__tau2_structural_boundary__sink_002": {
+      "condition": null,
+      "contracted_nodes": [],
+      "derived_from_edges": [],
+      "edge_kind": "structural_boundary",
+      "from_node": "sq",
+      "id": "__tau2_structural_boundary__sink_002",
+      "is_shortcut": false,
+      "protected": true,
+      "structural_only": true,
+      "to_node": "__tau2_structural_sink__"
+    },
+    "__tau2_structural_boundary__source_001": {
+      "condition": null,
+      "contracted_nodes": [],
+      "derived_from_edges": [],
+      "edge_kind": "structural_boundary",
+      "from_node": "__tau2_structural_source__",
+      "id": "__tau2_structural_boundary__source_001",
+      "is_shortcut": false,
+      "protected": true,
+      "structural_only": true,
+      "to_node": "r"
+    },
+    "e1": {
+      "condition": null,
+      "contracted_nodes": [],
+      "derived_from_edges": [],
+      "edge_kind": "business",
+      "from_node": "r",
+      "id": "e1",
+      "is_shortcut": false,
+      "protected": false,
+      "structural_only": false,
+      "to_node": "cc"
+    },
+    "e2": {
+      "condition": null,
+      "contracted_nodes": [],
+      "derived_from_edges": [],
+      "edge_kind": "business",
+      "from_node": "cc",
+      "id": "e2",
+      "is_shortcut": false,
+      "protected": false,
+      "structural_only": false,
+      "to_node": "cq"
+    },
+    "e3": {
+      "condition": {
+        "concept_id": "tc_cond_over_1m",
+        "confidence": 1.0,
+        "evidence": [],
+        "state": "value"
+      },
+      "contracted_nodes": [],
+      "derived_from_edges": [],
+      "edge_kind": "business",
+      "from_node": "cq",
+      "id": "e3",
+      "is_shortcut": false,
+      "protected": false,
+      "structural_only": false,
+      "to_node": "ap"
+    },
+    "e4": {
+      "condition": {
+        "concept_id": "tc_cond_at_or_below_1m",
+        "confidence": 1.0,
+        "evidence": [],
+        "state": "value"
+      },
+      "contracted_nodes": [],
+      "derived_from_edges": [],
+      "edge_kind": "business",
+      "from_node": "cq",
+      "id": "e4",
+      "is_shortcut": false,
+      "protected": false,
+      "structural_only": false,
+      "to_node": "sq"
+    },
+    "e5": {
+      "condition": null,
+      "contracted_nodes": [],
+      "derived_from_edges": [],
+      "edge_kind": "business",
+      "from_node": "ap",
+      "id": "e5",
+      "is_shortcut": false,
+      "protected": false,
+      "structural_only": false,
+      "to_node": "sq"
+    },
+    "e6": {
+      "condition": {
+        "concept_id": "tc_cond_month_end",
+        "confidence": 1.0,
+        "evidence": [],
+        "state": "value"
+      },
+      "contracted_nodes": [],
+      "derived_from_edges": [],
+      "edge_kind": "business",
+      "from_node": "cq",
+      "id": "e6",
+      "is_shortcut": false,
+      "protected": false,
+      "structural_only": false,
+      "to_node": "me"
+    }
+  },
+  "id": "quotation",
+  "name": "Quotation creation",
+  "nodes": {
+    "__tau2_structural_sink__": {
+      "activity": null,
+      "actor": null,
+      "id": "__tau2_structural_sink__",
+      "necessity_rationale": null,
+      "protected": true,
+      "reads": null,
+      "structural": true,
+      "structural_role": "sink",
+      "system": null,
+      "writes": null
+    },
+    "__tau2_structural_source__": {
+      "activity": null,
+      "actor": null,
+      "id": "__tau2_structural_source__",
+      "necessity_rationale": null,
+      "protected": true,
+      "reads": null,
+      "structural": true,
+      "structural_role": "source",
+      "system": null,
+      "writes": null
+    },
+    "ap": {
+      "activity": {
+        "concept_id": "tc_activity_approve_quotation",
+        "confidence": 1.0,
+        "evidence": [],
+        "state": "value"
+      },
+      "actor": {
+        "concept_id": "tc_actor_manager",
+        "confidence": 1.0,
+        "evidence": [],
+        "state": "value"
+      },
+      "id": "ap",
+      "necessity_rationale": {
+        "concept_id": "tc_rationale_credit_risk",
+        "confidence": 1.0,
+        "evidence": [],
+        "state": "value"
+      },
+      "protected": false,
+      "reads": null,
+      "structural": false,
+      "structural_role": null,
+      "system": null,
+      "writes": null
+    },
+    "cc": {
+      "activity": {
+        "concept_id": "tc_activity_check_customer",
+        "confidence": 1.0,
+        "evidence": [],
+        "state": "value"
+      },
+      "actor": {
+        "concept_id": "tc_actor_sales",
+        "confidence": 1.0,
+        "evidence": [],
+        "state": "value"
+      },
+      "id": "cc",
+      "necessity_rationale": null,
+      "protected": false,
+      "reads": [
+        {
+          "concept_id": "tc_customer",
+          "confidence": 1.0,
+          "evidence": [],
+          "state": "value"
+        }
+      ],
+      "structural": false,
+      "structural_role": null,
+      "system": {
+        "concept_id": "tc_system_crm",
+        "confidence": 1.0,
+        "evidence": [],
+        "state": "value"
+      },
+      "writes": null
+    },
+    "cq": {
+      "activity": {
+        "concept_id": "tc_activity_create_quotation",
+        "confidence": 1.0,
+        "evidence": [],
+        "state": "value"
+      },
+      "actor": {
+        "concept_id": "tc_actor_sales",
+        "confidence": 1.0,
+        "evidence": [],
+        "state": "value"
+      },
+      "id": "cq",
+      "necessity_rationale": null,
+      "protected": false,
+      "reads": [
+        {
+          "concept_id": "tc_customer",
+          "confidence": 1.0,
+          "evidence": [],
+          "state": "value"
+        },
+        {
+          "concept_id": "tc_pricing",
+          "confidence": 1.0,
+          "evidence": [],
+          "state": "value"
+        }
+      ],
+      "structural": false,
+      "structural_role": null,
+      "system": {
+        "concept_id": "tc_system_quoting",
+        "confidence": 1.0,
+        "evidence": [],
+        "state": "value"
+      },
+      "writes": [
+        {
+          "concept_id": "tc_quote",
+          "confidence": 1.0,
+          "evidence": [],
+          "state": "value"
+        }
+      ]
+    },
+    "me": {
+      "activity": {
+        "concept_id": "tc_activity_send_month_end_summary",
+        "confidence": 1.0,
+        "evidence": [],
+        "state": "value"
+      },
+      "actor": {
+        "concept_id": "tc_actor_sales",
+        "confidence": 1.0,
+        "evidence": [],
+        "state": "value"
+      },
+      "id": "me",
+      "necessity_rationale": null,
+      "protected": false,
+      "reads": null,
+      "structural": false,
+      "structural_role": null,
+      "system": {
+        "concept_id": "tc_system_excel",
+        "confidence": 1.0,
+        "evidence": [],
+        "state": "value"
+      },
+      "writes": [
+        {
+          "concept_id": "tc_excel_summary",
+          "confidence": 1.0,
+          "evidence": [],
+          "state": "value"
+        }
+      ]
+    },
+    "r": {
+      "activity": {
+        "concept_id": "tc_activity_receive_request",
+        "confidence": 1.0,
+        "evidence": [],
+        "state": "value"
+      },
+      "actor": {
+        "concept_id": "tc_actor_sales",
+        "confidence": 1.0,
+        "evidence": [],
+        "state": "value"
+      },
+      "id": "r",
+      "necessity_rationale": null,
+      "protected": false,
+      "reads": null,
+      "structural": false,
+      "structural_role": null,
+      "system": null,
+      "writes": [
+        {
+          "concept_id": "tc_request",
+          "confidence": 1.0,
+          "evidence": [],
+          "state": "value"
+        }
+      ]
+    },
+    "sq": {
+      "activity": {
+        "concept_id": "tc_activity_send_quotation",
+        "confidence": 1.0,
+        "evidence": [],
+        "state": "value"
+      },
+      "actor": {
+        "concept_id": "tc_actor_sales",
+        "confidence": 1.0,
+        "evidence": [],
+        "state": "value"
+      },
+      "id": "sq",
+      "necessity_rationale": null,
+      "protected": false,
+      "reads": null,
+      "structural": false,
+      "structural_role": null,
+      "system": {
+        "concept_id": "tc_system_email",
+        "confidence": 1.0,
+        "evidence": [],
+        "state": "value"
+      },
+      "writes": null
+    }
+  },
+  "sink_node_id": "__tau2_structural_sink__",
+  "source_node_id": "__tau2_structural_source__"
+}
