@@ -621,12 +621,15 @@ bare local concept addresses. Malformed syntax raises
 `None` for either case. No response plan, sidecar, annotation, or generated
 speech layer is present.
 
-All Phase 9 models are frozen Pydantic value objects with JSON round-trip
-support. Profile and knowledge collection inputs are normalized so map/list
-insertion order does not change semantics or serialized output. Focused tests
-cover all required configuration, epistemic-state, structural metadata,
-private mapping, shortcut, address, error, and ordering invariants. Existing
-Phase 1--8 tests and seed 9004 evaluator parity are unchanged.
+All Phase 9 models are deeply immutable Pydantic value objects, not merely
+shallow-frozen models. Sequences (`local_terms`, concept terms, reads/writes,
+and shortcut metadata) are stored as tuples. Mapping fields use the standard
+library's read-only `MappingProxyType`; JSON serialization still emits
+ordinary objects/arrays and validation accepts ordinary list/dict input.
+Profile and knowledge collection inputs are normalized so map/list insertion
+order does not change semantics or serialized output. Focused tests directly
+attempt mutations across top-level and nested collections. Existing Phase 1--8
+tests and seed 9004 evaluator parity are unchanged.
 
 Phase 10 is the next migration boundary: project canonical Truth through a
 `StakeholderProfile` into a `StakeholderKnowledge` world model, including any

@@ -14,13 +14,14 @@ stakeholder-local.
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import Literal, TypeAlias
+from types import MappingProxyType
+from typing import Literal, Self, TypeAlias
 
 from pydantic import (
     AliasChoices,
-    BaseModel,
     ConfigDict,
     Field,
+    field_serializer,
     field_validator,
     model_validator,
 )
@@ -32,11 +33,13 @@ from business_interview.models import (
     canonical_structure_errors,
 )
 
+from .base import _DeeplyImmutableModel
+
 KnowledgeEdgeKind = Literal["business", "structural_boundary", "shortcut"]
 StructuralRole = Literal["source", "sink"]
 
 
-class KnowledgeDontKnowType(BaseModel):
+class KnowledgeDontKnowType(_DeeplyImmutableModel):
     """Explicit unknown value, distinct from known absence (``None``)."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -68,7 +71,7 @@ def is_known_absent(value: object) -> bool:
     return value is None
 
 
-class KnowledgeConceptRef(BaseModel):
+class KnowledgeConceptRef(_DeeplyImmutableModel):
     """A value-bearing reference to a stakeholder-local concept."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -86,7 +89,14 @@ class KnowledgeConceptRef(BaseModel):
 
 
 KnowledgeSlot: TypeAlias = KnowledgeConceptRef | None | KnowledgeDontKnowType
-KnowledgeListSlot: TypeAlias = list[KnowledgeConceptRef] | None | KnowledgeDontKnowType
+KnowledgeListSlot: TypeAlias = (
+    tuple[KnowledgeConceptRef, ...] | None | KnowledgeDontKnowType
+)
+
+
+def _freeze_mapping(value: Mapping[str, object]) -> Mapping[str, object]:
+    """Store a mapping behind the standard library's read-only proxy."""
+    return MappingProxyType(dict(value))
 
 
 def _local_id(value: str, field_name: str) -> str:
@@ -137,7 +147,7 @@ def _normalize_map_fields(value: object, fields: tuple[str, ...]) -> object:
     return payload
 
 
-class StakeholderKnowledgeConcept(BaseModel):
+class StakeholderKnowledgeConcept(_DeeplyImmutableModel):
     """One local concept and its private Truth mapping.
 
     ``description`` and ``terms`` are independently known or unknown.  The
@@ -200,7 +210,7 @@ class StakeholderKnowledgeConcept(BaseModel):
         return not is_dont_know(self.terms)
 
 
-class StakeholderNode(BaseModel):
+class StakeholderNode(_DeeplyImmutableModel):
     """One local node with explicit value/absent/unknown property slots."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -256,16 +266,11 @@ class StakeholderNode(BaseModel):
     def slot_value(self, property_name: str) -> KnowledgeSlot | KnowledgeListSlot:
         return getattr(self, property_name)
 
-    def refs(self, property_name: str) -> list[KnowledgeConceptRef]:
-        value = self.slot_value(property_name)
-        if isinstance(value, KnowledgeConceptRef):
-            return [value]
-        if isinstance(value, list):
-            return list(value)
-        return []
+    def refs(self, property_name: str) -> tuple[KnowledgeConceptRef, ...]:
+        return _slot_refs(self.slot_value(property_name))
 
 
-class ShortcutProvenance(BaseModel):
+class ShortcutProvenance(_DeeplyImmutableModel):
     """Private provenance attached to a derived local shortcut edge."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -275,7 +280,7 @@ class ShortcutProvenance(BaseModel):
     derived_from_edges: tuple[str, ...] = Field(default_factory=tuple)
 
 
-class StakeholderEdge(BaseModel):
+class StakeholderEdge(_DeeplyImmutableModel):
     """One local edge, including protected boundary/shortcut metadata."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -314,12 +319,12 @@ class StakeholderEdge(BaseModel):
 _NODE_PROPERTIES = ("activity", "actor", "system", "reads", "writes", "rationale")
 
 
-def _slot_refs(value: object) -> list[KnowledgeConceptRef]:
+def _slot_refs(value: object) -> tuple[KnowledgeConceptRef, ...]:
     if isinstance(value, KnowledgeConceptRef):
-        return [value]
-    if isinstance(value, list):
-        return list(value)
-    return []
+        return (value,)
+    if isinstance(value, (list, tuple)):
+        return tuple(value)
+    return ()
 
 
 def _graph_semantic_ids(graph: StakeholderKnowledgeGraph) -> set[str]:
@@ -338,27 +343,27 @@ def _graph_semantic_ids(graph: StakeholderKnowledgeGraph) -> set[str]:
     return ids
 
 
-class StakeholderKnowledgeGraph(BaseModel):
+class StakeholderKnowledgeGraph(_DeeplyImmutableModel):
     """The private local graph seen by a future stakeholder simulator."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     id: str = "knowledge"
     name: str = ""
-    nodes: dict[str, StakeholderNode] = Field(default_factory=dict)
-    edges: dict[str, StakeholderEdge] = Field(default_factory=dict)
-    concepts: dict[str, StakeholderKnowledgeConcept] = Field(default_factory=dict)
+    nodes: Mapping[str, StakeholderNode] = Field(default_factory=dict)
+    edges: Mapping[str, StakeholderEdge] = Field(default_factory=dict)
+    concepts: Mapping[str, StakeholderKnowledgeConcept] = Field(default_factory=dict)
     source_node_id: str = STRUCTURAL_SOURCE_ID
     sink_node_id: str = STRUCTURAL_SINK_ID
-    node_truth_ids: dict[str, str] = Field(
+    node_truth_ids: Mapping[str, str] = Field(
         default_factory=dict,
         description="Private local-node ID to Truth-node ID mappings.",
     )
-    edge_truth_ids: dict[str, str] = Field(
+    edge_truth_ids: Mapping[str, str] = Field(
         default_factory=dict,
         description="Private local-edge ID to Truth-edge ID mappings.",
     )
-    shortcut_provenance: dict[str, ShortcutProvenance] = Field(
+    shortcut_provenance: Mapping[str, ShortcutProvenance] = Field(
         default_factory=dict,
         description="Private provenance for local shortcut edges.",
     )
@@ -377,6 +382,34 @@ class StakeholderKnowledgeGraph(BaseModel):
                 "shortcut_provenance",
             ),
         )
+
+    @model_validator(mode="after")
+    def _freeze_nested_collections(self) -> Self:
+        for field_name in (
+            "nodes",
+            "edges",
+            "concepts",
+            "node_truth_ids",
+            "edge_truth_ids",
+            "shortcut_provenance",
+        ):
+            object.__setattr__(
+                self,
+                field_name,
+                _freeze_mapping(getattr(self, field_name)),
+            )
+        return self
+
+    @field_serializer(
+        "nodes",
+        "edges",
+        "concepts",
+        "node_truth_ids",
+        "edge_truth_ids",
+        "shortcut_provenance",
+    )
+    def _serialize_mappings(self, value: Mapping[str, object]) -> dict[str, object]:
+        return dict(value)
 
     def semantic_ids(self) -> set[str]:
         """Return every addressable graph/concept ID in the local namespace."""
@@ -515,7 +548,7 @@ class StakeholderKnowledgeGraph(BaseModel):
         return ids
 
 
-class StakeholderKnowledge(BaseModel):
+class StakeholderKnowledge(_DeeplyImmutableModel):
     """Private world model passed to a future stakeholder simulator."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -523,7 +556,7 @@ class StakeholderKnowledge(BaseModel):
     graph: StakeholderKnowledgeGraph = Field(default_factory=StakeholderKnowledgeGraph)
 
     @property
-    def concepts(self) -> dict[str, StakeholderKnowledgeConcept]:
+    def concepts(self) -> Mapping[str, StakeholderKnowledgeConcept]:
         return self.graph.concepts
 
     def semantic_ids(self) -> set[str]:

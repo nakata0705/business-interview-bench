@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping, MutableMapping
 from pathlib import Path
+from typing import cast
 
 import pytest
 from pydantic import ValidationError
@@ -82,8 +84,8 @@ def _knowledge(*, reverse: bool = False) -> StakeholderKnowledge:
             activity=KnowledgeConceptRef(concept_id="concept_a7"),
             actor=None,
             system=DONT_KNOW,
-            reads=[KnowledgeConceptRef(concept_id="concept_d4")],
-            writes=[KnowledgeConceptRef(concept_id="concept_w2")],
+            reads=(KnowledgeConceptRef(concept_id="concept_d4"),),
+            writes=(KnowledgeConceptRef(concept_id="concept_w2"),),
             rationale=DONT_KNOW,
         ),
         "node_beta": StakeholderNode(
@@ -220,6 +222,63 @@ def test_stakeholder_profile_round_trip_and_visibility_semantics() -> None:
     )
 
 
+def test_profile_nested_collections_are_deeply_immutable() -> None:
+    profile = StakeholderProfile(
+        stakeholder_id="profile_sales",
+        name="Sales employee",
+        visible_node_ids=("r",),
+        visible_edge_ids=("e1",),
+        visible_node_attributes={"r": ("activity",)},
+        visible_edge_attributes={"e1": ("condition",)},
+        concept_overrides={
+            "tc_customer": ConceptKnowledgeOverride(local_terms=("customer",))
+        },
+    )
+
+    with pytest.raises(ValidationError):
+        profile.name = "Changed"
+    with pytest.raises(TypeError):
+        cast(MutableMapping[str, object], profile.visible_node_attributes)["new"] = (
+            "actor",
+        )
+    with pytest.raises(TypeError):
+        cast(MutableMapping[str, object], profile.visible_edge_attributes)["new"] = (
+            "condition",
+        )
+    with pytest.raises(TypeError):
+        cast(MutableMapping[str, object], profile.concept_overrides)["new"] = (
+            "override",
+        )
+    with pytest.raises(ValidationError):
+        profile.visible_node_ids += ("new",)
+    with pytest.raises(ValidationError):
+        profile.visible_edge_ids += ("new",)
+
+    local_terms = profile.concept_overrides["tc_customer"].local_terms
+    assert local_terms is not None
+    with pytest.raises(AttributeError):
+        getattr(local_terms, "append")("mutated")
+
+
+def test_model_copy_preserves_deep_immutability() -> None:
+    profile = StakeholderProfile(
+        stakeholder_id="profile_sales",
+        name="Sales employee",
+        visible_node_attributes={"r": ("activity",)},
+    )
+    copied_profile = profile.model_copy(deep=True)
+    assert copied_profile == profile
+    with pytest.raises(TypeError):
+        cast(MutableMapping[str, object], copied_profile.visible_node_attributes)[
+            "new"
+        ] = ("actor",)
+
+    copied_graph = _knowledge().graph.model_copy(deep=True)
+    assert copied_graph.is_valid
+    with pytest.raises(TypeError):
+        cast(MutableMapping[str, object], copied_graph.nodes)["new"] = object()
+
+
 def test_forgetting_probabilities_and_retries_are_bounded() -> None:
     probability_fields = (
         "baseline_forget_probability",
@@ -252,7 +311,8 @@ def test_knowledge_round_trip_preserves_values_absence_unknown_and_private_mappi
     assert isinstance(node.activity, KnowledgeConceptRef)
     assert is_known_absent(node.actor)
     assert is_dont_know(node.system)
-    assert isinstance(node.reads, list)
+    assert isinstance(node.reads, tuple)
+    assert isinstance(node.writes, tuple)
     assert isinstance(node.reads[0], KnowledgeConceptRef)
     assert restored.graph.edges["edge_shortcut"].is_shortcut
     assert restored.graph.shortcut_provenance["edge_shortcut"].contracted_nodes == (
@@ -261,9 +321,133 @@ def test_knowledge_round_trip_preserves_values_absence_unknown_and_private_mappi
     validate_stakeholder_knowledge(restored)
 
 
+def test_knowledge_nested_collections_are_deeply_immutable() -> None:
+    knowledge = _knowledge()
+    graph = knowledge.graph
+
+    with pytest.raises(TypeError):
+        cast(MutableMapping[str, object], graph.nodes)["new"] = object()
+    with pytest.raises(TypeError):
+        cast(MutableMapping[str, object], graph.edges)["new"] = object()
+    with pytest.raises(TypeError):
+        cast(MutableMapping[str, object], graph.concepts)["new"] = object()
+    with pytest.raises(TypeError):
+        cast(MutableMapping[str, object], graph.node_truth_ids)["new"] = "truth"
+    with pytest.raises(TypeError):
+        cast(MutableMapping[str, object], graph.edge_truth_ids)["new"] = "truth"
+    with pytest.raises(TypeError):
+        cast(MutableMapping[str, object], graph.shortcut_provenance)["new"] = object()
+
+    node = graph.nodes["node_alpha"]
+    assert isinstance(node.reads, tuple)
+    assert isinstance(node.writes, tuple)
+    with pytest.raises(AttributeError):
+        getattr(node.reads, "append")(KnowledgeConceptRef(concept_id="concept_w2"))
+    with pytest.raises(AttributeError):
+        getattr(node.writes, "append")(KnowledgeConceptRef(concept_id="concept_d4"))
+
+    concept_terms = graph.concepts["concept_a7"].terms
+    assert isinstance(concept_terms, tuple)
+    with pytest.raises(AttributeError):
+        getattr(concept_terms, "append")("mutated")
+
+    shortcut = graph.edges["edge_shortcut"]
+    with pytest.raises(AttributeError):
+        getattr(shortcut.contracted_nodes, "append")("mutated")
+    with pytest.raises(AttributeError):
+        getattr(shortcut.derived_from_edges, "append")("mutated")
+
+    provenance = graph.shortcut_provenance["edge_shortcut"]
+    with pytest.raises(AttributeError):
+        getattr(provenance.contracted_nodes, "append")("mutated")
+    with pytest.raises(AttributeError):
+        getattr(provenance.derived_from_edges, "append")("mutated")
+
+
 def test_knowledge_serialization_is_insertion_order_independent() -> None:
     first = _knowledge()
     second = _knowledge(reverse=True)
+
+    assert first == second
+    assert first.model_dump_json() == second.model_dump_json()
+
+
+def test_mutable_list_and_dict_input_is_normalized_to_immutable_storage() -> None:
+    profile = StakeholderProfile.model_validate(
+        {
+            "stakeholder_id": "profile_sales",
+            "name": "Sales employee",
+            "visible_node_ids": ["r", "cc"],
+            "visible_node_attributes": {"r": ["actor", "activity"]},
+            "concept_overrides": {
+                "tc_customer": {"local_terms": ["customer", "customer master"]}
+            },
+        }
+    )
+    assert isinstance(profile.visible_node_attributes, Mapping)
+    assert not isinstance(profile.visible_node_attributes, dict)
+    assert profile.visible_node_ids == ("cc", "r")
+    assert profile.concept_overrides["tc_customer"].local_terms == (
+        "customer",
+        "customer master",
+    )
+
+    graph = StakeholderKnowledgeGraph.model_validate(
+        {
+            "nodes": {
+                "local_node": {
+                    "id": "local_node",
+                    "reads": [{"concept_id": "local_concept"}],
+                }
+            },
+            "concepts": {
+                "local_concept": {
+                    "id": "local_concept",
+                    "truth_concept_id": "tc_input",
+                    "kind": "data",
+                    "terms": ["input"],
+                }
+            },
+            "node_truth_ids": {"local_node": "r"},
+        }
+    )
+    assert isinstance(graph.nodes, Mapping)
+    assert not isinstance(graph.nodes, dict)
+    assert isinstance(graph.nodes["local_node"].reads, tuple)
+    assert isinstance(graph.concepts["local_concept"].terms, tuple)
+
+
+def test_profile_serialization_is_insertion_order_independent() -> None:
+    first = StakeholderProfile.model_validate(
+        {
+            "stakeholder_id": "profile_sales",
+            "name": "Sales employee",
+            "visible_node_ids": ["cc", "r"],
+            "visible_node_attributes": {
+                "cc": ["system", "activity"],
+                "r": ["actor"],
+            },
+            "concept_overrides": {
+                "tc_output": {"local_terms": ["output", "result"]},
+                "tc_input": {"local_terms": ["input"]},
+            },
+        }
+    )
+    second = StakeholderProfile.model_validate(
+        {
+            "stakeholder_id": "profile_sales",
+            "name": "Sales employee",
+            "visible_node_ids": ["r", "cc"],
+            "visible_node_attributes": {
+                "r": ["actor"],
+                "cc": ["activity", "system"],
+            },
+            "concept_overrides": {
+                "tc_input": {"local_terms": ["input"]},
+                "tc_output": {"local_terms": ["result", "output"]},
+            },
+        }
+    )
 
     assert first == second
     assert first.model_dump_json() == second.model_dump_json()

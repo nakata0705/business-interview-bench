@@ -148,9 +148,13 @@ the pure `resolve_semantic_address()` API; invalid and unknown addresses are
 rejected distinctly. These private mappings and local IDs are never part of
 the public scenario prompt.
 
-All Phase 9 value models support JSON round trips and canonical ordering of
-map/list collections. Phase 7 primary evaluation remains unchanged. Phase 10
-is the next boundary for deterministic/stochastic Truth + stakeholder-profile
-projection into this knowledge graph. Inspect AI, LLM, simulator loop,
-Environment, InterviewDB, and runtime integration remain unimplemented.
+All Phase 9 value models are deeply immutable, not merely shallow-frozen:
+sequences are stored as tuples and mapping fields use the standard library's
+read-only `MappingProxyType`. Set-like inputs are canonicalized, while JSON
+serialization still emits ordinary arrays/objects and accepts ordinary
+list/dict input. Phase 7 primary evaluation remains unchanged. Phase 10 is the
+next boundary for deterministic/stochastic Truth + stakeholder-profile
+projection into this knowledge graph; its output can be retained as a stable
+value object. Inspect AI, LLM, simulator loop, Environment, InterviewDB, and
+runtime integration remain unimplemented.
 See `migration/README.md` and `migration/inventory.md` for migration details.

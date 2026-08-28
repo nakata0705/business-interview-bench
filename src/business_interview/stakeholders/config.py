@@ -1,18 +1,25 @@
 """Standalone stakeholder identity, visibility, and forgetting configuration."""
 
+# The workspace-level auxiliary Pyright runner can miss freshly added sibling
+# modules; project-level ``uv run pyright`` remains the authoritative check.
+# pyright: reportMissingImports=false
+
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import Literal
+from types import MappingProxyType
+from typing import Literal, Self
 
 from pydantic import (
     AliasChoices,
-    BaseModel,
     ConfigDict,
     Field,
+    field_serializer,
     field_validator,
     model_validator,
 )
+
+from .base import _DeeplyImmutableModel
 
 NodeProperty = Literal["activity", "actor", "system", "reads", "writes", "rationale"]
 EdgeProperty = Literal["condition"]
@@ -72,7 +79,12 @@ def _normalize_profile_input(value: object) -> object:
     return payload
 
 
-class ConceptKnowledgeOverride(BaseModel):
+def _freeze_mapping(value: Mapping[str, object]) -> Mapping[str, object]:
+    """Store a mapping behind the standard library's read-only proxy."""
+    return MappingProxyType(dict(value))
+
+
+class ConceptKnowledgeOverride(_DeeplyImmutableModel):
     """Per-Truth-concept knobs for a future knowledge projection.
 
     Description and terminology knowledge are independent. ``local_terms``
@@ -109,7 +121,7 @@ class ConceptKnowledgeOverride(BaseModel):
         return self.terms_known
 
 
-class ForgettingConfig(BaseModel):
+class ForgettingConfig(_DeeplyImmutableModel):
     """Bounded forgetting policy configuration, without sampling behavior."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -151,7 +163,7 @@ class ForgettingConfig(BaseModel):
 StakeholderForgettingConfig = ForgettingConfig
 
 
-class StakeholderProfile(BaseModel):
+class StakeholderProfile(_DeeplyImmutableModel):
     """Stable stakeholder identity and Truth visibility configuration.
 
     The IDs in this configuration address canonical Truth elements. They are
@@ -167,19 +179,41 @@ class StakeholderProfile(BaseModel):
     role: str | None = None
     visible_node_ids: tuple[str, ...] = Field(default_factory=tuple)
     visible_edge_ids: tuple[str, ...] = Field(default_factory=tuple)
-    visible_node_attributes: dict[str, tuple[NodeProperty, ...]] = Field(
+    visible_node_attributes: Mapping[str, tuple[NodeProperty, ...]] = Field(
         default_factory=dict
     )
-    visible_edge_attributes: dict[str, tuple[EdgeProperty, ...]] = Field(
+    visible_edge_attributes: Mapping[str, tuple[EdgeProperty, ...]] = Field(
         default_factory=dict
     )
-    concept_overrides: dict[str, ConceptKnowledgeOverride] = Field(default_factory=dict)
+    concept_overrides: Mapping[str, ConceptKnowledgeOverride] = Field(
+        default_factory=dict
+    )
     forgetting: ForgettingConfig = Field(default_factory=ForgettingConfig)
 
     @model_validator(mode="before")
     @classmethod
     def _normalize_input(cls, value: object) -> object:
         return _normalize_profile_input(value)
+
+    @model_validator(mode="after")
+    def _freeze_nested_collections(self) -> Self:
+        for field_name in (
+            "visible_node_attributes",
+            "visible_edge_attributes",
+            "concept_overrides",
+        ):
+            object.__setattr__(
+                self,
+                field_name,
+                _freeze_mapping(getattr(self, field_name)),
+            )
+        return self
+
+    @field_serializer(
+        "visible_node_attributes", "visible_edge_attributes", "concept_overrides"
+    )
+    def _serialize_mappings(self, value: Mapping[str, object]) -> dict[str, object]:
+        return dict(value)
 
     @field_validator("stakeholder_id", "name")
     @classmethod

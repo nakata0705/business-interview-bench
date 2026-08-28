@@ -520,10 +520,14 @@ syntax from `UnknownSemanticAddressError` for valid-but-missing local objects;
 Semantic Response Plan, sidecar parser, realization, or annotation validator
 is included.
 
-All Phase 9 value models are frozen Pydantic models with JSON round trips.
-Profile maps, local graph maps, concept terms, and reads/writes references are
-normalized so construction order does not change meaning or
-`model_dump_json()` output. `StakeholderKnowledge` and
+All Phase 9 value models are deeply immutable Pydantic value objects, not
+merely shallow-frozen models. Sequences (`local_terms`, concept terms,
+reads/writes, and shortcut metadata) are stored as tuples. Mapping fields use
+the standard library's read-only `MappingProxyType`; field serializers expose
+ordinary JSON objects, and Pydantic validation still accepts ordinary
+list/dict input. Profile maps, local graph maps, concept terms, and
+reads/writes references are normalized so construction order does not change
+meaning or `model_dump_json()` output. `StakeholderKnowledge` and
 `KnowledgeCoverageView` remain deliberately separate: the former constrains
 future stakeholder speech, while the latter is only the reduced evaluator
 coverage input introduced in Phase 7.
