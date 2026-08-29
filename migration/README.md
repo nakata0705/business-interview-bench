@@ -471,12 +471,11 @@ objects, omitted task-wrapper/private fields, and direct connection from
 catalog Truth into the existing 41-field evaluator. Normal pytest does not
 read the source checkout or tests/fixtures as runtime catalog data.
 
-Phase 9 is the smallest next boundary for a separately specified stakeholder
-simulator input contract: combining a public `ScenarioDefinition` with
-separately constructed private knowledge and a message/observation runtime.
-The simulator, knowledge projection, LLM API, Agent runtime, Environment,
-InterviewDB, tools, diagnostics, and Inspect AI integration are not started by
-Phase 8.
+Phase 8 established the public scenario input contract. Phase 9 then defined
+its separately constructed stakeholder profile/private knowledge boundary;
+Phase 10 applies that boundary as a pure Truth-to-knowledge projection. The
+simulator, LLM API, Agent runtime, Environment, InterviewDB, tools,
+diagnostics, and Inspect AI integration remain outside these domain layers.
 
 ## Phase 9 result: private stakeholder runtime input contract
 
@@ -497,9 +496,9 @@ forgetting:
 ```
 
 `ForgettingConfig` validates all probabilities in `[0, 1]` and retries as
-positive. Its effective probabilities are descriptive accessors only. Phase 9
-intentionally does not implement `project_knowledge()`, stochastic sampling,
-rejection retries, or shortcut contraction.
+positive. Phase 9 defines the policy value object; Phase 10 consumes its
+effective probabilities for local stochastic sampling, bounded rejection
+retries, and safe shortcut contraction.
 
 `StakeholderKnowledge` is a separate private world model, not an evaluator
 view. It contains `StakeholderKnowledgeGraph` with stakeholder-local opaque
@@ -536,10 +535,68 @@ coverage input introduced in Phase 7.
 probability/retry bounds, value/absence/unknown distinctions, local reference
 resolution, invalid/unknown address rejection, structural and shortcut
 metadata, private mappings, ordering-independent serialization, and the
-absence of fixture/source runtime dependencies. Existing Phase 1--8 tests and
+absence of fixture/source runtime dependencies. Existing Phase 1--9 tests and
 seed 9004 graph/interview/primary parity remain unchanged.
 
-Phase 10 is reserved for deterministic/stochastic Truth + StakeholderProfile
-projection into `StakeholderKnowledge`. LLM realization, simulator loop,
-Inspect AI, Environment, InterviewDB, Agent runtime, tools, diagnostics, and
-provider configuration remain out of scope.
+## Phase 10 result: pure Truth-to-knowledge projection
+
+Phase 10 adds `src/business_interview/stakeholders/projection.py` and completes
+the standalone domain pipeline:
+
+```text
+canonical BusinessProcessGraph + StakeholderProfile + seed
+    -> StakeholderKnowledge
+    -> KnowledgeCoverageView
+```
+
+The primary API is:
+
+```python
+from business_interview.stakeholders import (
+    knowledge_coverage_view,
+    project_knowledge,
+)
+
+knowledge = project_knowledge(truth, profile, seed=42)
+coverage = knowledge_coverage_view(truth, knowledge)
+```
+
+`project_knowledge()` rejects non-canonical Truth before sampling. It applies
+business node/edge visibility, property visibility, independent concept
+metadata overrides, and the three-valued slots without inventing hidden facts.
+Known values become local `KnowledgeConceptRef` objects, known absence remains
+`None`, and unknown values become `DONT_KNOW`. Only concepts referenced by
+known projected values enter the private graph. Local node/edge/concept IDs
+are deterministic index-only opaque IDs (`skn_###`, `ske_###`, `skc_###`),
+while local-to-Truth mappings remain private metadata.
+
+Structural SOURCE/SINK nodes and protected boundary edges bypass forgetting.
+Forgotten business nodes are removed only through validated safe serial
+contraction: exactly one predecessor and successor, both unconditional, no
+self-loop or parallel relation, and never a branch/merge/conditioned path.
+Shortcut edges retain contracted-node/derived-edge provenance. Unknown edges
+are omitted; any resulting invalid topology is rejected rather than silently
+repaired. `allow_shortcut_contraction=False` and retry exhaustion produce a
+clear `KnowledgeProjectionError`.
+
+Forgetting uses a local `random.Random(seed)` stream and never changes global
+random state. Retries consume the same stream and respect
+`ForgettingConfig.max_retries`. `seed=None` means private
+`random.Random(None)` and is intentionally non-reproducible when forgetting is
+enabled. For replay/rescore, persist the exact immutable projected
+`StakeholderKnowledge` (including generation metadata), not only the seed.
+
+`knowledge_coverage_view()` validates and derives the evaluator-only,
+Truth-addressed `KnowledgeCoverageView` from `StakeholderKnowledge`; it is not
+a second hand-maintained knowledge source. `StakeholderKnowledge` remains the
+simulator-private world model, while canonical Truth remains the primary
+evaluator target. Existing evaluator APIs and seed 9004 parity are unchanged.
+
+`tests/test_stakeholder_projection.py` covers visibility, three-valued
+properties, concept overrides, opaque ID determinism, local RNG/retries,
+structural preservation, safe/unsafe contractions, provenance, deep
+immutability, address resolution, and derived coverage. LLM realization,
+simulator loop, Inspect AI, Environment, InterviewDB, Agent runtime, tools,
+diagnostics, and provider configuration remain out of scope.
+
+Phase 11 is reserved for Inspect AI deterministic replay integration.

@@ -466,6 +466,8 @@ class StakeholderKnowledgeGraph(_DeeplyImmutableModel):
                 )
             if not truth_id.strip():
                 errors.append(f"node Truth mapping is empty: {local_id}")
+            if local_id in {self.source_node_id, self.sink_node_id}:
+                continue
             if local_id == truth_id:
                 errors.append(f"local node id must be opaque, not Truth id: {local_id}")
         for local_id, truth_id in self.edge_truth_ids.items():
@@ -554,6 +556,14 @@ class StakeholderKnowledge(_DeeplyImmutableModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     graph: StakeholderKnowledgeGraph = Field(default_factory=StakeholderKnowledgeGraph)
+    generation_seed: int | None = Field(
+        default=None,
+        description="Seed passed to project_knowledge, when one was supplied.",
+    )
+    generation_rng_source: str = Field(
+        default="not_recorded",
+        description="Evaluator metadata describing the projection RNG source.",
+    )
 
     @property
     def concepts(self) -> Mapping[str, StakeholderKnowledgeConcept]:

@@ -2,7 +2,7 @@
 
 Standalone migration target for the `business-interview` benchmark.
 
-This repository is currently at **Phase 9**. It is an intentionally small
+This repository is currently at **Phase 10**. It is an intentionally small
 Python 3.12 project managed with [`uv`](https://docs.astral.sh/uv/). The
 existing `tau2-bench` checkout remains the migration oracle; this project does
 not vendor tau2, copy the legacy evaluator, or start an LLM simulator
@@ -45,6 +45,7 @@ business-interview-bench/
     ├── test_graph_contract.py
     ├── test_project_smoke.py
     ├── test_seed9004_fixture.py
+    ├── test_stakeholder_projection.py # Truth-to-knowledge projection checks
     ├── test_stakeholders.py # private runtime contract checks
     └── test_serialization.py
 ```
@@ -120,24 +121,22 @@ and Truth alongside separately constructed knowledge.
 ## Phase 9: private stakeholder runtime input contract
 
 The `business_interview.stakeholders` package defines the future simulator's
-private inputs without running a projection or an LLM:
+private inputs; the Phase 9 contract itself runs no projection or LLM:
 
 ```python
 from business_interview.scenarios import get_scenario
-from business_interview.stakeholders import StakeholderKnowledge, StakeholderProfile
+from business_interview.stakeholders import StakeholderProfile
 
 scenario = get_scenario("quotation_workflow_1")
 profile = StakeholderProfile(stakeholder_id="sales", name="Sales")
-# A private graph is constructed separately from the public scenario.
-knowledge = StakeholderKnowledge(graph=private_knowledge_graph)
+# Phase 10 constructs the private graph from scenario.truth + profile.
 ```
 
 `StakeholderProfile`/`StakeholderFilter` carries stable identity, Truth
 visibility by business node/edge/property, independent per-concept
 `description_known`/`terms_known` overrides with optional local terms, and
-bounded `ForgettingConfig`. It describes future projection inputs only;
-Phase 9 does not sample forgetting, contract shortcuts, or implement
-`project_knowledge()`.
+bounded `ForgettingConfig`. Phase 9 established this immutable input contract;
+Phase 10 applies its forgetting policy and safe topology projection.
 
 `StakeholderKnowledge` is separate from evaluator-only `KnowledgeCoverageView`.
 It stores a stakeholder-local graph with value references, explicit known
@@ -148,13 +147,51 @@ the pure `resolve_semantic_address()` API; invalid and unknown addresses are
 rejected distinctly. These private mappings and local IDs are never part of
 the public scenario prompt.
 
-All Phase 9 value models are deeply immutable, not merely shallow-frozen:
+Phase 9 value models remain deeply immutable, not merely shallow-frozen:
 sequences are stored as tuples and mapping fields use the standard library's
 read-only `MappingProxyType`. Set-like inputs are canonicalized, while JSON
 serialization still emits ordinary arrays/objects and accepts ordinary
-list/dict input. Phase 7 primary evaluation remains unchanged. Phase 10 is the
-next boundary for deterministic/stochastic Truth + stakeholder-profile
-projection into this knowledge graph; its output can be retained as a stable
-value object. Inspect AI, LLM, simulator loop, Environment, InterviewDB, and
-runtime integration remain unimplemented.
-See `migration/README.md` and `migration/inventory.md` for migration details.
+list/dict input.
+
+## Phase 10: Truth-to-stakeholder projection
+
+Phase 10 completes the standalone domain pipeline from canonical Truth and an
+immutable stakeholder profile to a private knowledge world, then to the
+evaluator-only coverage view:
+
+```python
+from business_interview.stakeholders import (
+    knowledge_coverage_view,
+    project_knowledge,
+)
+
+knowledge = project_knowledge(truth, profile, seed=42)
+coverage = knowledge_coverage_view(truth, knowledge)
+```
+
+`project_knowledge()` validates canonical Truth, applies element/property
+visibility and three-valued slots, projects only referenced concepts, assigns
+deterministic opaque local IDs, and records private Truth mappings. A supplied
+seed uses a local `random.Random(seed)` stream without changing global random
+state. `seed=None` uses a private `random.Random(None)` stream and is therefore
+not reproducible when forgetting is enabled; exact projected knowledge should
+be saved for replay and rescore.
+
+Unsafe node-forgetting samples are rejected and retried up to
+`ForgettingConfig.max_retries`. Safe serial contraction is limited to
+non-structural nodes with exactly one unconditional predecessor and successor;
+branch/merge/conditioned paths are rejected. SOURCE/SINK and protected
+boundary structure remain present. `KnowledgeProjectionError` reports bounded
+retry exhaustion rather than silently disabling forgetting.
+
+`StakeholderKnowledge` is simulator-private world state and the source of
+truth for knowledge coverage. `knowledge_coverage_view()` derives the
+Truth-addressed `KnowledgeCoverageView` from that object; it is not a second
+hand-maintained knowledge input. `StakeholderKnowledge` remains deeply
+immutable and JSON-serializable.
+
+Phase 7 primary evaluation and seed 9004 parity remain unchanged. Phase 11 is
+reserved for Inspect AI deterministic replay integration. LLM realization,
+simulator loop, Environment, InterviewDB, Agent runtime, tools, and provider
+integration remain unimplemented. See `migration/README.md` and
+`migration/inventory.md` for migration details.

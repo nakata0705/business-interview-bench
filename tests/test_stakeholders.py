@@ -245,6 +245,8 @@ def test_profile_nested_collections_are_deeply_immutable() -> None:
         cast(MutableMapping[str, object], profile.visible_edge_attributes)["new"] = (
             "condition",
         )
+    with pytest.raises(AttributeError):
+        getattr(profile.visible_node_attributes["r"], "append")("actor")
     with pytest.raises(TypeError):
         cast(MutableMapping[str, object], profile.concept_overrides)["new"] = (
             "override",

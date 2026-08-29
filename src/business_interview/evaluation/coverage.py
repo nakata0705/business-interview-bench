@@ -1,8 +1,12 @@
 """Minimal Truth-addressed input and arithmetic for knowledge coverage."""
 
+# The workspace-level auxiliary Pyright runner can miss freshly added sibling
+# modules; project-level ``uv run pyright`` remains the authoritative check.
+# pyright: reportMissingImports=false
+
 from __future__ import annotations
 
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -145,6 +149,23 @@ def evaluate_knowledge_coverage(
     return known / total if total else 0.0
 
 
+def knowledge_coverage_view(
+    truth: BusinessProcessGraph,
+    knowledge: Any,
+) -> KnowledgeCoverageView:
+    """Derive coverage from a stakeholder-private projection.
+
+    The import is intentionally lazy so the evaluator package does not depend
+    on stakeholder projection at module import time.  The implementation and
+    validation authority remains in the stakeholder domain package.
+    """
+    from business_interview.stakeholders.projection import (
+        knowledge_coverage_view as derive_view,
+    )
+
+    return derive_view(truth, knowledge)
+
+
 # Keep the source spelling available while exposing a descriptive public name.
 knowledge_coverage = evaluate_knowledge_coverage
 
@@ -157,4 +178,5 @@ __all__ = [
     "KnowledgeCoverageView",
     "evaluate_knowledge_coverage",
     "knowledge_coverage",
+    "knowledge_coverage_view",
 ]

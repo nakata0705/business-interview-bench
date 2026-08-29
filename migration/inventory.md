@@ -628,11 +628,48 @@ library's read-only `MappingProxyType`; JSON serialization still emits
 ordinary objects/arrays and validation accepts ordinary list/dict input.
 Profile and knowledge collection inputs are normalized so map/list insertion
 order does not change semantics or serialized output. Focused tests directly
-attempt mutations across top-level and nested collections. Existing Phase 1--8
+attempt mutations across top-level and nested collections. Existing Phase 1--9
 tests and seed 9004 evaluator parity are unchanged.
 
-Phase 10 is the next migration boundary: project canonical Truth through a
-`StakeholderProfile` into a `StakeholderKnowledge` world model, including any
-explicit deterministic/stochastic forgetting and safe shortcut policy. LLM,
+## Phase 10 result: deterministic Truth-to-knowledge projection
+
+Phase 10 adds `stakeholders/projection.py` and completes the standalone domain
+pipeline:
+
+```text
+BusinessProcessGraph + StakeholderProfile + seed
+    -> StakeholderKnowledge
+    -> KnowledgeCoverageView
+```
+
+`project_knowledge()` validates canonical Truth up front, applies business
+node/edge visibility and property visibility, preserves known value / known
+absence / `DONT_KNOW`, applies independent concept description/terminology
+overrides, and omits unreferenced concepts. It assigns deterministic,
+index-only opaque local IDs (`skn_###`, `ske_###`, `skc_###`) and retains the
+local-to-Truth mappings as private immutable metadata. Structural SOURCE/SINK
+and protected boundary edges are always retained.
+
+Node forgetting removes a business node only through safe serial contraction:
+exactly one predecessor and successor, both unconditional, with no self-loop
+or parallel endpoint relation. Branches, merges, conditioned paths, disabled
+shortcuts, and any invalid post-forgetting topology reject the sample. Bounded
+retries reuse one local RNG stream and raise `KnowledgeProjectionError` on
+exhaustion; shortcut edge/provenance metadata retains all serial contractions.
+`random.Random(seed)` never changes global random state. `seed=None` uses
+private `random.Random(None)` and is intentionally non-reproducible when
+forgetting is enabled, so exact projected knowledge should be persisted for
+replay/rescore.
+
+`knowledge_coverage_view(truth, knowledge)` validates and derives the
+Truth-addressed evaluator-only `KnowledgeCoverageView` from the projected
+private model. It is not independently authored state. The primary evaluator
+still targets canonical Truth, and its existing contract is unchanged.
+
+Focused `test_stakeholder_projection.py` covers deterministic IDs, local RNG,
+retry behavior, safe/unsafe contraction, provenance, all slot semantics,
+coverage derivation, deep immutability, and semantic-address resolution. LLM,
 simulator loop, Inspect AI, Agent runtime, Environment, InterviewDB, tools,
-diagnostics, and provider integration remain unimplemented.
+diagnostics, and provider configuration remain unimplemented.
+
+Phase 11 is reserved for Inspect AI deterministic replay integration.

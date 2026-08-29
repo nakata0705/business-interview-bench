@@ -43,6 +43,12 @@ from .knowledge import (
     validate_stakeholder_knowledge,
     validate_stakeholder_knowledge_graph,
 )
+from .projection import (
+    KnowledgeProjectionError,
+    derive_knowledge_coverage_view,
+    knowledge_coverage_view,
+    project_knowledge,
+)
 
 __all__ = [
     "AddressKind",
@@ -51,6 +57,7 @@ __all__ = [
     "EdgeProperty",
     "ForgettingConfig",
     "InvalidSemanticAddressError",
+    "KnowledgeProjectionError",
     "KnowledgeConceptRef",
     "KnowledgeDontKnowType",
     "KnowledgeEdgeKind",
@@ -73,7 +80,10 @@ __all__ = [
     "UnknownSemanticAddressError",
     "is_dont_know",
     "is_known_absent",
+    "knowledge_coverage_view",
+    "derive_knowledge_coverage_view",
     "parse_semantic_address",
+    "project_knowledge",
     "resolve_semantic_address",
     "try_resolve_semantic_address",
     "validate_stakeholder_knowledge",

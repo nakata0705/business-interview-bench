@@ -18,6 +18,7 @@ from .coverage import (
     KnowledgeCoverageView,
     evaluate_knowledge_coverage,
     knowledge_coverage,
+    knowledge_coverage_view,
 )
 from .evaluator import evaluate_graph, evaluate_interview, evaluate_primary
 from .result import GraphEvaluation, InterviewEvaluation, PrimaryEvaluation
@@ -39,4 +40,5 @@ __all__ = [
     "evaluate_knowledge_coverage",
     "evaluate_primary",
     "knowledge_coverage",
+    "knowledge_coverage_view",
 ]
