@@ -39,7 +39,7 @@ from business_interview.models import (
 )
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-FIXTURE_ROOT = PROJECT_ROOT / "tests" / "fixtures" / "seed9004"
+FIXTURE_ROOT = PROJECT_ROOT / "src" / "business_interview" / "replay_data" / "seed9004"
 PHASE4_FIELDS = (
     "graph_created",
     "graph_valid",

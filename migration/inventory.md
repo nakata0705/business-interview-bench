@@ -277,10 +277,10 @@ business exits. It was selected over seed 9003 because 9003 stops at
 No seed 9002/9003 fixture was added; Phase 4 comparison work is described
 below.
 
-The curated fixture is:
+The curated replay asset is:
 
 ```text
-tests/fixtures/seed9004/
+src/business_interview/replay_data/seed9004/
 ├── truth.json
 ├── agent.json
 ├── expected.json
@@ -568,14 +568,14 @@ lab_sample_flow
 for unknown IDs; it does not dynamically infer a scenario or translate a
 suffix. `list_scenarios()` preserves catalog order. Both APIs return fresh
 nested definitions rather than a mutable shared singleton. The package never
-reads the source checkout or `tests/fixtures` at runtime.
+reads the source checkout or migration/test paths at runtime.
 
 Quotation EN/JA definitions share one canonical Truth resource and differ only
 in locale-specific public prompt/initial history. Truth concepts and canonical
 terms remain unchanged for JA. The quotation Truth retains the source's
 business IDs `r`, `cc`, `cq`, `ap`, `sq`, `me`, edges `e1`--`e6`, explicit
 SOURCE/SINK, entry `r`, exits `sq`/`me`, and canonical text. It is semantically
-equal to `tests/fixtures/seed9004/truth.json`. `lab_sample_flow` is loaded
+equal to `src/business_interview/replay_data/seed9004/truth.json`. `lab_sample_flow` is loaded
 from its own Truth resource and verifies that the catalog is not a
 quotation-specific shortcut.
 
@@ -672,4 +672,68 @@ coverage derivation, deep immutability, and semantic-address resolution. LLM,
 simulator loop, Inspect AI, Agent runtime, Environment, InterviewDB, tools,
 diagnostics, and provider configuration remain unimplemented.
 
-Phase 11 is reserved for Inspect AI deterministic replay integration.
+## Phase 11 result: Inspect AI execution and offline rescore
+
+Phase 11 introduces an independent Inspect adapter package while preserving the
+core boundary:
+
+```text
+Business Interview Core
+        ↓
+  Inspect Adapter
+        ↓
+deterministic replay
+        ↓
+    .eval log
+        ↓
+deterministic scorer
+        ↓
+offline inspect score
+```
+
+`inspect-ai>=0.3.260` is a development dependency recorded in `uv.lock`; the
+Pydantic-only core does not import it. `[project.entry-points.inspect_ai]`
+registers `business_interview_bench.inspect_adapter._registry` under the
+stable `business_interview_bench` namespace. Installed CLI names are
+`business_interview_bench/seed9004_replay` and
+`business_interview_bench/primary_scorer`.
+
+The one-sample dataset reads the runtime-neutral canonical asset at
+`src/business_interview/replay_data/seed9004/`. The old
+`tests/fixtures/seed9004` path is retained only as a symlink compatibility
+alias, so there is no second payload copy. Migration tests and the production
+adapter share the same Agent, Truth, context, coverage, expected, and
+provenance payloads. The custom solver validates those payloads and writes
+only JSON-compatible dictionaries to the typed sample-scoped
+`BusinessInterviewReplayStore`, then marks the state complete. It never calls
+`generate()`, `get_model()`, an LLM, Agent simulation, or stakeholder
+simulation. The `.eval` Store records exact AgentGraph, canonical Truth,
+InterviewEvaluationContext, KnowledgeCoverageView, replay/scenario/source
+metadata, expected oracle, and provenance. Truth/private knowledge is an
+allowed evaluator-private log artifact.
+
+The custom scorer restores Store dictionaries with `model_validate()` and
+calls only the existing authoritative
+`evaluate_primary(agent, truth, context, knowledge_coverage)`. It does not
+reload the scenario catalog or any original fixture/source path during offline
+rescore. Its dict-valued `Score.value` derives field names from
+`dataclasses.fields(PrimaryEvaluation)` and preserves all 41 fields. The
+headline is the existing `reconstruction_pass` field, not a new weighted
+aggregate. Primary reconstruction includes node/edge and semantic/concept
+metrics plus fabricated counts; evidence/protocol diagnostics include evidence
+coverage and provenance/observation/protocol fields; `knowledge_coverage` is
+context/informational.
+
+The real CLI path is:
+
+```bash
+inspect eval business_interview_bench/seed9004_replay --model none
+inspect score <generated-log>.eval \
+  --scorer business_interview_bench/primary_scorer
+```
+
+Live replay and offline rescore both reproduce seed9004's 41/41 exact oracle
+fields and equal score payloads with zero model/API calls, including with an
+ambient model setting because `--model none` is explicit. Inspect owns
+execution, logging, and rescoring; the evaluator remains deterministic core
+domain code. Phase 12 is reserved for stakeholder simulator semantics.

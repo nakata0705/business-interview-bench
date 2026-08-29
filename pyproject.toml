@@ -12,8 +12,12 @@ dependencies = [
     "pydantic>=2.10,<3",
 ]
 
+[project.entry-points.inspect_ai]
+business_interview_bench = "business_interview_bench.inspect_adapter._registry"
+
 [dependency-groups]
 dev = [
+    "inspect-ai>=0.3.260",
     "pyright>=1.1.390",
     "pytest>=8.3",
     "ruff>=0.9",
@@ -23,7 +27,7 @@ dev = [
 testpaths = ["tests"]
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/business_interview"]
+packages = ["src/business_interview", "src/business_interview_bench"]
 
 [tool.ruff]
 line-length = 88

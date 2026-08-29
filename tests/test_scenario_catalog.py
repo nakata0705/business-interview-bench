@@ -26,7 +26,7 @@ from business_interview.scenarios import (  # pyright: ignore[reportMissingImpor
 )
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-SEED_ROOT = PROJECT_ROOT / "tests" / "fixtures" / "seed9004"
+SEED_ROOT = PROJECT_ROOT / "src" / "business_interview" / "replay_data" / "seed9004"
 
 
 EXPECTED_IDS = [

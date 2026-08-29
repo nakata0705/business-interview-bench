@@ -23,8 +23,8 @@ integration remain deferred.
 
 ## Phase 3 status: seed 9004 normalized parity fixture
 
-Phase 3 is complete for one fixture only:
-`tests/fixtures/seed9004/`. The generation tool is
+Phase 3 is complete for one replay asset only:
+`src/business_interview/replay_data/seed9004/`. The generation tool is
 `migration/scripts/build_seed9004_fixture.py`; it requires the sibling source
 checkout only while generating and never adds tau2 to the target runtime.
 
@@ -469,7 +469,8 @@ behavior, canonical validation, quotation fixture equality and boundaries,
 EN/JA Truth sharing and prompt/message differences, lab isolation, fresh
 objects, omitted task-wrapper/private fields, and direct connection from
 catalog Truth into the existing 41-field evaluator. Normal pytest does not
-read the source checkout or tests/fixtures as runtime catalog data.
+read the source checkout or replay assets as runtime catalog data beyond the
+canonical packaged asset.
 
 Phase 8 established the public scenario input contract. Phase 9 then defined
 its separately constructed stakeholder profile/private knowledge boundary;
@@ -599,4 +600,79 @@ immutability, address resolution, and derived coverage. LLM realization,
 simulator loop, Inspect AI, Environment, InterviewDB, Agent runtime, tools,
 diagnostics, and provider configuration remain out of scope.
 
-Phase 11 is reserved for Inspect AI deterministic replay integration.
+## Phase 11 result: Inspect AI deterministic replay adapter
+
+Phase 11 keeps dependency direction explicit:
+
+```text
+Business Interview Core
+        ↓
+  Inspect Adapter
+        ↓
+deterministic replay
+        ↓
+    .eval log
+        ↓
+deterministic scorer
+        ↓
+offline inspect score
+```
+
+`inspect-ai` is in the `dev` dependency group and is not a runtime dependency
+of the Pydantic-only core. The adapter lives independently under
+`src/business_interview_bench/inspect_adapter/`; core modules never import
+`inspect_ai`. The package entry point is:
+
+```toml
+[project.entry-points.inspect_ai]
+business_interview_bench = "business_interview_bench.inspect_adapter._registry"
+```
+
+It registers the task `business_interview_bench/seed9004_replay`, the
+no-model `seed9004_replay_solver`, and the `business_interview_bench/primary_scorer`
+scorer. The replay dataset has exactly one sample. The solver validates the
+packaged canonical asset and writes JSON-compatible dictionaries into the
+sample-scoped `BusinessInterviewReplayStore`; it never calls `generate()`, a
+model, an Agent, or a stakeholder simulator. `--model none` remains safe even
+when an ambient `INSPECT_EVAL_MODEL` is set and requires no API credentials.
+
+The canonical asset is shared by tests and the production adapter at
+`src/business_interview/replay_data/seed9004/`. It contains the exact normalized
+AgentGraph, canonical Truth, InterviewEvaluationContext,
+KnowledgeCoverageView, expected oracle, and provenance payloads. The former
+`tests/fixtures/seed9004` path is retained only as a symlink compatibility alias;
+it contains no second payload copy. The solver stores the canonical values in
+the `.eval` log (plus replay/scenario/source metadata), and the scorer
+reconstructs the four domain inputs from Store payloads with `model_validate()`.
+Offline scoring does not reload the scenario catalog, read test fixture files,
+use the source checkout, call an external service, or require an original
+fixture path. Truth and private knowledge in the `.eval` log are accepted as
+evaluator-private artifacts because exact logged state is required for
+replay/rescore.
+
+The scorer delegates its authoritative result exclusively to
+`evaluate_primary(agent, truth, context, knowledge_coverage)`. It derives the
+field contract from `dataclasses.fields(PrimaryEvaluation)` and fails fast if
+field count or names drift. All 41 named fields are preserved in the
+Inspect `Score.value` dictionary; no new weighted total is introduced.
+Primary reconstruction covers node/edge recall/precision, semantic and
+concept correctness/recall/precision, fabricated counts, and
+`reconstruction_pass`. Evidence/protocol diagnostics cover evidence coverage,
+provenance/observation counts, and protocol fields. `knowledge_coverage` is a
+context/informational field. Inspect's only headline metric is the existing
+`reconstruction_pass` field.
+
+The live command and offline rescore are:
+
+```bash
+inspect eval business_interview_bench/seed9004_replay --model none
+inspect score <generated-log>.eval \
+  --scorer business_interview_bench/primary_scorer
+```
+
+Both paths produce the same 41/41 oracle fields and equal score payloads with
+zero model/API calls. Inspect owns execution, logging, and rescoring; the
+existing evaluator remains deterministic Business Interview domain code.
+Phase 12 is reserved for stakeholder simulator semantics. LLM realization,
+response planning, Agent runtime, Environment, InterviewDB, tools, and generic
+tau2 runtime remain out of scope.

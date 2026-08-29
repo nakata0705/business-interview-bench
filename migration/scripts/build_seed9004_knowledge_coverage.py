@@ -32,7 +32,7 @@ from business_interview.models import (
 SOURCE_PRIVATE_ARTIFACT = (
     "artifacts/business_interview_real_llm/run_00_seed9004.private.json"
 )
-TRUTH_FIXTURE = "tests/fixtures/seed9004/truth.json"
+TRUTH_FIXTURE = "src/business_interview/replay_data/seed9004/truth.json"
 CONTEXT_FILE = "knowledge_coverage.json"
 
 _SOURCE_EXTRACT_CODE = r"""
@@ -179,7 +179,13 @@ def _default_source_root() -> Path:
 
 
 def _default_output_root() -> Path:
-    return Path(__file__).resolve().parents[2] / "tests" / "fixtures" / "seed9004"
+    return (
+        Path(__file__).resolve().parents[2]
+        / "src"
+        / "business_interview"
+        / "replay_data"
+        / "seed9004"
+    )
 
 
 def main(argv: Sequence[str] | None = None) -> int:

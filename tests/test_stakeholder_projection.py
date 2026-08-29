@@ -799,7 +799,13 @@ def test_seed9004_catalog_projection_preserves_all_evaluator_parity() -> None:
     )
     knowledge = project_knowledge(truth, profile, seed=0)
     coverage = knowledge_coverage_view(truth, knowledge)
-    fixture_root = Path(__file__).resolve().parent / "fixtures" / "seed9004"
+    fixture_root = (
+        Path(__file__).resolve().parents[1]
+        / "src"
+        / "business_interview"
+        / "replay_data"
+        / "seed9004"
+    )
     expected = json.loads((fixture_root / "expected.json").read_text(encoding="utf-8"))[
         "oracle"
     ]["fields"]

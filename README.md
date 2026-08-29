@@ -2,7 +2,7 @@
 
 Standalone migration target for the `business-interview` benchmark.
 
-This repository is currently at **Phase 10**. It is an intentionally small
+This repository is currently at **Phase 11**. It is an intentionally small
 Python 3.12 project managed with [`uv`](https://docs.astral.sh/uv/). The
 existing `tau2-bench` checkout remains the migration oracle; this project does
 not vendor tau2, copy the legacy evaluator, or start an LLM simulator
@@ -34,10 +34,12 @@ business-interview-bench/
 │   ├── models/         # tau2-free Truth/Agent graph model
 │   ├── comparison/     # tau2-free deterministic alignment/comparison core
 │   ├── evaluation/     # graph-only and explicit-context evaluator facades
+│   ├── replay_data/    # packaged canonical seed9004 replay asset
 │   ├── scenarios/      # tau2-free scenario/task catalog and Truth resources
 │   └── stakeholders/   # private profile, knowledge, and address contracts
+├── src/business_interview_bench/
+│   └── inspect_adapter/ # Inspect task, solver, scorer, and replay Store
 └── tests/
-    ├── fixtures/seed9004/ # normalized Truth/Agent/context/coverage/oracle
     ├── test_comparison_core.py
     ├── test_evaluation.py
     ├── test_interview_evaluation.py # observation/evidence/protocol checks
@@ -46,6 +48,7 @@ business-interview-bench/
     ├── test_project_smoke.py
     ├── test_seed9004_fixture.py
     ├── test_stakeholder_projection.py # Truth-to-knowledge projection checks
+    ├── test_inspect_adapter.py # deterministic Inspect replay/rescore checks
     ├── test_stakeholders.py # private runtime contract checks
     └── test_serialization.py
 ```
@@ -81,9 +84,10 @@ provenance are runtime inputs. `evaluate_primary()` reuses the 40-field
 exactly 41 fields. Coverage is informational and cannot change any pass value.
 
 Seed 9004 now has exact 26/26 graph, 40/40 interview, and 41/41 primary
-parity. The context and coverage fixtures retain only evaluator-required raw
-inputs and Truth-addressed knowledge state; they do not copy a full
-transcript or private sidecar.
+parity. The canonical replay asset under
+`src/business_interview/replay_data/seed9004/` contains the normalized Agent,
+Truth, context, coverage, expected, and provenance payloads; tests and the
+Inspect adapter share it rather than maintaining fixture copies.
 
 ## Phase 8: scenario/task catalog
 
@@ -190,8 +194,59 @@ Truth-addressed `KnowledgeCoverageView` from that object; it is not a second
 hand-maintained knowledge input. `StakeholderKnowledge` remains deeply
 immutable and JSON-serializable.
 
-Phase 7 primary evaluation and seed 9004 parity remain unchanged. Phase 11 is
-reserved for Inspect AI deterministic replay integration. LLM realization,
-simulator loop, Environment, InterviewDB, Agent runtime, tools, and provider
-integration remain unimplemented. See `migration/README.md` and
-`migration/inventory.md` for migration details.
+## Phase 11: Inspect AI deterministic replay adapter
+
+The execution boundary is deliberately one-way:
+
+```text
+Business Interview Core
+        ↓
+  Inspect Adapter
+        ↓
+deterministic replay
+        ↓
+    .eval log
+        ↓
+deterministic scorer
+        ↓
+offline inspect score
+```
+
+`inspect-ai` is a development/evaluation dependency only. Core packages
+(`models`, `comparison`, `evaluation`, `scenarios`, `stakeholders`, and
+`replay_data`) never import Inspect. The independent
+`business_interview_bench.inspect_adapter` package is registered through
+`[project.entry-points.inspect_ai]` under the stable namespace
+`business_interview_bench`:
+
+```bash
+inspect eval business_interview_bench/seed9004_replay --model none
+inspect score <log>.eval --scorer business_interview_bench/primary_scorer
+```
+
+The registered task has exactly one packaged seed9004 sample. Its custom
+solver validates and stores canonical JSON payloads without calling
+`generate()`, a model, or an external service. The typed
+`BusinessInterviewReplayStore` records exact AgentGraph, canonical Truth,
+InterviewEvaluationContext, KnowledgeCoverageView, expected oracle, and
+provenance payloads. The scorer reconstructs those domain models from the
+Store and delegates authoritative scoring only to `evaluate_primary()`;
+`scenario` catalog reloads are not used for offline rescore. Truth/private
+knowledge in an `.eval` log is an evaluator-private artifact by design.
+
+The Inspect score preserves all 41 `PrimaryEvaluation` fields as named values;
+it does not create a new weighted total. Primary reconstruction fields include
+node/edge and semantic/concept metrics, fabricated counts, and
+`reconstruction_pass`. Evidence/protocol diagnostics include evidence
+coverage, provenance/observation counts, and protocol fields.
+`knowledge_coverage` remains a context/informational field. The only Inspect
+headline metric is the existing `reconstruction_pass` field.
+
+A live `--model none` replay and `inspect score` offline rescore therefore use
+the same exact logged inputs and produce byte-equivalent 41-field scores with
+no model/API calls. Inspect owns execution, logging, and rescoring; the
+existing evaluator remains deterministic domain code. Phase 12 is reserved for
+stakeholder simulator semantics. LLM realization, response planning, Agent
+runtime, Environment, InterviewDB, tools, and provider integration remain
+unimplemented. See `migration/README.md` and `migration/inventory.md` for
+migration details.

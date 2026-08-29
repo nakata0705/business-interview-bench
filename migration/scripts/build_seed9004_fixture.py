@@ -984,7 +984,13 @@ def _default_source_root() -> Path:
 
 
 def _default_output_root() -> Path:
-    return Path(__file__).resolve().parents[2] / "tests" / "fixtures" / "seed9004"
+    return (
+        Path(__file__).resolve().parents[2]
+        / "src"
+        / "business_interview"
+        / "replay_data"
+        / "seed9004"
+    )
 
 
 def main(argv: Sequence[str] | None = None) -> int:

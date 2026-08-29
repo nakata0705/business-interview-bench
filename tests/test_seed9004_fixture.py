@@ -27,7 +27,7 @@ from business_interview.models import (
 )
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-FIXTURE_ROOT = PROJECT_ROOT / "tests" / "fixtures" / "seed9004"
+FIXTURE_ROOT = PROJECT_ROOT / "src" / "business_interview" / "replay_data" / "seed9004"
 NORMALIZED_FILES = ("truth.json", "agent.json", "expected.json")
 SOURCE_COMMIT = "00a98a5efbe9db2ccc3aaf2f04529ef50c323bb0"
 
