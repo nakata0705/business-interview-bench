@@ -347,9 +347,9 @@ def test_annotation_mode_must_match_knowledge() -> None:
         )
 
 
-def test_public_message_cannot_leak_local_or_truth_ids() -> None:
+def test_public_message_cannot_leak_local_handles_but_allows_truth_words() -> None:
     plan = _plan(("node:skn_001:activity", "value"))
-    for leaked in ("node:skn_001:activity", "truth_activity"):
+    for leaked in ("skn_001", "node:skn_001:activity"):
         response = _response(
             leaked,
             SemanticAnnotation(
@@ -360,6 +360,47 @@ def test_public_message_cannot_leak_local_or_truth_ids() -> None:
         )
         with pytest.raises(ResponseValidationError, match="private identifier"):
             validate_stakeholder_response(_knowledge(), plan, response)
+
+    truth_word = "truth_activity"
+    response = _response(
+        truth_word,
+        SemanticAnnotation(
+            semantic_id="node:skn_001:activity",
+            mode="value",
+            quote=truth_word,
+        ),
+    )
+    assert validate_stakeholder_response(_knowledge(), plan, response) is response
+
+
+def test_public_message_rejects_every_local_handle_but_allows_truth_node_me() -> None:
+    for leaked in (
+        "skn_001",
+        "ske_001",
+        "skc_activity",
+        "node:skn_001:system",
+        "edge:ske_001:condition",
+    ):
+        with pytest.raises(ResponseValidationError, match="private identifier"):
+            validate_stakeholder_response(
+                _knowledge(),
+                SemanticResponsePlan(),
+                _response(leaked),
+            )
+
+    knowledge = _knowledge()
+    knowledge = StakeholderKnowledge(
+        graph=knowledge.graph.model_copy(update={"node_truth_ids": {"skn_001": "me"}})
+    )
+    allowed = _response("Please send it to me.")
+    assert (
+        validate_stakeholder_response(
+            knowledge,
+            SemanticResponsePlan(),
+            allowed,
+        )
+        is allowed
+    )
 
 
 @pytest.mark.parametrize(

@@ -687,8 +687,11 @@ rejects unknown/Truth-only IDs and every mode mismatch before realization.
 `validate_stakeholder_response()` requires exact quote/occurrence spans, full
 plan coverage, no unplanned business annotations, and concept-only alignment
 or terminology events. It does not infer facts from natural-language prose;
-the private sidecar remains the authority. Strict `model_validate_json()`
-parsers do not repair fences or heuristically extract JSON.
+the private sidecar remains the authority. Public-message leakage protection
+rejects stakeholder-local bare handles and full semantic addresses, but does
+not reject Truth IDs that were never rendered to the stakeholder. Strict
+`model_validate_json()` parsers do not repair fences or heuristically extract
+JSON.
 
 `prompting.py` provides pure `render_knowledge_prompt()`. It renders only
 stakeholder-local visible graph elements, local concepts/terms, opaque IDs,
@@ -703,6 +706,68 @@ semantic output with a small fixed bound (default three attempts per phase).
 No response-schema dependency or custom provider is used. Provider errors are
 not conflated with semantic retries, and no Phase 11 Store is extended. Mock
 integration tests verify two successful stakeholder-role calls, retry behavior,
-and explicit exhaustion errors. Phase 13 is reserved for multi-turn
-orchestration; Agent LLM behavior, tools, observations, LiveInterviewStore,
-completion protocol, and generic Environment/InterviewDB remain out of scope.
+and explicit exhaustion errors.
+
+## Phase 13 result: live multi-turn interview runtime
+
+Phase 13 adds the first live session without reviving tau2 runtime concepts:
+
+```text
+Truth
+  ↓
+StakeholderKnowledge
+  ↓
+Stakeholder WHAT/HOW
+  ↓
+public message ──────────────────────┐
+  ↓                                  │
+Observation + raw public ledger     │
+  ↓                                  │
+Candidate Agent + thin Inspect tools │
+  ↓                                  │
+AgentGraph ─────── next question ────┘
+  ↓
+explicit completion
+  ↓
+evaluate_primary()
+
+private SemanticLedger
+  └── validated annotations / alignments / terminology bound to the exact
+      public-message turn and Observation; never copied to Agent messages
+```
+
+The core `business_interview.runtime.LiveInterviewStore` is JSON-serializable
+state for `scenario_id`, AgentGraph, raw public message records, observations,
+private `SemanticLedger`, explicit protocol state, and turn counters.
+`ingest_stakeholder_response()` runs the existing deterministic Phase 12
+validator before atomically adding only `StakeholderResponse.message` to the
+public ledger and candidate conversation. The exact observation text/turn and
+the validated private annotations, alignments, and terminology are retained
+in separate contracts; prose is never re-analyzed.
+
+`business_interview.graph_mutations` is the authoritative pure mutation layer
+for node/edge/concept add-update-remove, node properties, edge conditions,
+explicit ABSENT/DONT_KNOW, endpoints, and Observation EvidenceRefs. The
+Inspect `@tool` wrappers only read/write the live Store and delegate to these
+operations. Candidate tools return only the candidate-owned AgentGraph and
+public observation evidence; Truth, StakeholderKnowledge, and SemanticLedger
+are not exposed.
+
+`multi_turn_interview_solver` invokes the default/current candidate model
+through Inspect's supplied `Generate` callback and invokes the stakeholder
+through `get_model(role="stakeholder", required=True)`. Tool calls can mutate
+the graph before a natural-language question. Each question receives one
+validated stakeholder response, then one observation/ledger ingestion, before
+the next candidate turn. `complete_interview` is explicit and prevents all
+later stakeholder calls and graph mutations. The public-only
+`get_observations` tool supplies stable observation IDs/turns/text for exact
+EvidenceRef attachment without exposing the private ledger. Hard max-turn
+exhaustion is stored as an incomplete protocol, not as completion.
+`phase13_interview_task()`
+and `phase13_primary_scorer()` exercise the actual Inspect eval path used by
+deterministic MockLLM tests and pass the resulting context/graph through the
+unchanged 41-field `evaluate_primary()`.
+
+Phase 13 does not implement real-provider E2E, model comparison, calibration,
+LLM-as-judge, aggregate-score redesign, or generic Environment/InterviewDB.
+Those are retained as Phase 14 work.

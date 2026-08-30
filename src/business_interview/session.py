@@ -1,38 +1,11 @@
-"""Standalone Business Interview benchmark package.
+"""Session-oriented compatibility exports for the core live interview API."""
 
-The core graph, runtime, and evaluation contracts have no Inspect AI or tau2
-runtime dependency.  Inspect-specific orchestration lives in the sibling
-``business_interview_bench.inspect_adapter`` package.
-"""
-
-__version__ = "0.2.0"
-
-# The workspace-level auxiliary resolver may not see freshly added siblings;
-# project-level ``uv run pyright`` is authoritative for this package.
+# The canonical implementation is split into ``runtime`` and
+# ``graph_mutations``; this module keeps the session-oriented API discoverable.
 # pyright: reportMissingImports=false
 
-from .graph_mutations import (
+from .interview import (
     GraphMutationError,
-    add_edge,
-    add_node,
-    attach_evidence,
-    define_concept,
-    remove_concept,
-    remove_edge,
-    remove_node,
-    set_edge_condition,
-    set_edge_condition_absent,
-    set_edge_condition_dont_know,
-    set_end_nodes,
-    set_node_absent,
-    set_node_dont_know,
-    set_node_property,
-    set_start_nodes,
-    update_concept,
-    update_edge,
-    update_node,
-)
-from .runtime import (
     InterviewProtocolState,
     InterviewRuntimeError,
     InterviewSession,
@@ -47,15 +20,46 @@ from .runtime import (
     SemanticLedger,
     SemanticLedgerEntry,
     SemanticLedgerRecord,
+    add_agent_concept,
+    add_agent_edge,
+    add_agent_node,
+    add_concept,
+    add_edge,
+    add_node,
     apply_agent_graph_mutation,
+    attach_evidence,
     build_evaluation_context,
     create_live_interview_store,
+    define_agent_concept,
+    define_concept,
     ingest_response,
     ingest_stakeholder_response,
     mark_interview_complete,
     mark_max_turn_exhausted,
     record_candidate_question,
     record_candidate_turn,
+    remove_agent_concept,
+    remove_agent_edge,
+    remove_agent_node,
+    remove_concept,
+    remove_edge,
+    remove_node,
+    set_agent_edge_condition,
+    set_agent_node_property,
+    set_edge_condition,
+    set_edge_condition_absent,
+    set_edge_condition_dont_know,
+    set_end_nodes,
+    set_node_absent,
+    set_node_dont_know,
+    set_node_property,
+    set_start_nodes,
+    update_agent_concept,
+    update_agent_edge,
+    update_agent_node,
+    update_concept,
+    update_edge,
+    update_node,
 )
 
 __all__ = [
@@ -74,13 +78,17 @@ __all__ = [
     "SemanticLedger",
     "SemanticLedgerEntry",
     "SemanticLedgerRecord",
-    "__version__",
+    "add_agent_concept",
+    "add_agent_edge",
+    "add_agent_node",
+    "add_concept",
     "add_edge",
     "add_node",
     "apply_agent_graph_mutation",
     "attach_evidence",
     "build_evaluation_context",
     "create_live_interview_store",
+    "define_agent_concept",
     "define_concept",
     "ingest_response",
     "ingest_stakeholder_response",
@@ -88,9 +96,14 @@ __all__ = [
     "mark_max_turn_exhausted",
     "record_candidate_question",
     "record_candidate_turn",
+    "remove_agent_concept",
+    "remove_agent_edge",
+    "remove_agent_node",
     "remove_concept",
     "remove_edge",
     "remove_node",
+    "set_agent_edge_condition",
+    "set_agent_node_property",
     "set_edge_condition",
     "set_edge_condition_absent",
     "set_edge_condition_dont_know",
@@ -99,6 +112,9 @@ __all__ = [
     "set_node_dont_know",
     "set_node_property",
     "set_start_nodes",
+    "update_agent_concept",
+    "update_agent_edge",
+    "update_agent_node",
     "update_concept",
     "update_edge",
     "update_node",

@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 
 from .concepts import ConceptKind, ConceptRef, EvidenceRef
 from .epistemic import (
@@ -256,11 +256,35 @@ class ObservationRecord(BaseModel):
     this contract.
     """
 
-    model_config = ConfigDict(frozen=True)
+    model_config = ConfigDict(frozen=True, populate_by_name=True)
 
-    id: str
-    text: str
-    turn: int
+    id: str = Field(
+        min_length=1,
+        validation_alias=AliasChoices("id", "observation_id"),
+    )
+    text: str = Field(
+        min_length=1,
+        validation_alias=AliasChoices("text", "exact_text"),
+    )
+    turn: int = Field(
+        ge=0,
+        validation_alias=AliasChoices("turn", "public_message_turn", "message_turn"),
+    )
+
+    @property
+    def observation_id(self) -> str:
+        """Descriptive alias for the stable observation identifier."""
+        return self.id
+
+    @property
+    def public_message_turn(self) -> int:
+        """Descriptive alias for the evaluator's source message turn."""
+        return self.turn
+
+    @property
+    def exact_text(self) -> str:
+        """The exact stakeholder/public message text."""
+        return self.text
 
 
 class LedgerMessage(BaseModel):
@@ -287,3 +311,8 @@ class InterviewEvaluationContext(BaseModel):
     observations: tuple[ObservationRecord, ...] = Field(default_factory=tuple)
     messages_by_turn: dict[int, LedgerMessage] = Field(default_factory=dict)
     protocol_completed: bool = False
+
+
+# Descriptive alias used by the live runtime without changing the Phase 6
+# serialized ObservationRecord schema.
+Observation = ObservationRecord

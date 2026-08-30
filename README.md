@@ -2,11 +2,11 @@
 
 Standalone migration target for the `business-interview` benchmark.
 
-This repository is currently at **Phase 11**. It is an intentionally small
+This repository is currently at **Phase 13**. It is an intentionally small
 Python 3.12 project managed with [`uv`](https://docs.astral.sh/uv/). The
 existing `tau2-bench` checkout remains the migration oracle; this project does
-not vendor tau2, copy the legacy evaluator, or start an LLM simulator
-integration.
+not vendor tau2, copy the legacy evaluator, or run real-provider benchmark
+calibration.
 
 ## Setup and checks
 
@@ -32,13 +32,15 @@ business-interview-bench/
 ├── src/business_interview/
 │   ├── __init__.py
 │   ├── models/         # tau2-free Truth/Agent graph model
+│   ├── graph_mutations.py # pure AgentGraph mutation operations
+│   ├── runtime.py       # live session/observation/semantic-ledger state
 │   ├── comparison/     # tau2-free deterministic alignment/comparison core
 │   ├── evaluation/     # graph-only and explicit-context evaluator facades
 │   ├── replay_data/    # packaged canonical seed9004 replay asset
 │   ├── scenarios/      # tau2-free scenario/task catalog and Truth resources
 │   └── stakeholders/   # profile, knowledge, response, and prompt contracts
 ├── src/business_interview_bench/
-│   └── inspect_adapter/ # Inspect task, solver, scorer, and replay Store
+│   └── inspect_adapter/ # Inspect tasks, solver, tools, scorers, and Stores
 └── tests/
     ├── test_comparison_core.py
     ├── test_evaluation.py
@@ -49,6 +51,8 @@ business-interview-bench/
     ├── test_seed9004_fixture.py
     ├── test_stakeholder_projection.py # Truth-to-knowledge projection checks
     ├── test_inspect_adapter.py # deterministic Inspect replay/rescore checks
+    ├── test_phase13_runtime.py # live state, ledger, and graph mutation checks
+    ├── test_phase13_inspect.py # MockLLM multi-turn Inspect integration
     ├── test_stakeholders.py # private runtime contract checks
     └── test_serialization.py
 ```
@@ -224,8 +228,11 @@ inspect eval business_interview_bench/seed9004_replay --model none
 inspect score <log>.eval --scorer business_interview_bench/primary_scorer
 ```
 
-The registered task has exactly one packaged seed9004 sample. Its minimal
-solver validates the four canonical scoring inputs and stores only their JSON
+The registered replay task has exactly one packaged seed9004 sample. A
+separate registered `phase13_interview` task/factory is available for live
+multi-turn runs; deterministic tests normally call it with MockLLM model
+objects and a stakeholder model role. The replay task's minimal solver
+validates the four canonical scoring inputs and stores only their JSON
 payloads. It never calls `generate()`, a model, or an external service. The
 `BusinessInterviewReplayStore` contains only `agent`, `truth`,
 `evaluation_context`, and `knowledge_coverage`; expected oracle and provenance
@@ -258,13 +265,18 @@ sidecar validation. A plan can reference only stakeholder-local opaque IDs and
 must use the mode implied by `StakeholderKnowledge`: `value`, `absent`,
 `dont_know`, `exists`, or `mention`. Realized annotations must cover the
 validated plan with exact message spans; alignments and terminology entries
-must target local concepts. No facts are inferred from prose, and literal
-local/Truth ID leakage in the public message is rejected.
+must target local concepts. No facts are inferred from prose. Public-message
+leakage protection rejects stakeholder-local handles and semantic addresses,
+while Truth IDs remain valid
+natural-language tokens because they are not shown to the stakeholder.
 
 `render_knowledge_prompt()` is a pure core renderer. It emits only visible
 positions, relations, concepts, local terms, and the distinct value/absence/
 unknown states. Truth mappings, Truth IDs, hidden facts, and evaluator metadata
 are never rendered, and canonical terminology is not supplemented externally.
+A public response guard rejects stakeholder-local bare handles and semantic
+addresses, but intentionally does not reject Truth IDs that were never shown
+in the stakeholder prompt (for example a Truth node named `me`).
 
 The thin Inspect-only `invoke_stakeholder_response()` adapter resolves
 `get_model(role="stakeholder", required=True)` and performs two calls: WHAT
@@ -277,8 +289,62 @@ conversation and knowledge arguments and does not extend the Phase 11 Store.
 MockLLM integration tests cover exactly two successful stakeholder-role calls,
 plan/realization retries, and explicit retry exhaustion errors.
 
-Phase 13 remains reserved for multi-turn orchestration. Agent LLM behavior,
-AgentGraph mutation tools, observations, SemanticLedger/LiveInterviewStore,
-completion protocol, candidate/stakeholder turn scheduling, provider
-configuration, and generic Environment/InterviewDB remain unimplemented. See
-`migration/README.md` and `migration/inventory.md` for migration details.
+## Phase 13: live multi-turn interview runtime
+
+Phase 13 adds the first complete multi-turn vertical slice. Core state remains
+Inspect-free:
+
+```text
+Truth
+  ↓
+StakeholderKnowledge
+  ↓
+Stakeholder WHAT/HOW
+  ↓
+public message ──────────────────────┐
+  ↓                                  │
+Observation + raw public ledger     │
+  ↓                                  │
+Candidate Agent + graph tools        │
+  ↓                                  │
+AgentGraph ─────── next question ────┘
+  ↓
+explicit completion
+  ↓
+evaluate_primary()
+
+private SemanticLedger
+  └── validated annotations / concept alignments / terminology
+      (bound to the exact public-message turn and Observation; never in
+       Agent-visible messages)
+```
+
+`business_interview.runtime.LiveInterviewStore` is a JSON-serializable live
+contract containing the scenario ID, AgentGraph, raw public messages,
+observations, private SemanticLedger, protocol state, and turn counters.
+`ingest_stakeholder_response()` validates the existing Phase 12 plan/response
+contract before atomically appending the exact `StakeholderResponse.message`,
+its `ObservationRecord`, and the private sidecar. No prose is re-parsed.
+
+`business_interview.graph_mutations` provides pure add/update/remove node,
+edge, and concept operations; slot value/ABSENT/DONT_KNOW operations; endpoint
+updates; and exact Observation EvidenceRef attachment. Invalid IDs, references,
+and terminal-state mutations raise explicit errors. Inspect `@tool` wrappers
+only serialize the candidate-owned graph and delegate all semantics to these
+operations.
+
+`multi_turn_interview_solver` uses Inspect's supplied default/current candidate
+model and the required `get_model(role="stakeholder", required=True)` role.
+Each candidate question receives one validated stakeholder response; only its
+public text is appended to the candidate history. The public-only
+`get_observations` tool exposes stable observation IDs/turns/text when exact
+EvidenceRef attachment is needed. `complete_interview` stops further
+stakeholder calls and graph mutations. A hard max-turn exhaustion is
+stored as `incomplete`, not as protocol completion. `phase13_interview_task()`
+and `phase13_primary_scorer()` provide a real Inspect path for deterministic
+MockLLM tests and connect the final state to the unchanged 41-field
+`evaluate_primary()` evaluator.
+
+Phase 13 intentionally does not add real-provider E2E, model comparison,
+calibration, judge logic, or tau2 Environment/InterviewDB. Those remain Phase
+14 work. See `migration/README.md` and `migration/inventory.md` for details.

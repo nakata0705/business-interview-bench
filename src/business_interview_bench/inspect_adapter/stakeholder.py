@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Sequence
+from dataclasses import dataclass
 
 from inspect_ai.model import (
     ChatMessage,
@@ -17,6 +18,7 @@ from inspect_ai.model import (
     get_model,
 )
 
+from business_interview.runtime import SemanticLedger
 from business_interview.stakeholders.knowledge import (
     StakeholderKnowledge,
     validate_stakeholder_knowledge,
@@ -53,6 +55,14 @@ class StakeholderResponseError(ValueError):
     """Raised when bounded semantic retry cannot produce a valid response."""
 
 
+@dataclass(frozen=True, slots=True)
+class StakeholderTurn:
+    """The validated private WHAT/HOW pair for one public response."""
+
+    plan: SemanticResponsePlan
+    response: StakeholderResponse
+
+
 def _model_input(
     conversation: Sequence[ChatMessage],
     knowledge_prompt: str,
@@ -63,6 +73,33 @@ def _model_input(
         *conversation,
         ChatMessageUser(content=instruction),
     ]
+
+
+def _prior_ledger_prompt(ledger: SemanticLedger | None) -> str:
+    """Render prior validated sidecar events for the stakeholder only."""
+    if ledger is None:
+        return ""
+    events = [
+        {
+            "observation_id": entry.observation_id,
+            "public_message_turn": entry.public_message_turn,
+            "annotations": [item.model_dump(mode="json") for item in entry.annotations],
+            "alignments": [item.model_dump(mode="json") for item in entry.alignments],
+            "terminology": [item.model_dump(mode="json") for item in entry.terminology],
+        }
+        for entry in ledger.entries
+        if entry.annotations or entry.alignments or entry.terminology
+    ]
+    if not events:
+        return ""
+    payload = json.dumps(events, ensure_ascii=False, sort_keys=True)
+    return (
+        "\nPreviously validated private sidecar events for this stakeholder "
+        "session (do not reveal their IDs or JSON):\n"
+        f"{payload}\n"
+        "Use these only to keep confirmed terminology consistent; do not add "
+        "facts that are not in the current private knowledge."
+    )
 
 
 def _retry_instruction(instruction: str, error: ValueError | None) -> str:
@@ -136,10 +173,44 @@ async def _realize_response(
     ) from error
 
 
+async def invoke_stakeholder_response_with_plan(
+    conversation: Sequence[ChatMessage],
+    knowledge: StakeholderKnowledge,
+    *,
+    prior_ledger: SemanticLedger | None = None,
+    max_plan_attempts: int = _DEFAULT_MAX_ATTEMPTS,
+    max_realization_attempts: int = _DEFAULT_MAX_ATTEMPTS,
+) -> StakeholderTurn:
+    """Generate and return one validated private plan plus public response."""
+    _attempts_are_positive(max_plan_attempts, max_realization_attempts)
+    validate_stakeholder_knowledge(knowledge)
+    model = get_model(role="stakeholder", required=True)
+    knowledge_prompt = render_knowledge_prompt(knowledge) + _prior_ledger_prompt(
+        prior_ledger
+    )
+    plan = await _generate_plan(
+        model,
+        conversation,
+        knowledge,
+        knowledge_prompt,
+        max_plan_attempts,
+    )
+    response = await _realize_response(
+        model,
+        conversation,
+        knowledge,
+        knowledge_prompt,
+        plan,
+        max_realization_attempts,
+    )
+    return StakeholderTurn(plan=plan, response=response)
+
+
 async def invoke_stakeholder_response(
     conversation: Sequence[ChatMessage],
     knowledge: StakeholderKnowledge,
     *,
+    prior_ledger: SemanticLedger | None = None,
     max_plan_attempts: int = _DEFAULT_MAX_ATTEMPTS,
     max_realization_attempts: int = _DEFAULT_MAX_ATTEMPTS,
 ) -> StakeholderResponse:
@@ -149,25 +220,19 @@ async def invoke_stakeholder_response(
     is never used as an implicit fallback. Provider errors are allowed to
     propagate separately from bounded semantic-output retries.
     """
-    _attempts_are_positive(max_plan_attempts, max_realization_attempts)
-    validate_stakeholder_knowledge(knowledge)
-    model = get_model(role="stakeholder", required=True)
-    knowledge_prompt = render_knowledge_prompt(knowledge)
-    plan = await _generate_plan(
-        model,
+    turn = await invoke_stakeholder_response_with_plan(
         conversation,
         knowledge,
-        knowledge_prompt,
-        max_plan_attempts,
+        prior_ledger=prior_ledger,
+        max_plan_attempts=max_plan_attempts,
+        max_realization_attempts=max_realization_attempts,
     )
-    return await _realize_response(
-        model,
-        conversation,
-        knowledge,
-        knowledge_prompt,
-        plan,
-        max_realization_attempts,
-    )
+    return turn.response
 
 
-__all__ = ["StakeholderResponseError", "invoke_stakeholder_response"]
+__all__ = [
+    "StakeholderResponseError",
+    "StakeholderTurn",
+    "invoke_stakeholder_response",
+    "invoke_stakeholder_response_with_plan",
+]

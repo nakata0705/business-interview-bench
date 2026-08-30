@@ -6,17 +6,10 @@
 
 from __future__ import annotations
 
-from dataclasses import asdict, fields
-from typing import Any, cast
-
 from inspect_ai.scorer import Score, Scorer, Target, mean, scorer
 from inspect_ai.solver import TaskState
 
-from business_interview.evaluation import (
-    KnowledgeCoverageView,
-    PrimaryEvaluation,
-    evaluate_primary,
-)
+from business_interview.evaluation import KnowledgeCoverageView
 from business_interview.models import (
     AgentGraph,
     BusinessProcessGraph,
@@ -24,6 +17,8 @@ from business_interview.models import (
     validate_canonical_graph,
 )
 
+from .live_scorer import live_primary_scorer, phase13_primary_scorer
+from .primary_score import score_primary_inputs
 from .store import BusinessInterviewReplayStore
 
 
@@ -43,18 +38,13 @@ def primary_scorer() -> Scorer:
         knowledge_coverage = KnowledgeCoverageView.model_validate(
             replay_store.knowledge_coverage
         )
-        result = evaluate_primary(agent, truth, context, knowledge_coverage)
-        values: dict[str, Any] = asdict(result)
-        field_names = tuple(field.name for field in fields(PrimaryEvaluation))
-        if len(values) != len(field_names) or set(values) != set(field_names):
-            raise ValueError(
-                "evaluate_primary field contract changed: "
-                f"expected {len(field_names)} fields {field_names!r}, "
-                f"got {len(values)} fields {tuple(values)!r}"
-            )
-        return Score(value=cast(dict[str, str | int | float | bool | None], values))
+        return score_primary_inputs(agent, truth, context, knowledge_coverage)
 
     return score
 
 
-__all__ = ["primary_scorer"]
+__all__ = [
+    "live_primary_scorer",
+    "phase13_primary_scorer",
+    "primary_scorer",
+]

@@ -208,13 +208,22 @@ def _require_message_span(
 def _private_identifiers(
     knowledge: StakeholderKnowledge | StakeholderKnowledgeGraph,
 ) -> set[str]:
+    """Return only local handles that can appear in stakeholder instructions.
+
+    Truth IDs are private projection metadata and are never rendered in the
+    stakeholder prompt.  Treating them as public-message leakage tokens would
+    reject ordinary language such as ``"Please send it to me."`` when a Truth
+    node happens to be named ``"me"``.  The local graph namespace, including
+    its full semantic addresses, is the only identifier surface that the
+    response validator must guard.
+    """
     graph = (
         knowledge.graph if isinstance(knowledge, StakeholderKnowledge) else knowledge
     )
     identifiers = set(graph.semantic_ids())
-    identifiers.update(graph.node_truth_ids.values())
-    identifiers.update(graph.edge_truth_ids.values())
-    identifiers.update(concept.truth_concept_id for concept in graph.concepts.values())
+    identifiers.update(graph.nodes)
+    identifiers.update(graph.edges)
+    identifiers.update(graph.concepts)
     return {identifier for identifier in identifiers if identifier}
 
 

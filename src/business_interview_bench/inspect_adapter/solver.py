@@ -8,6 +8,12 @@ from __future__ import annotations
 
 from inspect_ai.solver import Generate, Solver, TaskState, solver
 
+from .multiturn import (
+    MultiTurnInterviewError,
+    multi_turn_interview_solver,
+    multi_turn_solver,
+    phase13_solver,
+)
 from .store import BusinessInterviewReplayStore, _load_seed9004_scoring_inputs
 
 
@@ -29,4 +35,10 @@ def seed9004_replay_solver() -> Solver:
     return solve
 
 
-__all__ = ["seed9004_replay_solver"]
+__all__ = [
+    "MultiTurnInterviewError",
+    "multi_turn_interview_solver",
+    "multi_turn_solver",
+    "phase13_solver",
+    "seed9004_replay_solver",
+]

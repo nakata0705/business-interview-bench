@@ -749,7 +749,9 @@ from `StakeholderKnowledge.resolve()`. Plan validation rejects unknown,
 Truth-only, and mode-inconsistent IDs before realization. Sidecar validation
 requires exact message quote/occurrence spans, complete plan coverage, no
 unplanned business annotations, and concept-only alignment/terminology events.
-Literal local/Truth ID leakage is rejected; prose is never mined for facts.
+Stakeholder-local handle and semantic-address leakage is rejected; Truth IDs
+are not rejected because they are never rendered to the stakeholder. Prose is
+never mined for facts.
 
 `render_knowledge_prompt()` is a pure local-world renderer. It exposes only
 visible positions, relations, concepts, stakeholder-local terms and opaque IDs,
@@ -762,7 +764,55 @@ plan and realization calls, parses with strict `model_validate_json()`, and
 performs separate bounded semantic retries (default three per phase). It does
 not use response schemas, custom providers, or the Phase 11 Store. MockLLM
 integration covers exactly two successful role calls, invalid-plan and
-invalid-realization retries, and explicit exhaustion errors. Phase 13 is
-reserved for multi-turn orchestration; Agent runtime, tools, observations,
-LiveInterviewStore, completion protocol, provider configuration, and generic
-Environment/InterviewDB remain out of scope.
+invalid-realization retries, and explicit exhaustion errors.
+
+## Phase 13 result: live multi-turn interview runtime
+
+Phase 13 implements the first live Business Interview slice while keeping the
+core independent of Inspect and tau2:
+
+```text
+Truth -> StakeholderKnowledge -> stakeholder WHAT/HOW -> public message
+                                                        -> Observation
+                                                        -> Candidate + tools
+                                                        -> AgentGraph -> next question
+                                                        -> explicit completion
+                                                        -> evaluate_primary()
+
+private SemanticLedger: validated annotations/alignments/terminology, bound to
+exact public-message turns and observations, never placed in Agent messages.
+```
+
+`business_interview.runtime.LiveInterviewStore` is JSON-serializable state for
+scenario ID, AgentGraph, raw public message ledger, observations, private
+SemanticLedger, protocol state, and candidate/stakeholder turn counters. A
+validated response is ingested atomically: only `StakeholderResponse.message`
+becomes a public user message and the exact observation text/turn; the private
+sidecar is retained separately and is never recovered by parsing prose.
+Initial public stakeholder messages can be represented as empty semantic
+entries, while generated responses always enter through the Phase 12 validator.
+
+`business_interview.graph_mutations` owns pure add/update/remove node, edge,
+and concept operations, node properties, edge conditions, explicit
+ABSENT/DONT_KNOW, endpoints, and exact Observation EvidenceRefs. The thin
+Inspect `@tool` wrappers only bind those operations to the live Store and
+return candidate-owned graph JSON. They expose no Truth, StakeholderKnowledge,
+or SemanticLedger.
+
+`multi_turn_interview_solver` uses Inspect's supplied default/current candidate
+model and the existing required stakeholder role. Inspect's durable
+`Generate(tool_calls="loop")` path allows graph tools before a natural-language
+question. Every question invokes the stakeholder once at the runtime level,
+then appends one validated public response/observation before the next
+candidate turn. `complete_interview` prevents later stakeholder calls and graph
+mutations. The public-only `get_observations` tool exposes stable
+observation IDs/turns/text for exact EvidenceRef attachment and no private
+ledger fields. Exhausting the hard max-turn count records an explicit
+incomplete protocol rather than completion. `phase13_interview_task()` and
+`phase13_primary_scorer()` provide the real Inspect path used by deterministic
+MockLLM integration tests; final scoring delegates unchanged to
+`evaluate_primary()` and retains all 41 fields.
+
+Phase 13 does not add real-provider E2E, calibration, model comparison,
+LLM-as-judge, aggregate-score redesign, tau2 Environment/InterviewDB, or other
+generic runtime infrastructure. These items remain Phase 14 work.
