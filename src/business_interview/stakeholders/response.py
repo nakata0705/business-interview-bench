@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
 from typing import Literal
 
 from pydantic import Field, field_validator
@@ -83,18 +84,31 @@ class ConceptAlignmentAssertion(_DeeplyImmutableModel):
 
 
 class TerminologyConfirmation(_DeeplyImmutableModel):
-    """A private terminology-agreement event anchored to a message span."""
+    """A terminology-agreement event with deterministic proposal provenance.
+
+    ``proposal_turn`` addresses an assistant/public interviewer message in the
+    public message ledger.  ``proposal_quote`` and ``proposal_occurrence``
+    prove that the interviewer actually uttered the proposed term; ``quote``
+    and ``occurrence`` independently anchor the stakeholder's agreement in the
+    realized stakeholder message.
+    """
 
     semantic_id: str = Field(min_length=1)
     proposed_term: str = Field(min_length=1)
+    proposal_turn: int = Field(ge=0)
+    proposal_quote: str = Field(min_length=1)
+    proposal_occurrence: int = Field(default=0, ge=0)
     quote: str = Field(min_length=1)
     occurrence: int = Field(default=0, ge=0)
 
-    @field_validator("semantic_id", "proposed_term", "quote")
+    @field_validator("semantic_id", "proposed_term", "proposal_quote", "quote")
     @classmethod
     def _text_not_blank(cls, value: str) -> str:
         if not value.strip():
-            raise ValueError("semantic_id, proposed_term, and quote must not be blank")
+            raise ValueError(
+                "semantic_id, proposed_term, proposal_quote, and quote "
+                "must not be blank"
+            )
         return value
 
 
@@ -205,6 +219,92 @@ def _require_message_span(
         )
 
 
+def _public_message_parts(
+    message: object,
+    fallback_turn: int,
+) -> tuple[int, str, str] | None:
+    """Read role/turn/text without depending on runtime or Inspect types."""
+    if isinstance(message, Mapping):
+        role = message.get("role")
+        text = message.get("content", message.get("text"))
+        turn = message.get("turn", message.get("public_message_turn", fallback_turn))
+    elif (
+        isinstance(message, tuple)
+        and len(message) == 2
+        and isinstance(message[0], str)
+        and isinstance(message[1], str)
+    ):
+        role, text, turn = message[0], message[1], fallback_turn
+    else:
+        role = getattr(message, "role", None)
+        text = getattr(message, "text", None)
+        if not isinstance(text, str):
+            text = getattr(message, "content", None)
+        turn = getattr(message, "turn", fallback_turn)
+        if not isinstance(turn, int):
+            turn = getattr(message, "public_message_turn", fallback_turn)
+    if not isinstance(role, str) or not isinstance(text, str) or not text:
+        return None
+    if not isinstance(turn, int) or isinstance(turn, bool) or turn < 0:
+        return None
+    return turn, role, text
+
+
+def validate_terminology_provenance(
+    terminology: Sequence[TerminologyConfirmation],
+    interviewer_messages: Sequence[object] | None,
+    *,
+    response_public_message_turn: int | None = None,
+) -> None:
+    """Validate proposal and agreement spans without judging dialogue intent."""
+    if not terminology:
+        return
+    if interviewer_messages is None:
+        raise ResponseValidationError(
+            "terminology provenance requires interviewer message history"
+        )
+
+    messages_by_turn: dict[int, tuple[str, str]] = {}
+    for index, message in enumerate(interviewer_messages):
+        parts = _public_message_parts(message, index)
+        if parts is not None:
+            turn, role, text = parts
+            messages_by_turn[turn] = (role, text)
+
+    for index, event in enumerate(terminology):
+        proposal = messages_by_turn.get(event.proposal_turn)
+        if proposal is None:
+            raise ResponseValidationError(
+                f"terminology {index} proposal_turn {event.proposal_turn!r} "
+                "does not identify a public interviewer message"
+            )
+        role, text = proposal
+        if role != "assistant":
+            raise ResponseValidationError(
+                f"terminology {index} proposal_turn {event.proposal_turn!r} "
+                "must identify an assistant interviewer message"
+            )
+        if (
+            response_public_message_turn is not None
+            and event.proposal_turn >= response_public_message_turn
+        ):
+            raise ResponseValidationError(
+                f"terminology {index} proposal_turn {event.proposal_turn!r} "
+                "must precede the stakeholder response"
+            )
+        _require_message_span(
+            text,
+            event.proposal_quote,
+            event.proposal_occurrence,
+            subject=f"terminology {index} proposal",
+        )
+        if event.proposed_term not in event.proposal_quote:
+            raise ResponseValidationError(
+                f"terminology {index} proposed_term {event.proposed_term!r} "
+                "is not an exact span of proposal_quote"
+            )
+
+
 def _private_identifiers(
     knowledge: StakeholderKnowledge | StakeholderKnowledgeGraph,
 ) -> set[str]:
@@ -280,6 +380,9 @@ def validate_stakeholder_response(
     knowledge: StakeholderKnowledge | StakeholderKnowledgeGraph,
     plan: SemanticResponsePlan,
     response: StakeholderResponse,
+    *,
+    interviewer_messages: Sequence[object] | None = None,
+    response_public_message_turn: int | None = None,
 ) -> StakeholderResponse:
     """Validate a realized sidecar without inferring facts from prose."""
     validate_response_plan(knowledge, plan)
@@ -338,6 +441,11 @@ def validate_stakeholder_response(
             subject=f"terminology {index}",
         )
 
+    validate_terminology_provenance(
+        response.terminology,
+        interviewer_messages,
+        response_public_message_turn=response_public_message_turn,
+    )
     return response
 
 
@@ -374,4 +482,5 @@ __all__ = [
     "semantic_mode_for_resolution",
     "validate_response_plan",
     "validate_stakeholder_response",
+    "validate_terminology_provenance",
 ]

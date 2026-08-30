@@ -16,6 +16,7 @@ from inspect_ai.model import (
     ChatMessageAssistant,
     ChatMessageSystem,
     ChatMessageUser,
+    GenerateConfig,
 )
 from inspect_ai.solver import Generate, Solver, TaskState, solver
 
@@ -31,7 +32,7 @@ from business_interview.runtime import (
     create_live_interview_store,
     mark_max_turn_exhausted,
 )
-from business_interview.scenarios import get_scenario
+from business_interview.scenarios import StakeholderPrompt, get_scenario
 from business_interview.stakeholders import (
     EdgeProperty,
     NodeProperty,
@@ -53,6 +54,10 @@ from .stakeholder import (
     invoke_stakeholder_response_with_plan,
 )
 from .tools import build_interview_tools
+
+_DEFAULT_MAX_CANDIDATE_STEPS_PER_TURN = 8
+_DEFAULT_CANDIDATE_MAX_TOKENS = 1024
+_DEFAULT_STAKEHOLDER_GENERATIONS_PER_TURN = 6
 
 _CANDIDATE_SYSTEM_MARKER = "business-interview-bench phase13 candidate"
 _CANDIDATE_SYSTEM = f"""{_CANDIDATE_SYSTEM_MARKER}
@@ -99,8 +104,14 @@ def _public_conversation(runtime: LiveInterviewStore) -> list[ChatMessage]:
     ]
 
 
-def _all_visible_knowledge(truth: BusinessProcessGraph) -> StakeholderKnowledge:
-    """Construct a deterministic full-visibility knowledge input for a task."""
+def build_full_visibility_knowledge_for_smoke(
+    truth: BusinessProcessGraph,
+) -> StakeholderKnowledge:
+    """Build full visibility explicitly for infrastructure smoke tests only.
+
+    This helper is intentionally not used by the live Phase 13 task.  Live
+    callers must pass exact knowledge or an explicit profile plus seed.
+    """
     node_properties: dict[str, tuple[NodeProperty, ...]] = {
         node_id: cast(
             tuple[NodeProperty, ...],
@@ -130,21 +141,104 @@ def _all_visible_knowledge(truth: BusinessProcessGraph) -> StakeholderKnowledge:
     return project_knowledge(truth, profile, seed=0)
 
 
+def _resolve_max_turns(
+    max_turns: int,
+    max_turn_count: int | None,
+    max_interview_turns: int | None,
+) -> int:
+    aliases = [
+        value for value in (max_turn_count, max_interview_turns) if value is not None
+    ]
+    if len(set(aliases)) > 1:
+        raise ValueError("max_turn_count and max_interview_turns must agree")
+    return aliases[0] if aliases else max_turns
+
+
+def _validate_candidate_limits(
+    max_turns: int,
+    max_candidate_steps_per_turn: int,
+    candidate_max_tokens: int,
+) -> None:
+    if max_turns < 1:
+        raise ValueError("max_interview_turns must be positive")
+    if max_candidate_steps_per_turn < 1:
+        raise ValueError("max_candidate_steps_per_turn must be positive")
+    if candidate_max_tokens < 1:
+        raise ValueError("candidate_max_tokens must be positive")
+
+
 def _resolve_setup(
     scenario_id: str | None,
     truth: BusinessProcessGraph | None,
     knowledge: StakeholderKnowledge | None,
-) -> tuple[str, BusinessProcessGraph, StakeholderKnowledge]:
+    *,
+    stakeholder_profile: StakeholderProfile | None = None,
+    stakeholder_seed: int | None = None,
+    stakeholder_prompt: StakeholderPrompt | str | None = None,
+) -> tuple[
+    str,
+    BusinessProcessGraph,
+    StakeholderKnowledge,
+    StakeholderProfile | None,
+    int | None,
+    StakeholderPrompt | str | None,
+]:
     if scenario_id is None:
         raise MultiTurnInterviewError("scenario_id is required")
-    scenario = get_scenario(scenario_id) if truth is None else None
+    try:
+        scenario = get_scenario(scenario_id)
+    except LookupError:
+        if truth is None:
+            raise
+        scenario = None
     resolved_truth = truth or (scenario.truth if scenario is not None else None)
     if resolved_truth is None:  # pragma: no cover - guarded by the branch above
         raise MultiTurnInterviewError("truth is required when scenario is unavailable")
     validate_canonical_graph(resolved_truth)
-    resolved_knowledge = knowledge or _all_visible_knowledge(resolved_truth)
+
+    if knowledge is None:
+        if stakeholder_profile is None or stakeholder_seed is None:
+            raise MultiTurnInterviewError(
+                "stakeholder setup is required: pass exact stakeholder_knowledge "
+                "or both stakeholder_profile and stakeholder_seed"
+            )
+        resolved_knowledge = project_knowledge(
+            resolved_truth,
+            stakeholder_profile,
+            seed=stakeholder_seed,
+        )
+    else:
+        # A task factory may pass the already projected exact object together
+        # with its profile/seed solely to persist reproducibility metadata.
+        if stakeholder_profile is not None and stakeholder_seed is None:
+            raise MultiTurnInterviewError(
+                "stakeholder_seed is required when stakeholder_profile is supplied"
+            )
+        resolved_knowledge = knowledge
     validate_stakeholder_knowledge(resolved_knowledge)
-    return scenario_id, resolved_truth, resolved_knowledge
+
+    resolved_prompt = stakeholder_prompt
+    if resolved_prompt is None and scenario is not None:
+        resolved_prompt = scenario.prompt
+    if resolved_prompt is None:
+        raise MultiTurnInterviewError(
+            "stakeholder_prompt is required when scenario is unavailable"
+        )
+    if isinstance(resolved_prompt, str) and not resolved_prompt.strip():
+        raise MultiTurnInterviewError("stakeholder_prompt must not be blank")
+    resolved_seed = (
+        stakeholder_seed
+        if stakeholder_seed is not None
+        else resolved_knowledge.generation_seed
+    )
+    return (
+        scenario_id,
+        resolved_truth,
+        resolved_knowledge,
+        stakeholder_profile,
+        resolved_seed,
+        resolved_prompt,
+    )
 
 
 def _persist(
@@ -152,9 +246,19 @@ def _persist(
     runtime: LiveInterviewStore,
     truth: BusinessProcessGraph,
     coverage: KnowledgeCoverageView,
+    knowledge: StakeholderKnowledge,
+    stakeholder_profile: StakeholderProfile | None,
+    stakeholder_seed: int | None,
 ) -> None:
     persist_live_state(inspect_store, runtime)
-    persist_evaluation_inputs(inspect_store, truth, coverage)
+    persist_evaluation_inputs(
+        inspect_store,
+        truth,
+        coverage,
+        stakeholder_knowledge=knowledge,
+        stakeholder_profile=stakeholder_profile,
+        stakeholder_seed=stakeholder_seed,
+    )
 
 
 @solver(name="multi_turn_interview_solver")
@@ -163,7 +267,13 @@ def multi_turn_interview_solver(
     stakeholder_knowledge: StakeholderKnowledge | None = None,
     *,
     truth: BusinessProcessGraph | None = None,
+    stakeholder_profile: StakeholderProfile | None = None,
+    stakeholder_seed: int | None = None,
+    stakeholder_prompt: StakeholderPrompt | str | None = None,
     max_turns: int = 8,
+    max_interview_turns: int | None = None,
+    max_candidate_steps_per_turn: int = _DEFAULT_MAX_CANDIDATE_STEPS_PER_TURN,
+    candidate_max_tokens: int = _DEFAULT_CANDIDATE_MAX_TOKENS,
     initial_graph: AgentGraph | None = None,
     initial_messages: Sequence[ChatMessage] | None = None,
     max_turn_count: int | None = None,
@@ -175,10 +285,20 @@ def multi_turn_interview_solver(
     preserved.  Stakeholder calls use the existing required ``stakeholder``
     model role.  Private sidecar output is retained only in ``live_state``.
     """
-    resolved_scenario_id, resolved_truth, resolved_knowledge = _resolve_setup(
+    (
+        resolved_scenario_id,
+        resolved_truth,
+        resolved_knowledge,
+        resolved_profile,
+        resolved_seed,
+        resolved_prompt,
+    ) = _resolve_setup(
         scenario_id,
         truth,
         stakeholder_knowledge,
+        stakeholder_profile=stakeholder_profile,
+        stakeholder_seed=stakeholder_seed,
+        stakeholder_prompt=stakeholder_prompt,
     )
     catalog_initial_messages: tuple[ChatMessage, ...] | None = None
     if initial_messages is None and truth is None:
@@ -186,10 +306,16 @@ def multi_turn_interview_solver(
             _chat_message(message.role, message.content)
             for message in get_scenario(resolved_scenario_id).initial_messages
         )
-    if max_turn_count is not None:
-        max_turns = max_turn_count
-    if max_turns < 1:
-        raise ValueError("max_turns must be positive")
+    max_turns = _resolve_max_turns(
+        max_turns,
+        max_turn_count,
+        max_interview_turns,
+    )
+    _validate_candidate_limits(
+        max_turns,
+        max_candidate_steps_per_turn,
+        candidate_max_tokens,
+    )
     coverage = knowledge_coverage_view(resolved_truth, resolved_knowledge)
 
     async def solve(state: TaskState, generate: Generate) -> TaskState:
@@ -216,6 +342,7 @@ def multi_turn_interview_solver(
                 initial_graph=initial_graph,
                 initial_public_messages=pairs,
                 max_turns=max_turns,
+                max_candidate_steps_per_turn=max_candidate_steps_per_turn,
             )
         if runtime.scenario_id != resolved_scenario_id:
             raise MultiTurnInterviewError(
@@ -223,11 +350,23 @@ def multi_turn_interview_solver(
             )
         if runtime.max_turns != max_turns:
             raise MultiTurnInterviewError("live state max_turns mismatch")
+        if runtime.max_candidate_steps_per_turn != max_candidate_steps_per_turn:
+            raise MultiTurnInterviewError(
+                "live state max_candidate_steps_per_turn mismatch"
+            )
 
         runtime_ref = [runtime]
 
         def persist(runtime_value: LiveInterviewStore) -> None:
-            _persist(inspect_store, runtime_value, resolved_truth, coverage)
+            _persist(
+                inspect_store,
+                runtime_value,
+                resolved_truth,
+                coverage,
+                resolved_knowledge,
+                resolved_profile,
+                resolved_seed,
+            )
 
         def complete_state() -> None:
             state.completed = True
@@ -265,18 +404,79 @@ def multi_turn_interview_solver(
             runtime_ref[0] = runtime
             persist(runtime)
 
-            try:
-                state = await generate(state, tool_calls="loop")
-            except StakeholderResponseError:
-                raise
-            except Exception as exc:
-                raise MultiTurnInterviewError("candidate model turn failed") from exc
+            question: str | None = None
+            while runtime_ref[0].active:
+                if runtime_ref[0].candidate_steps >= max_candidate_steps_per_turn:
+                    runtime = mark_max_turn_exhausted(
+                        runtime_ref[0],
+                        "candidate_step_limit_exhausted",
+                    )
+                    runtime_ref[0] = runtime
+                    persist(runtime)
+                    break
+                try:
+                    # Inspect's ``loop`` is intentionally not used here: it
+                    # can keep invoking the candidate until a provider stops
+                    # emitting tools.  One explicit ``single`` call is one
+                    # bounded candidate generation/tool-execution step.
+                    state = await generate(
+                        state,
+                        tool_calls="single",
+                        max_tokens=candidate_max_tokens,
+                        parallel_tool_calls=False,
+                    )
+                except StakeholderResponseError:
+                    raise
+                except Exception as exc:
+                    raise MultiTurnInterviewError(
+                        "candidate model turn failed"
+                    ) from exc
+
+                runtime = runtime_ref[0]
+                tool_calls = state.output.message.tool_calls or []
+                if tool_calls and runtime.completed:
+                    # complete_interview is terminal by construction; do not
+                    # spend another step or attempt any follow-up call.
+                    persist(runtime)
+                    break
+                if tool_calls:
+                    try:
+                        runtime = runtime.record_candidate_step()
+                    except InterviewRuntimeError:
+                        runtime = mark_max_turn_exhausted(
+                            runtime,
+                            "candidate_step_limit_exhausted",
+                        )
+                    runtime_ref[0] = runtime
+                    persist(runtime)
+                    if runtime.completed or runtime.incomplete:
+                        break
+                    if runtime.candidate_steps >= max_candidate_steps_per_turn:
+                        runtime = mark_max_turn_exhausted(
+                            runtime,
+                            "candidate_step_limit_exhausted",
+                        )
+                        runtime_ref[0] = runtime
+                        persist(runtime)
+                        break
+                    # Tool-only output is not a public question.  Generate the
+                    # next candidate step within this same interview turn.
+                    continue
+                if runtime.completed or runtime.incomplete:
+                    break
+                question = state.output.message.text.strip()
+                if not question:
+                    runtime = mark_max_turn_exhausted(
+                        runtime, "candidate_did_not_ask_question"
+                    )
+                    runtime_ref[0] = runtime
+                    persist(runtime)
+                break
 
             runtime = runtime_ref[0]
             if runtime.completed or runtime.incomplete:
                 break
-            question = state.output.message.text.strip()
-            if not question:
+            if question is None:
                 runtime = mark_max_turn_exhausted(
                     runtime, "candidate_did_not_ask_question"
                 )
@@ -290,6 +490,7 @@ def multi_turn_interview_solver(
                 stakeholder_turn = await invoke_stakeholder_response_with_plan(
                     _public_conversation(runtime),
                     resolved_knowledge,
+                    stakeholder_prompt=resolved_prompt,
                     prior_ledger=runtime.semantic_ledger,
                 )
                 runtime = runtime.ingest_stakeholder_response(
@@ -328,6 +529,7 @@ def multi_turn_interview_solver(
                 runtime.protocol_state.failure_reason or "incomplete interview"
             )
         state.metadata["interview_candidate_turns"] = runtime.candidate_turns
+        state.metadata["interview_candidate_steps"] = runtime.candidate_steps
         state.metadata["interview_stakeholder_turns"] = runtime.stakeholder_turns
         return state
 
@@ -344,7 +546,13 @@ def phase13_interview_task(
     stakeholder_knowledge: StakeholderKnowledge | None = None,
     *,
     truth: BusinessProcessGraph | None = None,
+    stakeholder_profile: StakeholderProfile | None = None,
+    stakeholder_seed: int | None = None,
+    stakeholder_prompt: StakeholderPrompt | str | None = None,
     max_turns: int = 8,
+    max_interview_turns: int | None = None,
+    max_candidate_steps_per_turn: int = _DEFAULT_MAX_CANDIDATE_STEPS_PER_TURN,
+    candidate_max_tokens: int = _DEFAULT_CANDIDATE_MAX_TOKENS,
     initial_graph: AgentGraph | None = None,
     initial_messages: Sequence[ChatMessage] | None = None,
     max_turn_count: int | None = None,
@@ -355,10 +563,20 @@ def phase13_interview_task(
     custom ``model_roles={"stakeholder": get_model(...)}``; no private state is
     placed in the Sample input or candidate system message.
     """
-    resolved_scenario_id, resolved_truth, resolved_knowledge = _resolve_setup(
+    (
+        resolved_scenario_id,
+        resolved_truth,
+        resolved_knowledge,
+        resolved_profile,
+        resolved_seed,
+        resolved_prompt,
+    ) = _resolve_setup(
         scenario_id,
         truth,
         stakeholder_knowledge,
+        stakeholder_profile=stakeholder_profile,
+        stakeholder_seed=stakeholder_seed,
+        stakeholder_prompt=stakeholder_prompt,
     )
     if initial_messages is not None:
         initial = list(initial_messages)
@@ -375,8 +593,28 @@ def phase13_interview_task(
                 for message in scenario.initial_messages
             ]
     sample_id = f"phase13-{resolved_scenario_id}"
-    if max_turn_count is not None:
-        max_turns = max_turn_count
+    max_turns = _resolve_max_turns(
+        max_turns,
+        max_turn_count,
+        max_interview_turns,
+    )
+    _validate_candidate_limits(
+        max_turns,
+        max_candidate_steps_per_turn,
+        candidate_max_tokens,
+    )
+    # Leave one message of headroom because Inspect checks the limit before a
+    # generation.  Each tool step contributes assistant+tool messages; a
+    # completed interview step contributes assistant question+stakeholder.
+    message_limit = (
+        len(initial) + max_turns * (2 * max_candidate_steps_per_turn + 2) + 1
+    )
+    token_limit = max(32_000, message_limit * candidate_max_tokens * 4)
+    turn_limit = (
+        max_turns
+        * (max_candidate_steps_per_turn + _DEFAULT_STAKEHOLDER_GENERATIONS_PER_TURN + 1)
+        + 1
+    )
     return Task(
         dataset=MemoryDataset(
             [
@@ -391,27 +629,60 @@ def phase13_interview_task(
             resolved_scenario_id,
             resolved_knowledge,
             truth=resolved_truth,
+            stakeholder_profile=resolved_profile,
+            stakeholder_seed=resolved_seed,
+            stakeholder_prompt=resolved_prompt,
             max_turns=max_turns,
+            max_candidate_steps_per_turn=max_candidate_steps_per_turn,
+            candidate_max_tokens=candidate_max_tokens,
             initial_graph=initial_graph,
             initial_messages=initial,
         ),
         scorer=phase13_primary_scorer(),
         model=None,
-        version=1,
+        config=GenerateConfig(max_tokens=candidate_max_tokens),
+        message_limit=message_limit,
+        token_limit=token_limit,
+        turn_limit=turn_limit,
+        version=2,
+    )
+
+
+def phase13_smoke_interview_task(
+    scenario_id: str = "lab_sample_flow",
+    *,
+    truth: BusinessProcessGraph | None = None,
+    max_turns: int = 8,
+    max_candidate_steps_per_turn: int = _DEFAULT_MAX_CANDIDATE_STEPS_PER_TURN,
+    candidate_max_tokens: int = _DEFAULT_CANDIDATE_MAX_TOKENS,
+) -> Task:
+    """Build an explicit full-visibility task for adapter infrastructure smoke tests."""
+    if truth is None:
+        truth = get_scenario(scenario_id).truth
+    knowledge = build_full_visibility_knowledge_for_smoke(truth)
+    return phase13_interview_task(
+        scenario_id,
+        knowledge,
+        truth=truth,
+        max_turns=max_turns,
+        max_candidate_steps_per_turn=max_candidate_steps_per_turn,
+        candidate_max_tokens=candidate_max_tokens,
     )
 
 
 @task(name="phase13_interview")
 def phase13_interview() -> Task:
-    """Registered Phase 13 task; supply candidate/stakeholder models at eval time."""
+    """Registered task requiring explicit stakeholder knowledge configuration."""
     return phase13_interview_task()
 
 
 __all__ = [
+    "build_full_visibility_knowledge_for_smoke",
     "MultiTurnInterviewError",
     "multi_turn_interview_solver",
     "multi_turn_solver",
     "phase13_interview",
     "phase13_interview_task",
+    "phase13_smoke_interview_task",
     "phase13_solver",
 ]

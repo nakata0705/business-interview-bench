@@ -28,9 +28,17 @@ def score_primary_inputs(
     truth: BusinessProcessGraph,
     context: InterviewEvaluationContext,
     knowledge_coverage: KnowledgeCoverageView,
+    *,
+    terminology_terms: dict[str, list[str]] | None = None,
 ) -> Score:
     """Delegate exactly once to ``evaluate_primary`` and preserve all fields."""
-    result = evaluate_primary(agent, truth, context, knowledge_coverage)
+    result = evaluate_primary(
+        agent,
+        truth,
+        context,
+        knowledge_coverage,
+        terminology_terms=terminology_terms,
+    )
     values: dict[str, Any] = asdict(result)
     field_names = tuple(field.name for field in fields(PrimaryEvaluation))
     if len(values) != len(field_names) or set(values) != set(field_names):

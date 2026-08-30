@@ -11,9 +11,66 @@ from inspect_ai.solver import TaskState
 
 from business_interview.evaluation import KnowledgeCoverageView
 from business_interview.models import BusinessProcessGraph, validate_canonical_graph
+from business_interview.stakeholders import (
+    StakeholderKnowledge,
+    StakeholderProfile,
+    knowledge_coverage_view,
+    project_knowledge,
+)
 
 from .live_store import BusinessInterviewLiveStore, load_live_state
 from .primary_score import score_primary_inputs
+
+
+def _load_validated_stakeholder_knowledge(
+    store: BusinessInterviewLiveStore,
+    truth: BusinessProcessGraph,
+    coverage: KnowledgeCoverageView,
+) -> StakeholderKnowledge | None:
+    """Validate persisted exact knowledge and optional projection provenance."""
+    if not store.stakeholder_knowledge:
+        if store.stakeholder_profile or store.stakeholder_seed is not None:
+            raise ValueError(
+                "stakeholder projection metadata requires exact stakeholder knowledge"
+            )
+        return None
+    knowledge = StakeholderKnowledge.model_validate(store.stakeholder_knowledge)
+    if store.stakeholder_profile:
+        if store.stakeholder_seed is None:
+            raise ValueError(
+                "stored stakeholder profile is missing its projection seed"
+            )
+        profile = StakeholderProfile.model_validate(store.stakeholder_profile)
+        projected = project_knowledge(truth, profile, seed=store.stakeholder_seed)
+        if projected != knowledge:
+            raise ValueError(
+                "stored StakeholderKnowledge does not match profile and seed"
+            )
+    if knowledge_coverage_view(truth, knowledge) != coverage:
+        raise ValueError(
+            "stored knowledge coverage does not match exact StakeholderKnowledge"
+        )
+    return knowledge
+
+
+def _validated_terminology_terms(
+    store: BusinessInterviewLiveStore,
+    knowledge: StakeholderKnowledge | None,
+) -> dict[str, list[str]]:
+    """Translate validated private terminology into evaluator term hints."""
+    if knowledge is None:
+        return {}
+    terms: dict[str, set[str]] = {}
+    runtime = load_live_state(store)
+    for entry in runtime.semantic_ledger.entries:
+        for event in entry.terminology:
+            concept = knowledge.graph.concepts.get(event.semantic_id)
+            if concept is None:
+                raise ValueError(
+                    "stored terminology references an unknown stakeholder concept"
+                )
+            terms.setdefault(concept.truth_concept_id, set()).add(event.proposed_term)
+    return {truth_id: sorted(values) for truth_id, values in sorted(terms.items())}
 
 
 @scorer({"reconstruction_pass": [mean()]}, name="phase13_primary_scorer")
@@ -27,11 +84,13 @@ def phase13_primary_scorer() -> Scorer:
         truth = BusinessProcessGraph.model_validate(store.truth)
         validate_canonical_graph(truth)
         coverage = KnowledgeCoverageView.model_validate(store.knowledge_coverage)
+        knowledge = _load_validated_stakeholder_knowledge(store, truth, coverage)
         return score_primary_inputs(
             runtime.agent_graph,
             truth,
             runtime.evaluation_context(),
             coverage,
+            terminology_terms=_validated_terminology_terms(store, knowledge),
         )
 
     return score

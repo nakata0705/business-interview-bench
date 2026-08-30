@@ -16,16 +16,19 @@ from .live_store import (
 )
 from .multiturn import (
     MultiTurnInterviewError,
+    build_full_visibility_knowledge_for_smoke,
     multi_turn_interview_solver,
     multi_turn_solver,
     phase13_interview,
     phase13_interview_task,
+    phase13_smoke_interview_task,
     phase13_solver,
 )
 from .tools import build_interview_tools, graph_mutation_tools, make_interview_tools
 
 __all__ = [
     "BusinessInterviewLiveStore",
+    "build_full_visibility_knowledge_for_smoke",
     "InspectLiveInterviewStore",
     "LiveInterviewInspectStore",
     "LiveInterviewStoreModel",
@@ -38,6 +41,7 @@ __all__ = [
     "multi_turn_solver",
     "phase13_interview",
     "phase13_interview_task",
+    "phase13_smoke_interview_task",
     "phase13_primary_scorer",
     "phase13_solver",
 ]

@@ -38,6 +38,7 @@ from business_interview.models import (
 from business_interview.runtime import (
     InterviewRuntimeError,
     LiveInterviewStore,
+    apply_agent_graph_mutation,
     create_live_interview_store,
     ingest_stakeholder_response,
     mark_interview_complete,
@@ -152,7 +153,9 @@ def _validated_response() -> tuple[SemanticResponsePlan, StakeholderResponse]:
         terminology=(
             TerminologyConfirmation(
                 semantic_id="skc_activity",
-                proposed_term="request review",
+                proposed_term="review requests",
+                proposal_turn=0,
+                proposal_quote="May I call this review requests?",
                 quote="Yes.",
             ),
         ),
@@ -163,7 +166,7 @@ def _validated_response() -> tuple[SemanticResponsePlan, StakeholderResponse]:
 def _asked_store() -> LiveInterviewStore:
     store = create_live_interview_store("test-scenario")
     store = store.record_candidate_turn()
-    return store.record_candidate_question("What do you do?")
+    return store.record_candidate_question("May I call this review requests?")
 
 
 def test_live_ingestion_is_atomic_and_preserves_public_provenance() -> None:
@@ -228,6 +231,30 @@ def test_max_turn_exhaustion_is_incomplete_not_completion() -> None:
     assert exhausted.protocol_state.status == "incomplete"
     assert not exhausted.protocol_completed
     assert exhausted.termination_reason == "max_turns_exhausted"
+
+
+def test_candidate_turns_and_candidate_steps_have_separate_bounds() -> None:
+    store = create_live_interview_store(
+        "test-scenario",
+        max_interview_turns=2,
+        max_candidate_steps_per_turn=2,
+    )
+    store = store.record_candidate_turn().record_candidate_step()
+    next_turn = store.record_candidate_turn()
+    assert next_turn.candidate_turns == 2
+    assert next_turn.candidate_steps == 0
+    next_turn = next_turn.record_candidate_step().record_candidate_step()
+    with pytest.raises(InterviewRuntimeError, match="candidate step count"):
+        next_turn.record_candidate_step()
+
+
+def test_graph_mutation_error_reason_survives_runtime_wrapper() -> None:
+    store = create_live_interview_store("test-scenario")
+    with pytest.raises(InterviewRuntimeError, match="node does not exist"):
+        apply_agent_graph_mutation(
+            store,
+            lambda graph: remove_node(graph, "missing"),
+        )
 
 
 def test_pure_node_and_concept_mutations_preserve_input_and_states() -> None:

@@ -795,23 +795,29 @@ entries, while generated responses always enter through the Phase 12 validator.
 `business_interview.graph_mutations` owns pure add/update/remove node, edge,
 and concept operations, node properties, edge conditions, explicit
 ABSENT/DONT_KNOW, endpoints, and exact Observation EvidenceRefs. The thin
-Inspect `@tool` wrappers only bind those operations to the live Store and
-return candidate-owned graph JSON. They expose no Truth, StakeholderKnowledge,
-or SemanticLedger.
+Inspect `@tool` wrappers only bind those operations to the live Store; mutation
+receipts are compact and the full candidate-owned graph is returned only by
+`get_agent_graph`. They expose no Truth, StakeholderKnowledge, or
+SemanticLedger.
 
 `multi_turn_interview_solver` uses Inspect's supplied default/current candidate
-model and the existing required stakeholder role. Inspect's durable
-`Generate(tool_calls="loop")` path allows graph tools before a natural-language
-question. Every question invokes the stakeholder once at the runtime level,
-then appends one validated public response/observation before the next
-candidate turn. `complete_interview` prevents later stakeholder calls and graph
-mutations. The public-only `get_observations` tool exposes stable
-observation IDs/turns/text for exact EvidenceRef attachment and no private
-ledger fields. Exhausting the hard max-turn count records an explicit
-incomplete protocol rather than completion. `phase13_interview_task()` and
-`phase13_primary_scorer()` provide the real Inspect path used by deterministic
-MockLLM integration tests; final scoring delegates unchanged to
-`evaluate_primary()` and retains all 41 fields.
+model and the existing required stakeholder role. Its explicit bounded loop
+uses `candidate_turns` for interview turns and
+`max_candidate_steps_per_turn` for tool-execution steps; it does not delegate
+runtime safety to `Generate(tool_calls="loop")`. Every question invokes the
+stakeholder once at the runtime level, then appends one validated public
+response/observation before the next candidate turn. `complete_interview`
+prevents later stakeholder calls and graph mutations. The public-only
+`get_observations` tool exposes stable observation IDs/turns/text for exact
+EvidenceRef attachment and no private ledger fields. Exhausting either hard
+limit records an explicit incomplete protocol rather than completion.
+
+`phase13_interview_task()` requires exact `StakeholderKnowledge` or an explicit
+`StakeholderProfile` plus projection seed, and persists exact private setup
+JSON for replay. Terminology confirmations retain exact interviewer proposal
+and stakeholder-agreement provenance. `phase13_primary_scorer()` provides the
+real Inspect path used by deterministic MockLLM integration tests; final
+scoring delegates to the unchanged 41-field `evaluate_primary()`.
 
 Phase 13 does not add real-provider E2E, calibration, model comparison,
 LLM-as-judge, aggregate-score redesign, tau2 Environment/InterviewDB, or other

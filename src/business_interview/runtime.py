@@ -21,6 +21,7 @@ from pydantic import (
     model_validator,
 )
 
+from business_interview.graph_mutations import GraphMutationError
 from business_interview.models import (
     AbsentType,
     AgentGraph,
@@ -42,6 +43,7 @@ from business_interview.stakeholders.response import (
     StakeholderResponse,
     TerminologyConfirmation,
     validate_stakeholder_response,
+    validate_terminology_provenance,
 )
 
 
@@ -203,14 +205,22 @@ class SemanticLedger(BaseModel):
         *,
         public_message_turn: int,
         observation_id: str,
+        interviewer_messages: Sequence[object] | None = None,
     ) -> SemanticLedger:
         """Validate then append one response sidecar atomically."""
         validate_stakeholder_knowledge(knowledge)
-        validated = validate_stakeholder_response(knowledge, plan, response)
+        validated = validate_stakeholder_response(
+            knowledge,
+            plan,
+            response,
+            interviewer_messages=interviewer_messages,
+            response_public_message_turn=public_message_turn,
+        )
         return self.append_validated(
             validated,
             public_message_turn=public_message_turn,
             observation_id=observation_id,
+            interviewer_messages=interviewer_messages,
         )
 
     def append_validated(
@@ -219,6 +229,7 @@ class SemanticLedger(BaseModel):
         *,
         public_message_turn: int,
         observation_id: str,
+        interviewer_messages: Sequence[object] | None = None,
     ) -> SemanticLedger:
         """Append a sidecar that the caller has already validated.
 
@@ -230,6 +241,11 @@ class SemanticLedger(BaseModel):
             raise ValueError(
                 "SemanticLedger entries must be appended in public-message order"
             )
+        validate_terminology_provenance(
+            response.terminology,
+            interviewer_messages,
+            response_public_message_turn=public_message_turn,
+        )
         entry = SemanticLedgerEntry(
             public_message_turn=public_message_turn,
             observation_id=observation_id,
@@ -376,8 +392,20 @@ class LiveInterviewStore(BaseModel):
         default_factory=InterviewProtocolState,
         validation_alias=AliasChoices("protocol_state", "protocol", "completion_state"),
     )
-    max_turns: int = Field(default=8, ge=1)
+    max_turns: int = Field(
+        default=8,
+        ge=1,
+        validation_alias=AliasChoices(
+            "max_turns", "max_turn_count", "max_interview_turns"
+        ),
+    )
+    max_candidate_steps_per_turn: int = Field(default=8, ge=1)
     candidate_turns: int = Field(default=0, ge=0)
+    candidate_steps: int = Field(
+        default=0,
+        ge=0,
+        validation_alias=AliasChoices("candidate_steps", "candidate_step"),
+    )
     stakeholder_turns: int = Field(default=0, ge=0)
     question_count: int = Field(default=0, ge=0)
     initial_observation_count: int = Field(default=0, ge=0)
@@ -415,8 +443,13 @@ class LiveInterviewStore(BaseModel):
                 }
         if "candidate_turns" not in payload and "turn_count" in payload:
             payload["candidate_turns"] = payload["turn_count"]
-        if "max_turns" not in payload and "max_turn_count" in payload:
-            payload["max_turns"] = payload["max_turn_count"]
+        if "max_turns" not in payload:
+            for alias in ("max_turn_count", "max_interview_turns"):
+                if alias in payload:
+                    payload["max_turns"] = payload[alias]
+                    break
+        if "candidate_steps" not in payload and "candidate_step" in payload:
+            payload["candidate_steps"] = payload["candidate_step"]
         for alias in (
             "raw_public_message_ledger",
             "raw_public_messages",
@@ -429,6 +462,8 @@ class LiveInterviewStore(BaseModel):
             "termination_reason",
             "turn_count",
             "max_turn_count",
+            "max_interview_turns",
+            "candidate_step",
         ):
             payload.pop(alias, None)
         return payload
@@ -497,12 +532,21 @@ class LiveInterviewStore(BaseModel):
                 entry,
                 initial=index < self.initial_observation_count,
             )
+            validate_terminology_provenance(
+                entry.terminology,
+                self.public_message_ledger,
+                response_public_message_turn=observation.turn,
+            )
         graph_errors = _agent_graph_errors(self.agent_graph)
         if graph_errors:
             raise ValueError("AgentGraph is invalid:\n- " + "\n- ".join(graph_errors))
         _validate_graph_evidence(self.agent_graph, self.observations)
         if self.candidate_turns > self.max_turns:
             raise ValueError("candidate_turns cannot exceed max_turns")
+        if self.candidate_steps > self.max_candidate_steps_per_turn:
+            raise ValueError(
+                "candidate_steps cannot exceed max_candidate_steps_per_turn"
+            )
         if self.question_count < self.stakeholder_turns:
             raise ValueError("question_count cannot be below stakeholder_turns")
         if self.question_count > self.candidate_turns:
@@ -582,8 +626,18 @@ class LiveInterviewStore(BaseModel):
 
     @property
     def turn_count(self) -> int:
-        """Candidate model-turn count used by the hard limit."""
+        """Candidate interview-turn count used by the hard limit."""
         return self.candidate_turns
+
+    @property
+    def max_interview_turns(self) -> int:
+        """Descriptive alias for the interview-level turn limit."""
+        return self.max_turns
+
+    @property
+    def candidate_step(self) -> int:
+        """Short alias for the current interview turn's tool-step count."""
+        return self.candidate_steps
 
     @property
     def messages_by_turn(self) -> dict[int, LedgerMessage]:
@@ -619,11 +673,23 @@ class LiveInterviewStore(BaseModel):
             )
 
     def record_candidate_turn(self) -> LiveInterviewStore:
-        """Record one candidate model invocation under the hard turn limit."""
+        """Start one interview turn and reset its candidate tool-step count."""
         self._require_active()
         if self.candidate_turns >= self.max_turns:
             raise InterviewRuntimeError("maximum interview turn count exhausted")
-        return self._copy(candidate_turns=self.candidate_turns + 1)
+        return self._copy(
+            candidate_turns=self.candidate_turns + 1,
+            candidate_steps=0,
+        )
+
+    def record_candidate_step(self) -> LiveInterviewStore:
+        """Record one bounded candidate generation/tool execution step."""
+        self._require_active()
+        if self.candidate_steps >= self.max_candidate_steps_per_turn:
+            raise InterviewRuntimeError(
+                "maximum candidate step count for interview turn exhausted"
+            )
+        return self._copy(candidate_steps=self.candidate_steps + 1)
 
     def record_candidate_question(self, text: str) -> LiveInterviewStore:
         """Append one candidate question to the public message ledger."""
@@ -676,8 +742,14 @@ class LiveInterviewStore(BaseModel):
         if self.public_message_ledger[-1].role != "assistant":
             raise InterviewRuntimeError("no candidate question is awaiting a response")
         validate_stakeholder_knowledge(knowledge)
-        validated = validate_stakeholder_response(knowledge, plan, response)
         public_turn = self._next_public_turn()
+        validated = validate_stakeholder_response(
+            knowledge,
+            plan,
+            response,
+            interviewer_messages=self.public_message_ledger,
+            response_public_message_turn=public_turn,
+        )
         resolved_observation_id = observation_id or f"obs_{public_turn}"
         if any(
             observation.id == resolved_observation_id
@@ -700,6 +772,7 @@ class LiveInterviewStore(BaseModel):
             validated,
             public_message_turn=public_turn,
             observation_id=resolved_observation_id,
+            interviewer_messages=self.public_message_ledger,
         )
         return self._copy(
             observations=(*self.observations, observation),
@@ -762,14 +835,20 @@ def create_live_interview_store(
     ] = (),
     max_turns: int = 8,
     max_turn_count: int | None = None,
+    max_interview_turns: int | None = None,
+    max_candidate_steps_per_turn: int = 8,
 ) -> LiveInterviewStore:
     """Create deterministic live state from public initial history only."""
     if not isinstance(scenario_id, str) or not scenario_id.strip():
         raise InterviewRuntimeError("scenario_id must not be blank")
     if max_turn_count is not None:
         max_turns = max_turn_count
+    if max_interview_turns is not None:
+        max_turns = max_interview_turns
     if max_turns < 1:
         raise InterviewRuntimeError("max_turns must be positive")
+    if max_candidate_steps_per_turn < 1:
+        raise InterviewRuntimeError("max_candidate_steps_per_turn must be positive")
     messages: list[PublicMessageRecord] = []
     for index, raw in enumerate(initial_public_messages):
         if isinstance(raw, PublicMessageRecord):
@@ -833,6 +912,7 @@ def create_live_interview_store(
         public_message_ledger=tuple(messages),
         semantic_ledger=SemanticLedger(entries=initial_entries),
         max_turns=max_turns,
+        max_candidate_steps_per_turn=max_candidate_steps_per_turn,
         initial_observation_count=len(initial_observations),
     )
 
@@ -848,6 +928,11 @@ def record_candidate_question(
 ) -> LiveInterviewStore:
     """Functional facade for appending one candidate question."""
     return store.record_candidate_question(text)
+
+
+def record_candidate_step(store: LiveInterviewStore) -> LiveInterviewStore:
+    """Functional facade for one bounded candidate tool step."""
+    return store.record_candidate_step()
 
 
 def ingest_stakeholder_response(
@@ -874,12 +959,19 @@ def apply_agent_graph_mutation(
     store: LiveInterviewStore,
     operation: Callable[[AgentGraph], AgentGraph],
 ) -> LiveInterviewStore:
-    """Apply one pure graph operation to active live state."""
+    """Apply one pure graph operation to active live state.
+
+    ``GraphMutationError`` messages are safe, candidate-actionable validation
+    reasons.  Preserve them across the runtime boundary; only unexpected
+    implementation failures receive the generic wrapper.
+    """
     store._require_active()
     try:
         graph = operation(store.agent_graph)
     except InterviewRuntimeError:
         raise
+    except GraphMutationError as exc:
+        raise InterviewRuntimeError(str(exc)) from exc
     except Exception as exc:
         raise InterviewRuntimeError("AgentGraph mutation failed") from exc
     return store.apply_agent_graph(graph)
@@ -940,5 +1032,6 @@ __all__ = [
     "mark_interview_complete",
     "mark_max_turn_exhausted",
     "record_candidate_question",
+    "record_candidate_step",
     "record_candidate_turn",
 ]

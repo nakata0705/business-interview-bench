@@ -335,14 +335,24 @@ operations.
 
 `multi_turn_interview_solver` uses Inspect's supplied default/current candidate
 model and the required `get_model(role="stakeholder", required=True)` role.
-Each candidate question receives one validated stakeholder response; only its
-public text is appended to the candidate history. The public-only
-`get_observations` tool exposes stable observation IDs/turns/text when exact
-EvidenceRef attachment is needed. `complete_interview` stops further
-stakeholder calls and graph mutations. A hard max-turn exhaustion is
-stored as `incomplete`, not as protocol completion. `phase13_interview_task()`
-and `phase13_primary_scorer()` provide a real Inspect path for deterministic
-MockLLM tests and connect the final state to the unchanged 41-field
+Each interview turn has an explicit `max_candidate_steps_per_turn` bound;
+Inspect's unbounded tool loop is not used. Each candidate question receives
+one validated stakeholder response, and only its public text is appended to
+the candidate history. The public-only `get_observations` tool exposes stable
+observation IDs/turns/text when exact EvidenceRef attachment is needed;
+mutation receipts are compact and `get_agent_graph` is the explicit full-graph
+read. `complete_interview` stops further stakeholder calls and graph
+mutations. A hard interview-turn or candidate-step exhaustion is stored as
+`incomplete`, not as protocol completion.
+
+Live `phase13_interview_task()` requires either exact `StakeholderKnowledge` or
+an explicit `StakeholderProfile` plus projection seed. The exact knowledge,
+profile, and seed are persisted in evaluator-private Store JSON; the
+full-visibility `phase13_smoke_interview_task()` helper is reserved for
+infrastructure tests. Terminology confirmations retain exact interviewer
+proposal and stakeholder-agreement provenance. Together with
+`phase13_primary_scorer()`, this provides a real Inspect path for deterministic
+MockLLM tests and connects the final state to the unchanged 41-field
 `evaluate_primary()` evaluator.
 
 Phase 13 intentionally does not add real-provider E2E, model comparison,

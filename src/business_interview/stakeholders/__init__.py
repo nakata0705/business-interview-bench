@@ -67,6 +67,7 @@ from .response import (
     semantic_mode_for_resolution,
     validate_response_plan,
     validate_stakeholder_response,
+    validate_terminology_provenance,
 )
 
 __all__ = [
@@ -121,6 +122,7 @@ __all__ = [
     "semantic_mode_for_resolution",
     "try_resolve_semantic_address",
     "validate_response_plan",
+    "validate_terminology_provenance",
     "validate_stakeholder_knowledge",
     "validate_stakeholder_response",
     "validate_stakeholder_knowledge_graph",

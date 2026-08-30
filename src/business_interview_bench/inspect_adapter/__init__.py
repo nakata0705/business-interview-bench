@@ -16,6 +16,7 @@ from .multiturn import (
     multi_turn_solver,
     phase13_interview,
     phase13_interview_task,
+    phase13_smoke_interview_task,
     phase13_solver,
 )
 from .scorer import primary_scorer
@@ -48,6 +49,7 @@ __all__ = [
     "multi_turn_interview_solver",
     "multi_turn_solver",
     "phase13_interview_task",
+    "phase13_smoke_interview_task",
     "phase13_primary_scorer",
     "phase13_solver",
     "primary_scorer",

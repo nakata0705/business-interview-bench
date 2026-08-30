@@ -1,7 +1,8 @@
 """Thin Inspect ``@tool`` wrappers for the core interview operations.
 
-These wrappers only read/write a mutable runtime reference and serialize
-public AgentGraph results.  They do not know Truth, stakeholder knowledge, or
+These wrappers only read/write a mutable runtime reference. Mutation tools
+return compact receipts and the explicit graph-read tool serializes the public
+AgentGraph. They do not know Truth, stakeholder knowledge, or
 the private semantic ledger, and they contain no graph mutation semantics.
 """
 
@@ -55,6 +56,15 @@ def _graph_json(runtime: LiveInterviewStore) -> str:
     )
 
 
+def _mutation_result(operation: str, target: str) -> str:
+    """Return a stable small result; the full graph is an explicit read."""
+    return json.dumps(
+        {"ok": True, "operation": operation, "target": target},
+        ensure_ascii=False,
+        sort_keys=True,
+    )
+
+
 def build_interview_tools(
     runtime_ref: list[LiveInterviewStore],
     *,
@@ -77,7 +87,13 @@ def build_interview_tools(
         if persist is not None:
             persist(runtime)
 
-    def mutate(operation: Callable[..., Any], **kwargs: Any) -> str:
+    def mutate(
+        operation: Callable[..., Any],
+        *,
+        operation_name: str,
+        result_target: str,
+        **kwargs: Any,
+    ) -> str:
         runtime = runtime_ref[0]
         try:
             updated = apply_agent_graph_mutation(
@@ -89,7 +105,7 @@ def build_interview_tools(
             # result, allowing it to correct an invalid graph operation.
             raise ToolError(str(exc)) from exc
         save(updated)
-        return _graph_json(updated)
+        return _mutation_result(operation_name, result_target)
 
     @tool(name="get_agent_graph")
     def get_agent_graph() -> Tool:
@@ -136,12 +152,17 @@ def build_interview_tools(
         """Add a node to the AgentGraph; use set_node_property for its slots."""
 
         async def execute(node_id: str) -> str:
-            """Add a node with this ID and return the updated graph as JSON.
+            """Add a node and return a compact mutation receipt as JSON.
 
             Args:
                 node_id: New candidate-owned node ID.
             """
-            return mutate(add_node, node_id=node_id)
+            return mutate(
+                add_node,
+                operation_name="add_node",
+                result_target=f"node:{node_id}",
+                node_id=node_id,
+            )
 
         return execute
 
@@ -150,13 +171,19 @@ def build_interview_tools(
         """Update an existing AgentGraph node with a JSON updates object."""
 
         async def execute(node_id: str, updates: dict[str, Any]) -> str:
-            """Apply a JSON patch to an existing node.
+            """Apply a JSON patch and return a compact mutation receipt.
 
             Args:
                 node_id: Existing node ID.
                 updates: Node fields to update.
             """
-            return mutate(update_node, node_id=node_id, updates=updates)
+            return mutate(
+                update_node,
+                operation_name="update_node",
+                result_target=f"node:{node_id}",
+                node_id=node_id,
+                updates=updates,
+            )
 
         return execute
 
@@ -165,12 +192,17 @@ def build_interview_tools(
         """Remove an AgentGraph node after its incident edges are removed."""
 
         async def execute(node_id: str) -> str:
-            """Remove an existing node after its incident edges are removed.
+            """Remove an existing node and return a compact mutation receipt.
 
             Args:
                 node_id: Existing node ID.
             """
-            return mutate(remove_node, node_id=node_id)
+            return mutate(
+                remove_node,
+                operation_name="remove_node",
+                result_target=f"node:{node_id}",
+                node_id=node_id,
+            )
 
         return execute
 
@@ -179,7 +211,7 @@ def build_interview_tools(
         """Add a directed edge between two existing AgentGraph nodes."""
 
         async def execute(edge_id: str, from_node: str, to_node: str) -> str:
-            """Add a directed edge between existing candidate nodes.
+            """Add an edge and return a compact mutation receipt.
 
             Args:
                 edge_id: New candidate-owned edge ID.
@@ -188,6 +220,8 @@ def build_interview_tools(
             """
             return mutate(
                 add_edge,
+                operation_name="add_edge",
+                result_target=f"edge:{edge_id}",
                 edge_id=edge_id,
                 from_node=from_node,
                 to_node=to_node,
@@ -200,13 +234,19 @@ def build_interview_tools(
         """Update an existing AgentGraph edge with a JSON updates object."""
 
         async def execute(edge_id: str, updates: dict[str, Any]) -> str:
-            """Apply a JSON patch to an existing edge.
+            """Apply a JSON patch and return a compact mutation receipt.
 
             Args:
                 edge_id: Existing edge ID.
                 updates: Edge fields to update.
             """
-            return mutate(update_edge, edge_id=edge_id, updates=updates)
+            return mutate(
+                update_edge,
+                operation_name="update_edge",
+                result_target=f"edge:{edge_id}",
+                edge_id=edge_id,
+                updates=updates,
+            )
 
         return execute
 
@@ -215,12 +255,17 @@ def build_interview_tools(
         """Remove an existing AgentGraph edge."""
 
         async def execute(edge_id: str) -> str:
-            """Remove an existing candidate-owned edge.
+            """Remove an edge and return a compact mutation receipt.
 
             Args:
                 edge_id: Existing edge ID.
             """
-            return mutate(remove_edge, edge_id=edge_id)
+            return mutate(
+                remove_edge,
+                operation_name="remove_edge",
+                result_target=f"edge:{edge_id}",
+                edge_id=edge_id,
+            )
 
         return execute
 
@@ -234,7 +279,7 @@ def build_interview_tools(
             display_label: str,
             description: str = "",
         ) -> str:
-            """Add a glossary concept to the candidate-owned graph.
+            """Add a glossary concept and return a compact mutation receipt.
 
             Args:
                 concept_id: New candidate-owned concept ID.
@@ -244,6 +289,8 @@ def build_interview_tools(
             """
             return mutate(
                 define_concept,
+                operation_name="define_concept",
+                result_target=f"concept:{concept_id}",
                 concept_id=concept_id,
                 kind=kind,
                 display_label=display_label,
@@ -257,13 +304,19 @@ def build_interview_tools(
         """Update an existing AgentGraph glossary concept."""
 
         async def execute(concept_id: str, updates: dict[str, Any]) -> str:
-            """Apply a JSON patch to an existing glossary concept.
+            """Apply a JSON patch and return a compact mutation receipt.
 
             Args:
                 concept_id: Existing concept ID.
                 updates: Concept fields to update.
             """
-            return mutate(update_concept, concept_id=concept_id, updates=updates)
+            return mutate(
+                update_concept,
+                operation_name="update_concept",
+                result_target=f"concept:{concept_id}",
+                concept_id=concept_id,
+                updates=updates,
+            )
 
         return execute
 
@@ -272,12 +325,17 @@ def build_interview_tools(
         """Remove an unreferenced AgentGraph glossary concept."""
 
         async def execute(concept_id: str) -> str:
-            """Remove an unreferenced glossary concept.
+            """Remove a glossary concept and return a compact mutation receipt.
 
             Args:
                 concept_id: Existing concept ID.
             """
-            return mutate(remove_concept, concept_id=concept_id)
+            return mutate(
+                remove_concept,
+                operation_name="remove_concept",
+                result_target=f"concept:{concept_id}",
+                concept_id=concept_id,
+            )
 
         return execute
 
@@ -304,6 +362,8 @@ def build_interview_tools(
             """
             return mutate(
                 set_node_property,
+                operation_name="set_node_property",
+                result_target=f"node:{node_id}:{property_name}",
                 node_id=node_id,
                 property_name=property_name,
                 value=value,
@@ -320,7 +380,7 @@ def build_interview_tools(
             property_name: str,
             evidence: list[dict[str, Any]] | None = None,
         ) -> str:
-            """Set a node property to explicit ABSENT.
+            """Set a node property to ABSENT and return a compact receipt.
 
             Args:
                 node_id: Existing node ID.
@@ -329,6 +389,8 @@ def build_interview_tools(
             """
             return mutate(
                 set_node_absent,
+                operation_name="set_node_absent",
+                result_target=f"node:{node_id}:{property_name}",
                 node_id=node_id,
                 property_name=property_name,
                 evidence=evidence or (),
@@ -354,6 +416,8 @@ def build_interview_tools(
             """
             return mutate(
                 set_node_dont_know,
+                operation_name="set_node_dont_know",
+                result_target=f"node:{node_id}:{property_name}",
                 node_id=node_id,
                 property_name=property_name,
                 evidence=evidence or (),
@@ -366,13 +430,19 @@ def build_interview_tools(
         """Set an edge condition to a concept ID or explicit state object."""
 
         async def execute(edge_id: str, value: Any) -> str:
-            """Set an edge condition to a concept value or explicit state.
+            """Set an edge condition and return a compact mutation receipt.
 
             Args:
                 edge_id: Existing edge ID.
                 value: Concept ID or state object.
             """
-            return mutate(set_edge_condition, edge_id=edge_id, value=value)
+            return mutate(
+                set_edge_condition,
+                operation_name="set_edge_condition",
+                result_target=f"edge:{edge_id}:condition",
+                edge_id=edge_id,
+                value=value,
+            )
 
         return execute
 
@@ -384,7 +454,7 @@ def build_interview_tools(
             edge_id: str,
             evidence: list[dict[str, Any]] | None = None,
         ) -> str:
-            """Set an edge condition to explicit ABSENT.
+            """Set an edge condition to ABSENT and return a compact receipt.
 
             Args:
                 edge_id: Existing edge ID.
@@ -392,6 +462,8 @@ def build_interview_tools(
             """
             return mutate(
                 set_edge_condition_absent,
+                operation_name="set_edge_condition_absent",
+                result_target=f"edge:{edge_id}:condition",
                 edge_id=edge_id,
                 evidence=evidence or (),
             )
@@ -406,7 +478,7 @@ def build_interview_tools(
             edge_id: str,
             evidence: list[dict[str, Any]] | None = None,
         ) -> str:
-            """Set an edge condition to explicit DONT_KNOW.
+            """Set an edge condition to DONT_KNOW and return a compact receipt.
 
             Args:
                 edge_id: Existing edge ID.
@@ -414,6 +486,8 @@ def build_interview_tools(
             """
             return mutate(
                 set_edge_condition_dont_know,
+                operation_name="set_edge_condition_dont_know",
+                result_target=f"edge:{edge_id}:condition",
                 edge_id=edge_id,
                 evidence=evidence or (),
             )
@@ -436,7 +510,7 @@ def build_interview_tools(
             quote: str | None = None,
             occurrence: int = 0,
         ) -> str:
-            """Attach an exact public observation span to a graph target.
+            """Attach evidence and return a compact mutation receipt.
 
             Args:
                 target: Graph target such as node:n1:activity or edge:e1.
@@ -446,6 +520,8 @@ def build_interview_tools(
             """
             return mutate(
                 attach_evidence,
+                operation_name="attach_evidence",
+                result_target=target,
                 target=target,
                 observation_id=observation_id,
                 quote=quote,
@@ -466,12 +542,17 @@ def build_interview_tools(
         """Set the AgentGraph start node IDs after they have been added."""
 
         async def execute(node_ids: list[str]) -> str:
-            """Set existing node IDs as AgentGraph starts.
+            """Set graph starts and return a compact mutation receipt.
 
             Args:
                 node_ids: Unique existing start node IDs.
             """
-            return mutate(set_start_nodes, node_ids=node_ids)
+            return mutate(
+                set_start_nodes,
+                operation_name="set_start_nodes",
+                result_target="agent_graph:start_node_ids",
+                node_ids=node_ids,
+            )
 
         return execute
 
@@ -480,12 +561,17 @@ def build_interview_tools(
         """Set the AgentGraph end node IDs after they have been added."""
 
         async def execute(node_ids: list[str]) -> str:
-            """Set existing node IDs as AgentGraph ends.
+            """Set graph ends and return a compact mutation receipt.
 
             Args:
                 node_ids: Unique existing end node IDs.
             """
-            return mutate(set_end_nodes, node_ids=node_ids)
+            return mutate(
+                set_end_nodes,
+                operation_name="set_end_nodes",
+                result_target="agent_graph:end_node_ids",
+                node_ids=node_ids,
+            )
 
         return execute
 
@@ -509,7 +595,7 @@ def build_interview_tools(
             save(updated)
             if on_complete is not None:
                 on_complete()
-            return "Interview completion recorded."
+            return _mutation_result("complete_interview", "interview")
 
         return execute
 

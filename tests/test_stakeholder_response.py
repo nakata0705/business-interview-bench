@@ -296,12 +296,23 @@ def test_valid_response_allows_multiple_spans_and_private_concept_events() -> No
             TerminologyConfirmation(
                 semantic_id="skc_activity",
                 proposed_term="work item",
+                proposal_turn=0,
+                proposal_quote="Could we call this a work item?",
                 quote="Yes.",
             ),
         ),
     )
 
-    assert validate_stakeholder_response(knowledge, plan, response) is response
+    assert (
+        validate_stakeholder_response(
+            knowledge,
+            plan,
+            response,
+            interviewer_messages=(("assistant", "Could we call this a work item?"),),
+            response_public_message_turn=1,
+        )
+        is response
+    )
 
 
 def test_missing_planned_annotation_is_rejected() -> None:
@@ -473,20 +484,73 @@ def test_terminology_requires_a_knowledge_concept_and_nonempty_term() -> None:
             TerminologyConfirmation(
                 semantic_id="skc_activity",
                 proposed_term="request review",
+                proposal_turn=0,
+                proposal_quote="Can we call this a request review?",
                 quote="Yes.",
             ),
         ),
     )
     assert (
-        validate_stakeholder_response(knowledge, SemanticResponsePlan(), valid) is valid
+        validate_stakeholder_response(
+            knowledge,
+            SemanticResponsePlan(),
+            valid,
+            interviewer_messages=(("assistant", "Can we call this a request review?"),),
+            response_public_message_turn=1,
+        )
+        is valid
     )
 
     with pytest.raises(ValidationError):
         TerminologyConfirmation(
             semantic_id="skc_activity",
             proposed_term=" ",
+            proposal_turn=0,
+            proposal_quote="Can we call this a request review?",
             quote="Yes.",
         )
+
+
+def test_terminology_provenance_rejects_forged_proposals_and_agreement_spans() -> None:
+    history = (
+        ("assistant", "Could we call this a work item?"),
+        ("user", "Yes, please."),
+    )
+    term = TerminologyConfirmation(
+        semantic_id="skc_activity",
+        proposed_term="work item",
+        proposal_turn=0,
+        proposal_quote="Could we call this a work item?",
+        quote="Yes.",
+    )
+    valid = _response("Yes.", terminology=(term,))
+    assert (
+        validate_stakeholder_response(
+            _knowledge(),
+            SemanticResponsePlan(),
+            valid,
+            interviewer_messages=history,
+            response_public_message_turn=2,
+        )
+        is valid
+    )
+
+    invalid_cases = (
+        term.model_copy(update={"proposed_term": "not proposed"}),
+        term.model_copy(update={"proposal_turn": 1}),
+        term.model_copy(update={"proposal_occurrence": 1}),
+        term.model_copy(update={"quote": "No."}),
+        term.model_copy(update={"semantic_id": "truth_activity"}),
+    )
+    for invalid_term in invalid_cases:
+        with pytest.raises(ResponseValidationError):
+            validate_stakeholder_response(
+                _knowledge(),
+                SemanticResponsePlan(),
+                _response("Yes.", terminology=(invalid_term,)),
+                interviewer_messages=history,
+                response_public_message_turn=2,
+            )
 
 
 def test_prompt_renders_only_local_knowledge_and_distinguishes_slot_states() -> None:

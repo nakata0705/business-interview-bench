@@ -749,23 +749,30 @@ in separate contracts; prose is never re-analyzed.
 for node/edge/concept add-update-remove, node properties, edge conditions,
 explicit ABSENT/DONT_KNOW, endpoints, and Observation EvidenceRefs. The
 Inspect `@tool` wrappers only read/write the live Store and delegate to these
-operations. Candidate tools return only the candidate-owned AgentGraph and
-public observation evidence; Truth, StakeholderKnowledge, and SemanticLedger
-are not exposed.
+operations. Mutation receipts are compact; the full candidate-owned graph is
+available only from `get_agent_graph`. Truth, StakeholderKnowledge, and
+SemanticLedger are not exposed to candidate tools.
 
 `multi_turn_interview_solver` invokes the default/current candidate model
 through Inspect's supplied `Generate` callback and invokes the stakeholder
-through `get_model(role="stakeholder", required=True)`. Tool calls can mutate
-the graph before a natural-language question. Each question receives one
-validated stakeholder response, then one observation/ledger ingestion, before
-the next candidate turn. `complete_interview` is explicit and prevents all
-later stakeholder calls and graph mutations. The public-only
-`get_observations` tool supplies stable observation IDs/turns/text for exact
-EvidenceRef attachment without exposing the private ledger. Hard max-turn
-exhaustion is stored as an incomplete protocol, not as completion.
-`phase13_interview_task()`
-and `phase13_primary_scorer()` exercise the actual Inspect eval path used by
-deterministic MockLLM tests and pass the resulting context/graph through the
+through `get_model(role="stakeholder", required=True)`. It uses an explicit
+bounded candidate tool-step loop rather than Inspect's unbounded `loop`; the
+interview-level `candidate_turns` counter is separate from
+`max_candidate_steps_per_turn`. Tool calls can mutate the graph before a
+natural-language question. Each question receives one validated stakeholder
+response, then one observation/ledger ingestion, before the next candidate
+turn. `complete_interview` is explicit and prevents all later stakeholder
+calls and graph mutations. The public-only `get_observations` tool supplies
+stable observation IDs/turns/text for exact EvidenceRef attachment without
+exposing the private ledger. Hard interview-turn or candidate-step exhaustion
+is stored as an incomplete protocol, not as completion.
+
+`phase13_interview_task()` requires exact `StakeholderKnowledge` or an explicit
+`StakeholderProfile` plus projection seed, and persists the exact knowledge,
+profile, and seed in evaluator-private Store JSON. Terminology confirmations
+carry exact interviewer proposal and stakeholder-agreement provenance.
+`phase13_primary_scorer()` exercises the actual Inspect eval path used by
+deterministic MockLLM tests and passes the resulting context/graph through the
 unchanged 41-field `evaluate_primary()`.
 
 Phase 13 does not implement real-provider E2E, model comparison, calibration,

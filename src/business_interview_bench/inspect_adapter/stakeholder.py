@@ -19,6 +19,7 @@ from inspect_ai.model import (
 )
 
 from business_interview.runtime import SemanticLedger
+from business_interview.scenarios import StakeholderPrompt
 from business_interview.stakeholders.knowledge import (
     StakeholderKnowledge,
     validate_stakeholder_knowledge,
@@ -31,6 +32,7 @@ from business_interview.stakeholders.response import (
     parse_stakeholder_response,
     validate_response_plan,
     validate_stakeholder_response,
+    validate_terminology_provenance,
 )
 
 _DEFAULT_MAX_ATTEMPTS = 3
@@ -44,10 +46,15 @@ _REALIZATION_INSTRUCTION = (
     "Return only JSON in this shape: {"
     '"message": "...", "annotations": [{"semantic_id": "...", '
     '"mode": "...", "quote": "...", "occurrence": 0}], '
-    '"alignments": [], "terminology": []}. '
+    '"alignments": [], "terminology": [{"semantic_id": "...", '
+    '"proposed_term": "...", "proposal_turn": 0, '
+    '"proposal_quote": "...", "proposal_occurrence": 0, '
+    '"quote": "...", "occurrence": 0}]}. '
     "Naturally express every item in the validated plan, annotate each item "
     "with an exact message span, add no unplanned business assertion, and "
-    "never put local IDs in message."
+    "never put local IDs in message. Include terminology only when the "
+    "assistant history contains the exact proposed term and preserve both "
+    "proposal and agreement provenance fields."
 )
 
 
@@ -63,16 +70,98 @@ class StakeholderTurn:
     response: StakeholderResponse
 
 
+def _render_scenario_prompt(prompt: StakeholderPrompt | str | None) -> str:
+    """Render public scenario behavior instructions without evaluator data."""
+    if prompt is None:
+        return ""
+    if isinstance(prompt, str):
+        if not prompt.strip():
+            raise ValueError("stakeholder_prompt must not be blank")
+        return prompt
+    return (
+        "Scenario behavior instructions (public/business behavior only):\n"
+        f"Persona:\n{prompt.persona}\n\n"
+        f"Reason for call:\n{prompt.reason_for_call}\n\n"
+        f"Task instructions:\n{prompt.task_instructions}"
+    )
+
+
 def _model_input(
     conversation: Sequence[ChatMessage],
-    knowledge_prompt: str,
+    system_context: str,
     instruction: str,
 ) -> list[ChatMessage]:
     return [
-        ChatMessageSystem(content=knowledge_prompt),
+        ChatMessageSystem(content=system_context),
         *conversation,
         ChatMessageUser(content=instruction),
     ]
+
+
+def _validate_prior_ledger(
+    knowledge: StakeholderKnowledge,
+    conversation: Sequence[ChatMessage],
+    ledger: SemanticLedger | None,
+) -> None:
+    """Reject private terminology that lacks both sides of its provenance."""
+    if ledger is None:
+        return
+    for entry in ledger.entries:
+        if not entry.terminology:
+            continue
+        validate_terminology_provenance(
+            entry.terminology,
+            conversation,
+            response_public_message_turn=entry.public_message_turn,
+        )
+        if entry.public_message_turn >= len(conversation):
+            raise ValueError(
+                "prior terminology agreement message is not in conversation history"
+            )
+        message = conversation[entry.public_message_turn]
+        if message.role != "user":
+            raise ValueError(
+                "prior terminology agreement must target a stakeholder message"
+            )
+        text = message.text
+        for index, event in enumerate(entry.terminology):
+            try:
+                resolved = knowledge.resolve(event.semantic_id)
+            except ValueError as exc:
+                raise ValueError(
+                    f"prior terminology {index} has an unknown stakeholder concept"
+                ) from exc
+            if resolved.kind != "concept":
+                raise ValueError(
+                    f"prior terminology {index} does not target a stakeholder concept"
+                )
+            start = -1
+            for _occurrence in range(event.occurrence + 1):
+                start = text.find(event.quote, start + 1)
+                if start < 0:
+                    raise ValueError(
+                        f"prior terminology {index} agreement quote is not "
+                        "an exact stakeholder message span"
+                    )
+
+
+def _stakeholder_system_context(
+    prompt: StakeholderPrompt | str | None,
+    knowledge: StakeholderKnowledge,
+    conversation: Sequence[ChatMessage],
+    prior_ledger: SemanticLedger | None,
+) -> str:
+    _validate_prior_ledger(knowledge, conversation, prior_ledger)
+    parts = [
+        part
+        for part in (
+            _render_scenario_prompt(prompt),
+            render_knowledge_prompt(knowledge),
+            _prior_ledger_prompt(prior_ledger),
+        )
+        if part
+    ]
+    return "\n\n".join(parts)
 
 
 def _prior_ledger_prompt(ledger: SemanticLedger | None) -> str:
@@ -118,7 +207,7 @@ async def _generate_plan(
     model: Model,
     conversation: Sequence[ChatMessage],
     knowledge: StakeholderKnowledge,
-    knowledge_prompt: str,
+    system_context: str,
     max_attempts: int,
 ) -> SemanticResponsePlan:
     error: ValueError | None = None
@@ -126,7 +215,7 @@ async def _generate_plan(
         output = await model.generate(
             _model_input(
                 conversation,
-                knowledge_prompt,
+                system_context,
                 _retry_instruction(_PLAN_INSTRUCTION, error),
             )
         )
@@ -146,7 +235,7 @@ async def _realize_response(
     model: Model,
     conversation: Sequence[ChatMessage],
     knowledge: StakeholderKnowledge,
-    knowledge_prompt: str,
+    system_context: str,
     plan: SemanticResponsePlan,
     max_attempts: int,
 ) -> StakeholderResponse:
@@ -157,13 +246,19 @@ async def _realize_response(
         output = await model.generate(
             _model_input(
                 conversation,
-                knowledge_prompt,
+                system_context,
                 _retry_instruction(instruction, error),
             )
         )
         try:
             response = parse_stakeholder_response(output.completion)
-            return validate_stakeholder_response(knowledge, plan, response)
+            return validate_stakeholder_response(
+                knowledge,
+                plan,
+                response,
+                interviewer_messages=conversation,
+                response_public_message_turn=len(conversation),
+            )
         except ValueError as exc:
             error = exc
     if error is None:
@@ -177,6 +272,7 @@ async def invoke_stakeholder_response_with_plan(
     conversation: Sequence[ChatMessage],
     knowledge: StakeholderKnowledge,
     *,
+    stakeholder_prompt: StakeholderPrompt | str | None = None,
     prior_ledger: SemanticLedger | None = None,
     max_plan_attempts: int = _DEFAULT_MAX_ATTEMPTS,
     max_realization_attempts: int = _DEFAULT_MAX_ATTEMPTS,
@@ -185,21 +281,24 @@ async def invoke_stakeholder_response_with_plan(
     _attempts_are_positive(max_plan_attempts, max_realization_attempts)
     validate_stakeholder_knowledge(knowledge)
     model = get_model(role="stakeholder", required=True)
-    knowledge_prompt = render_knowledge_prompt(knowledge) + _prior_ledger_prompt(
-        prior_ledger
+    system_context = _stakeholder_system_context(
+        stakeholder_prompt,
+        knowledge,
+        conversation,
+        prior_ledger,
     )
     plan = await _generate_plan(
         model,
         conversation,
         knowledge,
-        knowledge_prompt,
+        system_context,
         max_plan_attempts,
     )
     response = await _realize_response(
         model,
         conversation,
         knowledge,
-        knowledge_prompt,
+        system_context,
         plan,
         max_realization_attempts,
     )
@@ -210,6 +309,7 @@ async def invoke_stakeholder_response(
     conversation: Sequence[ChatMessage],
     knowledge: StakeholderKnowledge,
     *,
+    stakeholder_prompt: StakeholderPrompt | str | None = None,
     prior_ledger: SemanticLedger | None = None,
     max_plan_attempts: int = _DEFAULT_MAX_ATTEMPTS,
     max_realization_attempts: int = _DEFAULT_MAX_ATTEMPTS,
@@ -223,6 +323,7 @@ async def invoke_stakeholder_response(
     turn = await invoke_stakeholder_response_with_plan(
         conversation,
         knowledge,
+        stakeholder_prompt=stakeholder_prompt,
         prior_ledger=prior_ledger,
         max_plan_attempts=max_plan_attempts,
         max_realization_attempts=max_realization_attempts,

@@ -55,6 +55,7 @@ from .runtime import (
     mark_interview_complete,
     mark_max_turn_exhausted,
     record_candidate_question,
+    record_candidate_step,
     record_candidate_turn,
 )
 
@@ -87,6 +88,7 @@ __all__ = [
     "mark_interview_complete",
     "mark_max_turn_exhausted",
     "record_candidate_question",
+    "record_candidate_step",
     "record_candidate_turn",
     "remove_concept",
     "remove_edge",
