@@ -8,26 +8,7 @@ from __future__ import annotations
 
 from inspect_ai.solver import Generate, Solver, TaskState, solver
 
-from .store import BusinessInterviewReplayStore, load_seed9004_store_payload
-
-_METADATA_KEYS = (
-    "replay_case_id",
-    "scenario_id",
-    "source_repository",
-    "source_branch",
-    "source_commit_sha",
-)
-
-
-def _check_sample_metadata(state: TaskState, payload: dict[str, object]) -> None:
-    for key in _METADATA_KEYS:
-        expected = payload[key]
-        actual = state.metadata.get(key)
-        if actual != expected:
-            raise ValueError(
-                f"seed 9004 replay metadata {key!r} must be {expected!r}; "
-                f"got {actual!r}"
-            )
+from .store import BusinessInterviewReplayStore, _load_seed9004_scoring_inputs
 
 
 @solver(name="seed9004_replay_solver")
@@ -35,11 +16,13 @@ def seed9004_replay_solver() -> Solver:
     """Load and persist exact replay inputs without invoking a model."""
 
     async def solve(state: TaskState, generate: Generate) -> TaskState:
-        payload = load_seed9004_store_payload()
-        _check_sample_metadata(state, payload)
+        del generate  # required by Inspect's Solver protocol; replay never generates
+        payload = _load_seed9004_scoring_inputs()
         replay_store = state.store_as(BusinessInterviewReplayStore)
-        for field_name, value in payload.items():
-            setattr(replay_store, field_name, value)
+        replay_store.agent = payload["agent"]
+        replay_store.truth = payload["truth"]
+        replay_store.evaluation_context = payload["evaluation_context"]
+        replay_store.knowledge_coverage = payload["knowledge_coverage"]
         state.completed = True
         return state
 

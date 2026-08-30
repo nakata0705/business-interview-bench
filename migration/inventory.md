@@ -669,8 +669,9 @@ still targets canonical Truth, and its existing contract is unchanged.
 Focused `test_stakeholder_projection.py` covers deterministic IDs, local RNG,
 retry behavior, safe/unsafe contraction, provenance, all slot semantics,
 coverage derivation, deep immutability, and semantic-address resolution. LLM,
-simulator loop, Inspect AI, Agent runtime, Environment, InterviewDB, tools,
-diagnostics, and provider configuration remain unimplemented.
+simulator loop, Agent runtime, Environment, InterviewDB, tools, diagnostics,
+and provider configuration remain unimplemented; the Inspect adapter is added
+in Phase 11 below.
 
 ## Phase 11 result: Inspect AI execution and offline rescore
 
@@ -699,26 +700,25 @@ stable `business_interview_bench` namespace. Installed CLI names are
 `business_interview_bench/primary_scorer`.
 
 The one-sample dataset reads the runtime-neutral canonical asset at
-`src/business_interview/replay_data/seed9004/`. The old
-`tests/fixtures/seed9004` path is retained only as a symlink compatibility
-alias, so there is no second payload copy. Migration tests and the production
-adapter share the same Agent, Truth, context, coverage, expected, and
-provenance payloads. The custom solver validates those payloads and writes
+`src/business_interview/replay_data/seed9004/` and records only minimal sample
+metadata: `replay_case_id`, `scenario_id`, and `source_commit_sha`. There is no
+compatibility fixture or second payload copy. The expected oracle and
+provenance stay in packaged migration/test data; they are not copied into the
+runtime Store. The minimal solver validates the four scoring inputs and writes
 only JSON-compatible dictionaries to the typed sample-scoped
 `BusinessInterviewReplayStore`, then marks the state complete. It never calls
 `generate()`, `get_model()`, an LLM, Agent simulation, or stakeholder
-simulation. The `.eval` Store records exact AgentGraph, canonical Truth,
-InterviewEvaluationContext, KnowledgeCoverageView, replay/scenario/source
-metadata, expected oracle, and provenance. Truth/private knowledge is an
-allowed evaluator-private log artifact.
+simulation. The Store contains only `agent`, `truth`, `evaluation_context`, and
+`knowledge_coverage`.
 
-The custom scorer restores Store dictionaries with `model_validate()` and
+The scorer restores those four Store dictionaries with `model_validate()` and
 calls only the existing authoritative
 `evaluate_primary(agent, truth, context, knowledge_coverage)`. It does not
 reload the scenario catalog or any original fixture/source path during offline
 rescore. Its dict-valued `Score.value` derives field names from
-`dataclasses.fields(PrimaryEvaluation)` and preserves all 41 fields. The
-headline is the existing `reconstruction_pass` field, not a new weighted
+`dataclasses.fields(PrimaryEvaluation)` and preserves all 41 fields. Inspect's
+standard `mean()` is selected for the `reconstruction_pass` dictionary key, so
+that existing field is the headline without a custom metric or weighted
 aggregate. Primary reconstruction includes node/edge and semantic/concept
 metrics plus fabricated counts; evidence/protocol diagnostics include evidence
 coverage and provenance/observation/protocol fields; `knowledge_coverage` is

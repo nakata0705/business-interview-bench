@@ -224,23 +224,24 @@ inspect eval business_interview_bench/seed9004_replay --model none
 inspect score <log>.eval --scorer business_interview_bench/primary_scorer
 ```
 
-The registered task has exactly one packaged seed9004 sample. Its custom
-solver validates and stores canonical JSON payloads without calling
-`generate()`, a model, or an external service. The typed
-`BusinessInterviewReplayStore` records exact AgentGraph, canonical Truth,
-InterviewEvaluationContext, KnowledgeCoverageView, expected oracle, and
-provenance payloads. The scorer reconstructs those domain models from the
-Store and delegates authoritative scoring only to `evaluate_primary()`;
-`scenario` catalog reloads are not used for offline rescore. Truth/private
-knowledge in an `.eval` log is an evaluator-private artifact by design.
+The registered task has exactly one packaged seed9004 sample. Its minimal
+solver validates the four canonical scoring inputs and stores only their JSON
+payloads. It never calls `generate()`, a model, or an external service. The
+`BusinessInterviewReplayStore` contains only `agent`, `truth`,
+`evaluation_context`, and `knowledge_coverage`; expected oracle and provenance
+remain packaged migration/test data, not runtime Store state. The scorer
+reconstructs those four domain models with `model_validate()` and delegates
+authoritative scoring only to `evaluate_primary()`; scenario catalog reloads
+are not used for offline rescore.
 
 The Inspect score preserves all 41 `PrimaryEvaluation` fields as named values;
-it does not create a new weighted total. Primary reconstruction fields include
-node/edge and semantic/concept metrics, fabricated counts, and
-`reconstruction_pass`. Evidence/protocol diagnostics include evidence
+it does not create a new weighted total. Inspect's standard `mean()` metric is
+applied to the dict key `reconstruction_pass`, so that existing field remains
+the headline without a custom metric implementation. Primary reconstruction
+fields include node/edge and semantic/concept metrics, fabricated counts, and
+`reconstruction_pass`; evidence/protocol diagnostics include evidence
 coverage, provenance/observation counts, and protocol fields.
-`knowledge_coverage` remains a context/informational field. The only Inspect
-headline metric is the existing `reconstruction_pass` field.
+`knowledge_coverage` remains a context/informational field.
 
 A live `--model none` replay and `inspect score` offline rescore therefore use
 the same exact logged inputs and produce byte-equivalent 41-field scores with

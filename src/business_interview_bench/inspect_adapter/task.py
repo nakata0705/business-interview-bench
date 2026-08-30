@@ -8,35 +8,20 @@ from __future__ import annotations
 
 from inspect_ai import Task, task
 
-from .dataset import seed9004_replay_dataset, seed9004_replay_metadata
+from .dataset import seed9004_replay_dataset
 from .scorer import primary_scorer
 from .solver import seed9004_replay_solver
 
 
-@task(
-    name="seed9004_replay",
-    version=1,
-    tags=["business-interview", "deterministic-replay", "seed9004"],
-)
+@task(name="seed9004_replay")
 def seed9004_replay() -> Task:
     """Evaluate one packaged sample without model generation."""
-    metadata = seed9004_replay_metadata()
-    metadata.update(
-        {
-            "adapter": "business_interview_bench.inspect_adapter",
-            "headline_field": "reconstruction_pass",
-            "score_contract": "PrimaryEvaluation dataclass; no aggregate total",
-        }
-    )
     return Task(
         dataset=seed9004_replay_dataset(),
         solver=seed9004_replay_solver(),
         scorer=primary_scorer(),
         model="none",
-        metadata=metadata,
         version=1,
-        epochs=1,
-        fail_on_error=True,
     )
 
 

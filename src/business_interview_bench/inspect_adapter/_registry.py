@@ -5,13 +5,7 @@
 # packaged components before CLI name resolution.
 # pyright: reportMissingImports=false
 
-from .scorer import primary_scorer, reconstruction_pass_metric
-from .solver import seed9004_replay_solver
+from .scorer import primary_scorer
 from .task import seed9004_replay
 
-__all__ = [
-    "primary_scorer",
-    "reconstruction_pass_metric",
-    "seed9004_replay",
-    "seed9004_replay_solver",
-]
+__all__ = ["primary_scorer", "seed9004_replay"]

@@ -630,37 +630,38 @@ business_interview_bench = "business_interview_bench.inspect_adapter._registry"
 
 It registers the task `business_interview_bench/seed9004_replay`, the
 no-model `seed9004_replay_solver`, and the `business_interview_bench/primary_scorer`
-scorer. The replay dataset has exactly one sample. The solver validates the
-packaged canonical asset and writes JSON-compatible dictionaries into the
-sample-scoped `BusinessInterviewReplayStore`; it never calls `generate()`, a
-model, an Agent, or a stakeholder simulator. `--model none` remains safe even
-when an ambient `INSPECT_EVAL_MODEL` is set and requires no API credentials.
+scorer. The replay dataset has exactly one sample and only minimal
+identification metadata (`replay_case_id`, `scenario_id`, and
+`source_commit_sha`). The solver loads and validates the packaged canonical
+asset, writes four JSON-compatible dictionaries into the sample-scoped
+`BusinessInterviewReplayStore`, marks the state complete, and returns it. It
+never calls `generate()`, a model, an Agent, or a stakeholder simulator.
+`--model none` remains safe even when an ambient `INSPECT_EVAL_MODEL` is set and
+requires no API credentials.
 
 The canonical asset is shared by tests and the production adapter at
 `src/business_interview/replay_data/seed9004/`. It contains the exact normalized
 AgentGraph, canonical Truth, InterviewEvaluationContext,
-KnowledgeCoverageView, expected oracle, and provenance payloads. The former
-`tests/fixtures/seed9004` path is retained only as a symlink compatibility alias;
-it contains no second payload copy. The solver stores the canonical values in
-the `.eval` log (plus replay/scenario/source metadata), and the scorer
-reconstructs the four domain inputs from Store payloads with `model_validate()`.
-Offline scoring does not reload the scenario catalog, read test fixture files,
-use the source checkout, call an external service, or require an original
-fixture path. Truth and private knowledge in the `.eval` log are accepted as
-evaluator-private artifacts because exact logged state is required for
-replay/rescore.
+KnowledgeCoverageView, expected oracle, and provenance payloads. The expected
+oracle and provenance are migration/test assets and are not copied into the
+runtime Store. The Store contains only `agent`, `truth`,
+`evaluation_context`, and `knowledge_coverage`. Offline scoring reconstructs
+these four domain inputs with `model_validate()` and does not reload the
+scenario catalog, read test fixture files, use the source checkout, call an
+external service, or require an original fixture path.
 
 The scorer delegates its authoritative result exclusively to
 `evaluate_primary(agent, truth, context, knowledge_coverage)`. It derives the
 field contract from `dataclasses.fields(PrimaryEvaluation)` and fails fast if
 field count or names drift. All 41 named fields are preserved in the
 Inspect `Score.value` dictionary; no new weighted total is introduced.
-Primary reconstruction covers node/edge recall/precision, semantic and
+Inspect's public dict-valued metric selection applies standard `mean()` to the
+existing `reconstruction_pass` key, which remains the headline. Primary
+reconstruction covers node/edge recall/precision, semantic and
 concept correctness/recall/precision, fabricated counts, and
-`reconstruction_pass`. Evidence/protocol diagnostics cover evidence coverage,
+`reconstruction_pass`; evidence/protocol diagnostics cover evidence coverage,
 provenance/observation counts, and protocol fields. `knowledge_coverage` is a
-context/informational field. Inspect's only headline metric is the existing
-`reconstruction_pass` field.
+context/informational field.
 
 The live command and offline rescore are:
 
