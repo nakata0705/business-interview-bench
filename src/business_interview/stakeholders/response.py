@@ -1,0 +1,368 @@
+"""Pure stakeholder response contracts and deterministic semantic validation."""
+
+from __future__ import annotations
+
+from typing import Literal
+
+from pydantic import Field, field_validator
+
+from .addressing import (
+    ResolvedSemanticAddress,
+    SemanticAddressError,
+    resolve_semantic_address,
+)
+from .base import _DeeplyImmutableModel
+from .knowledge import (
+    StakeholderKnowledge,
+    StakeholderKnowledgeGraph,
+    is_dont_know,
+)
+
+SemanticMode = Literal["value", "absent", "dont_know", "exists", "mention"]
+AlignmentAct = Literal["confirm", "partial", "unknown", "dispute"]
+
+
+class ResponseParseError(ValueError):
+    """Raised when model output is not valid JSON for a response contract."""
+
+
+class ResponseValidationError(ValueError):
+    """Raised when a response contract contradicts stakeholder knowledge."""
+
+
+class PlannedResponseItem(_DeeplyImmutableModel):
+    """One knowledge-backed semantic assertion in a response plan."""
+
+    semantic_id: str = Field(min_length=1)
+    mode: SemanticMode
+
+    @field_validator("semantic_id")
+    @classmethod
+    def _semantic_id_not_blank(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("semantic_id must not be blank")
+        return value
+
+
+class SemanticResponsePlan(_DeeplyImmutableModel):
+    """The private WHAT to convey before natural-language realization."""
+
+    items: tuple[PlannedResponseItem, ...] = Field(default_factory=tuple)
+
+
+class SemanticAnnotation(_DeeplyImmutableModel):
+    """One private exact-span assertion in a realized stakeholder message."""
+
+    semantic_id: str = Field(min_length=1)
+    mode: SemanticMode
+    quote: str = Field(min_length=1)
+    occurrence: int = Field(default=0, ge=0)
+
+    @field_validator("semantic_id", "quote")
+    @classmethod
+    def _text_not_blank(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("semantic_id and quote must not be blank")
+        return value
+
+
+class ConceptAlignmentAssertion(_DeeplyImmutableModel):
+    """A private concept-identity dialogue act anchored to a message span."""
+
+    semantic_id: str = Field(min_length=1)
+    quote: str = Field(min_length=1)
+    occurrence: int = Field(default=0, ge=0)
+    act: AlignmentAct
+
+    @field_validator("semantic_id", "quote")
+    @classmethod
+    def _text_not_blank(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("semantic_id and quote must not be blank")
+        return value
+
+
+class TerminologyConfirmation(_DeeplyImmutableModel):
+    """A private terminology-agreement event anchored to a message span."""
+
+    semantic_id: str = Field(min_length=1)
+    proposed_term: str = Field(min_length=1)
+    quote: str = Field(min_length=1)
+    occurrence: int = Field(default=0, ge=0)
+
+    @field_validator("semantic_id", "proposed_term", "quote")
+    @classmethod
+    def _text_not_blank(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("semantic_id, proposed_term, and quote must not be blank")
+        return value
+
+
+class StakeholderResponse(_DeeplyImmutableModel):
+    """Public message plus its private, deterministic semantic sidecar."""
+
+    message: str = Field(min_length=1)
+    annotations: tuple[SemanticAnnotation, ...] = Field(default_factory=tuple)
+    alignments: tuple[ConceptAlignmentAssertion, ...] = Field(default_factory=tuple)
+    terminology: tuple[TerminologyConfirmation, ...] = Field(default_factory=tuple)
+
+    @field_validator("message")
+    @classmethod
+    def _message_not_blank(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("message must not be blank")
+        return value
+
+
+def semantic_mode_for_resolution(
+    resolved: ResolvedSemanticAddress,
+) -> SemanticMode:
+    """Derive the one canonical mode for a successful address resolution."""
+    if resolved.kind in ("node", "edge"):
+        return "exists"
+    if resolved.kind == "concept":
+        return "mention"
+    if resolved.kind == "node_element":
+        return "value"
+    if resolved.value is None:
+        return "absent"
+    if is_dont_know(resolved.value):
+        return "dont_know"
+    if resolved.kind in ("node_slot", "edge_slot"):
+        return "value"
+    raise ResponseValidationError(
+        f"unsupported resolved semantic kind: {resolved.kind!r}"
+    )
+
+
+def canonical_semantic_mode(
+    knowledge: StakeholderKnowledge | StakeholderKnowledgeGraph,
+    semantic_id: str,
+) -> SemanticMode:
+    """Resolve a local ID and derive its canonical knowledge-backed mode."""
+    return semantic_mode_for_resolution(
+        resolve_semantic_address(knowledge, semantic_id)
+    )
+
+
+def _resolve_for_validation(
+    knowledge: StakeholderKnowledge | StakeholderKnowledgeGraph,
+    semantic_id: str,
+    *,
+    subject: str,
+) -> ResolvedSemanticAddress:
+    try:
+        return resolve_semantic_address(knowledge, semantic_id)
+    except SemanticAddressError as exc:
+        raise ResponseValidationError(
+            f"{subject} semantic_id {semantic_id!r} is not resolvable in "
+            "stakeholder knowledge"
+        ) from exc
+
+
+def validate_response_plan(
+    knowledge: StakeholderKnowledge | StakeholderKnowledgeGraph,
+    plan: SemanticResponsePlan,
+) -> SemanticResponsePlan:
+    """Validate every planned item against the local canonical resolver."""
+    for index, item in enumerate(plan.items):
+        resolved = _resolve_for_validation(
+            knowledge,
+            item.semantic_id,
+            subject=f"plan item {index}",
+        )
+        expected = semantic_mode_for_resolution(resolved)
+        if item.mode != expected:
+            raise ResponseValidationError(
+                f"plan item {index} {item.semantic_id!r} declares mode "
+                f"{item.mode!r}, but stakeholder knowledge requires {expected!r}"
+            )
+    return plan
+
+
+def _occurrence_start(message: str, quote: str, occurrence: int) -> int | None:
+    if occurrence < 0 or not quote:
+        return None
+    start = -1
+    for _ in range(occurrence + 1):
+        start = message.find(quote, start + 1)
+        if start < 0:
+            return None
+    return start
+
+
+def _require_message_span(
+    message: str,
+    quote: str,
+    occurrence: int,
+    *,
+    subject: str,
+) -> None:
+    if _occurrence_start(message, quote, occurrence) is None:
+        raise ResponseValidationError(
+            f"{subject} quote {quote!r} occurrence {occurrence} is not an "
+            "exact span of the response message"
+        )
+
+
+def _private_identifiers(
+    knowledge: StakeholderKnowledge | StakeholderKnowledgeGraph,
+) -> set[str]:
+    graph = (
+        knowledge.graph if isinstance(knowledge, StakeholderKnowledge) else knowledge
+    )
+    identifiers = set(graph.semantic_ids())
+    identifiers.update(graph.node_truth_ids.values())
+    identifiers.update(graph.edge_truth_ids.values())
+    identifiers.update(concept.truth_concept_id for concept in graph.concepts.values())
+    return {identifier for identifier in identifiers if identifier}
+
+
+def _contains_identifier(message: str, identifier: str) -> bool:
+    start = 0
+    while True:
+        index = message.find(identifier, start)
+        if index < 0:
+            return False
+        before = message[index - 1] if index else ""
+        after_index = index + len(identifier)
+        after = message[after_index] if after_index < len(message) else ""
+        if not (before.isalnum() or before == "_") and not (
+            after.isalnum() or after == "_"
+        ):
+            return True
+        start = index + 1
+
+
+def _reject_private_identifier_leak(
+    knowledge: StakeholderKnowledge | StakeholderKnowledgeGraph,
+    message: str,
+) -> None:
+    for identifier in sorted(_private_identifiers(knowledge), key=len, reverse=True):
+        if _contains_identifier(message, identifier):
+            raise ResponseValidationError(
+                f"public response message contains private identifier {identifier!r}"
+            )
+
+
+def _validate_concept_event(
+    knowledge: StakeholderKnowledge | StakeholderKnowledgeGraph,
+    semantic_id: str,
+    quote: str,
+    occurrence: int,
+    message: str,
+    *,
+    subject: str,
+) -> None:
+    resolved = _resolve_for_validation(knowledge, semantic_id, subject=subject)
+    if resolved.kind != "concept":
+        raise ResponseValidationError(
+            f"{subject} semantic_id {semantic_id!r} must resolve to a knowledge concept"
+        )
+    _require_message_span(
+        message,
+        quote,
+        occurrence,
+        subject=subject,
+    )
+
+
+def validate_stakeholder_response(
+    knowledge: StakeholderKnowledge | StakeholderKnowledgeGraph,
+    plan: SemanticResponsePlan,
+    response: StakeholderResponse,
+) -> StakeholderResponse:
+    """Validate a realized sidecar without inferring facts from prose."""
+    validate_response_plan(knowledge, plan)
+    _reject_private_identifier_leak(knowledge, response.message)
+
+    plan_keys = {(item.semantic_id, item.mode) for item in plan.items}
+    covered_keys: set[tuple[str, SemanticMode]] = set()
+    for index, annotation in enumerate(response.annotations):
+        resolved = _resolve_for_validation(
+            knowledge,
+            annotation.semantic_id,
+            subject=f"annotation {index}",
+        )
+        expected = semantic_mode_for_resolution(resolved)
+        if annotation.mode != expected:
+            raise ResponseValidationError(
+                f"annotation {index} {annotation.semantic_id!r} declares mode "
+                f"{annotation.mode!r}, but stakeholder knowledge requires {expected!r}"
+            )
+        key = (annotation.semantic_id, annotation.mode)
+        if key not in plan_keys:
+            raise ResponseValidationError(
+                f"annotation {index} asserts unplanned semantic item {key!r}"
+            )
+        _require_message_span(
+            response.message,
+            annotation.quote,
+            annotation.occurrence,
+            subject=f"annotation {index}",
+        )
+        covered_keys.add(key)
+
+    missing = plan_keys - covered_keys
+    if missing:
+        raise ResponseValidationError(
+            f"realized response is missing planned semantic items: {sorted(missing)!r}"
+        )
+
+    for index, event in enumerate(response.alignments):
+        _validate_concept_event(
+            knowledge,
+            event.semantic_id,
+            event.quote,
+            event.occurrence,
+            response.message,
+            subject=f"alignment {index}",
+        )
+
+    for index, event in enumerate(response.terminology):
+        _validate_concept_event(
+            knowledge,
+            event.semantic_id,
+            event.quote,
+            event.occurrence,
+            response.message,
+            subject=f"terminology {index}",
+        )
+
+    return response
+
+
+def parse_semantic_response_plan(content: str) -> SemanticResponsePlan:
+    """Parse only strict JSON into a response plan; do not repair model output."""
+    try:
+        return SemanticResponsePlan.model_validate_json(content)
+    except (TypeError, ValueError) as exc:
+        raise ResponseParseError("invalid SemanticResponsePlan JSON") from exc
+
+
+def parse_stakeholder_response(content: str) -> StakeholderResponse:
+    """Parse only strict JSON into a stakeholder response sidecar."""
+    try:
+        return StakeholderResponse.model_validate_json(content)
+    except (TypeError, ValueError) as exc:
+        raise ResponseParseError("invalid StakeholderResponse JSON") from exc
+
+
+__all__ = [
+    "AlignmentAct",
+    "ConceptAlignmentAssertion",
+    "PlannedResponseItem",
+    "ResponseParseError",
+    "ResponseValidationError",
+    "SemanticAnnotation",
+    "SemanticMode",
+    "SemanticResponsePlan",
+    "StakeholderResponse",
+    "TerminologyConfirmation",
+    "canonical_semantic_mode",
+    "parse_semantic_response_plan",
+    "parse_stakeholder_response",
+    "semantic_mode_for_resolution",
+    "validate_response_plan",
+    "validate_stakeholder_response",
+]

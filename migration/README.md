@@ -674,6 +674,35 @@ inspect score <generated-log>.eval \
 Both paths produce the same 41/41 oracle fields and equal score payloads with
 zero model/API calls. Inspect owns execution, logging, and rescoring; the
 existing evaluator remains deterministic Business Interview domain code.
-Phase 12 is reserved for stakeholder simulator semantics. LLM realization,
-response planning, Agent runtime, Environment, InterviewDB, tools, and generic
-tau2 runtime remain out of scope.
+
+## Phase 12 result: one stakeholder response
+
+Phase 12 keeps response semantics in the core `business_interview.stakeholders`
+package, not in Inspect. `response.py` defines immutable
+`SemanticResponsePlan`, `SemanticAnnotation`, `ConceptAlignmentAssertion`,
+`TerminologyConfirmation`, and `StakeholderResponse` contracts. The pure
+`canonical_semantic_mode()` function derives `value`, `absent`, `dont_know`,
+`exists`, or `mention` from the canonical local resolver. `validate_response_plan()`
+rejects unknown/Truth-only IDs and every mode mismatch before realization.
+`validate_stakeholder_response()` requires exact quote/occurrence spans, full
+plan coverage, no unplanned business annotations, and concept-only alignment
+or terminology events. It does not infer facts from natural-language prose;
+the private sidecar remains the authority. Strict `model_validate_json()`
+parsers do not repair fences or heuristically extract JSON.
+
+`prompting.py` provides pure `render_knowledge_prompt()`. It renders only
+stakeholder-local visible graph elements, local concepts/terms, opaque IDs,
+and explicit value/absence/DONT_KNOW states. Truth mappings, Truth IDs, hidden
+facts, and external terminology are excluded.
+
+The only Inspect-specific Phase 12 code is
+`business_interview_bench.inspect_adapter.stakeholder`. It obtains the model
+with `get_model(role="stakeholder", required=True)`, calls the model twice
+(plan then realization), validates between calls, and retries only invalid
+semantic output with a small fixed bound (default three attempts per phase).
+No response-schema dependency or custom provider is used. Provider errors are
+not conflated with semantic retries, and no Phase 11 Store is extended. Mock
+integration tests verify two successful stakeholder-role calls, retry behavior,
+and explicit exhaustion errors. Phase 13 is reserved for multi-turn
+orchestration; Agent LLM behavior, tools, observations, LiveInterviewStore,
+completion protocol, and generic Environment/InterviewDB remain out of scope.

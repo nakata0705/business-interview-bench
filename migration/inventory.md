@@ -736,4 +736,33 @@ Live replay and offline rescore both reproduce seed9004's 41/41 exact oracle
 fields and equal score payloads with zero model/API calls, including with an
 ambient model setting because `--model none` is explicit. Inspect owns
 execution, logging, and rescoring; the evaluator remains deterministic core
-domain code. Phase 12 is reserved for stakeholder simulator semantics.
+domain code.
+
+## Phase 12 result: one stakeholder response contract
+
+Core response semantics live in `business_interview.stakeholders.response` and
+`prompting`, with no Inspect or tau2 dependency. Immutable Pydantic models cover
+`SemanticResponsePlan`, `PlannedResponseItem`, `SemanticAnnotation`,
+`ConceptAlignmentAssertion`, `TerminologyConfirmation`, and
+`StakeholderResponse`. `canonical_semantic_mode()` derives the one allowed mode
+from `StakeholderKnowledge.resolve()`. Plan validation rejects unknown,
+Truth-only, and mode-inconsistent IDs before realization. Sidecar validation
+requires exact message quote/occurrence spans, complete plan coverage, no
+unplanned business annotations, and concept-only alignment/terminology events.
+Literal local/Truth ID leakage is rejected; prose is never mined for facts.
+
+`render_knowledge_prompt()` is a pure local-world renderer. It exposes only
+visible positions, relations, concepts, stakeholder-local terms and opaque IDs,
+with distinct known value, known absence, and DONT_KNOW states. It omits Truth
+mappings, hidden facts, and external terminology.
+
+`business_interview_bench.inspect_adapter.stakeholder` is deliberately thin:
+it resolves only `get_model(role="stakeholder", required=True)`, performs the
+plan and realization calls, parses with strict `model_validate_json()`, and
+performs separate bounded semantic retries (default three per phase). It does
+not use response schemas, custom providers, or the Phase 11 Store. MockLLM
+integration covers exactly two successful role calls, invalid-plan and
+invalid-realization retries, and explicit exhaustion errors. Phase 13 is
+reserved for multi-turn orchestration; Agent runtime, tools, observations,
+LiveInterviewStore, completion protocol, provider configuration, and generic
+Environment/InterviewDB remain out of scope.

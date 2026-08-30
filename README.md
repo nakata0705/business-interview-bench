@@ -36,7 +36,7 @@ business-interview-bench/
 │   ├── evaluation/     # graph-only and explicit-context evaluator facades
 │   ├── replay_data/    # packaged canonical seed9004 replay asset
 │   ├── scenarios/      # tau2-free scenario/task catalog and Truth resources
-│   └── stakeholders/   # private profile, knowledge, and address contracts
+│   └── stakeholders/   # profile, knowledge, response, and prompt contracts
 ├── src/business_interview_bench/
 │   └── inspect_adapter/ # Inspect task, solver, scorer, and replay Store
 └── tests/
@@ -246,8 +246,39 @@ coverage, provenance/observation counts, and protocol fields.
 A live `--model none` replay and `inspect score` offline rescore therefore use
 the same exact logged inputs and produce byte-equivalent 41-field scores with
 no model/API calls. Inspect owns execution, logging, and rescoring; the
-existing evaluator remains deterministic domain code. Phase 12 is reserved for
-stakeholder simulator semantics. LLM realization, response planning, Agent
-runtime, Environment, InterviewDB, tools, and provider integration remain
-unimplemented. See `migration/README.md` and `migration/inventory.md` for
-migration details.
+existing evaluator remains deterministic domain code.
+
+## Phase 12: one stakeholder response contract
+
+Phase 12 adds only the semantic contract for one stakeholder response. Core
+code in `business_interview.stakeholders.response` defines immutable
+`SemanticResponsePlan` and `StakeholderResponse` models, canonical mode
+projection from the local resolver, strict JSON parsing, plan validation, and
+sidecar validation. A plan can reference only stakeholder-local opaque IDs and
+must use the mode implied by `StakeholderKnowledge`: `value`, `absent`,
+`dont_know`, `exists`, or `mention`. Realized annotations must cover the
+validated plan with exact message spans; alignments and terminology entries
+must target local concepts. No facts are inferred from prose, and literal
+local/Truth ID leakage in the public message is rejected.
+
+`render_knowledge_prompt()` is a pure core renderer. It emits only visible
+positions, relations, concepts, local terms, and the distinct value/absence/
+unknown states. Truth mappings, Truth IDs, hidden facts, and evaluator metadata
+are never rendered, and canonical terminology is not supplemented externally.
+
+The thin Inspect-only `invoke_stakeholder_response()` adapter resolves
+`get_model(role="stakeholder", required=True)` and performs two calls: WHAT
+(plan JSON), deterministic plan validation, then HOW (response JSON),
+deterministic sidecar validation. It uses strict `model_validate_json()`
+parsing, no response-schema dependency, and separate bounded retry limits
+(default three) for semantic output failures. Provider failures are not
+silently converted into semantic retries. The adapter accepts ordinary
+conversation and knowledge arguments and does not extend the Phase 11 Store.
+MockLLM integration tests cover exactly two successful stakeholder-role calls,
+plan/realization retries, and explicit retry exhaustion errors.
+
+Phase 13 remains reserved for multi-turn orchestration. Agent LLM behavior,
+AgentGraph mutation tools, observations, SemanticLedger/LiveInterviewStore,
+completion protocol, candidate/stakeholder turn scheduling, provider
+configuration, and generic Environment/InterviewDB remain unimplemented. See
+`migration/README.md` and `migration/inventory.md` for migration details.
