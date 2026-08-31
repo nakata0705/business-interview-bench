@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Callable
-from typing import Any
+from typing import Any, Literal
 
 from inspect_ai.tool import Tool, ToolError, tool
 
@@ -35,9 +35,6 @@ from business_interview.graph_mutations import (
     set_node_dont_know,
     set_node_property,
     set_start_nodes,
-    update_concept,
-    update_edge,
-    update_node,
 )
 from business_interview.runtime import (
     LiveInterviewStore,
@@ -166,27 +163,6 @@ def build_interview_tools(
 
         return execute
 
-    @tool(name="update_node")
-    def update_node_tool() -> Tool:
-        """Update an existing AgentGraph node with a JSON updates object."""
-
-        async def execute(node_id: str, updates: dict[str, Any]) -> str:
-            """Apply a JSON patch and return a compact mutation receipt.
-
-            Args:
-                node_id: Existing node ID.
-                updates: Node fields to update.
-            """
-            return mutate(
-                update_node,
-                operation_name="update_node",
-                result_target=f"node:{node_id}",
-                node_id=node_id,
-                updates=updates,
-            )
-
-        return execute
-
     @tool(name="remove_node")
     def remove_node_tool() -> Tool:
         """Remove an AgentGraph node after its incident edges are removed."""
@@ -225,27 +201,6 @@ def build_interview_tools(
                 edge_id=edge_id,
                 from_node=from_node,
                 to_node=to_node,
-            )
-
-        return execute
-
-    @tool(name="update_edge")
-    def update_edge_tool() -> Tool:
-        """Update an existing AgentGraph edge with a JSON updates object."""
-
-        async def execute(edge_id: str, updates: dict[str, Any]) -> str:
-            """Apply a JSON patch and return a compact mutation receipt.
-
-            Args:
-                edge_id: Existing edge ID.
-                updates: Edge fields to update.
-            """
-            return mutate(
-                update_edge,
-                operation_name="update_edge",
-                result_target=f"edge:{edge_id}",
-                edge_id=edge_id,
-                updates=updates,
             )
 
         return execute
@@ -299,27 +254,6 @@ def build_interview_tools(
 
         return execute
 
-    @tool(name="update_concept")
-    def update_concept_tool() -> Tool:
-        """Update an existing AgentGraph glossary concept."""
-
-        async def execute(concept_id: str, updates: dict[str, Any]) -> str:
-            """Apply a JSON patch and return a compact mutation receipt.
-
-            Args:
-                concept_id: Existing concept ID.
-                updates: Concept fields to update.
-            """
-            return mutate(
-                update_concept,
-                operation_name="update_concept",
-                result_target=f"concept:{concept_id}",
-                concept_id=concept_id,
-                updates=updates,
-            )
-
-        return execute
-
     @tool(name="remove_concept")
     def remove_concept_tool() -> Tool:
         """Remove an unreferenced AgentGraph glossary concept."""
@@ -341,24 +275,19 @@ def build_interview_tools(
 
     @tool(name="set_node_property")
     def set_node_property_tool() -> Tool:
-        """Set activity, actor, system, reads, writes, or rationale.
-
-        ``value`` is a concept ID string, a list of concept ID strings, or a
-        JSON object with ``state`` equal to ``unset``, ``absent``, or
-        ``dont_know`` and optional EvidenceRef objects.
-        """
+        """Set one scalar node property to a candidate concept ID."""
 
         async def execute(
             node_id: str,
-            property_name: str,
-            value: Any,
+            property_name: Literal["activity", "actor", "system", "rationale"],
+            value: str,
         ) -> str:
-            """Set one node property to a concept value or explicit state.
+            """Set activity, actor, system, or rationale to a concept ID.
 
             Args:
                 node_id: Existing node ID.
-                property_name: activity, actor, system, reads, writes, or rationale.
-                value: Concept ID, list of concept IDs, or state object.
+                property_name: Scalar node property to set.
+                value: Existing candidate concept ID.
             """
             return mutate(
                 set_node_property,
@@ -371,21 +300,48 @@ def build_interview_tools(
 
         return execute
 
+    @tool(name="set_node_property_list")
+    def set_node_property_list_tool() -> Tool:
+        """Set a list-valued node property to candidate concept IDs."""
+
+        async def execute(
+            node_id: str,
+            property_name: Literal["reads", "writes"],
+            concept_ids: list[str],
+        ) -> str:
+            """Set reads or writes to an explicit list of concept IDs.
+
+            Args:
+                node_id: Existing node ID.
+                property_name: List-valued node property to set.
+                concept_ids: Existing candidate concept IDs.
+            """
+            return mutate(
+                set_node_property,
+                operation_name="set_node_property_list",
+                result_target=f"node:{node_id}:{property_name}",
+                node_id=node_id,
+                property_name=property_name,
+                value=concept_ids,
+            )
+
+        return execute
+
     @tool(name="set_node_absent")
     def set_node_absent_tool() -> Tool:
         """Mark one AgentGraph node property explicitly ABSENT."""
 
         async def execute(
             node_id: str,
-            property_name: str,
-            evidence: list[dict[str, Any]] | None = None,
+            property_name: Literal[
+                "activity", "actor", "system", "reads", "writes", "rationale"
+            ],
         ) -> str:
-            """Set a node property to ABSENT and return a compact receipt.
+            """Set a node property to ABSENT; attach evidence separately.
 
             Args:
                 node_id: Existing node ID.
                 property_name: Node property to mark absent.
-                evidence: Optional public EvidenceRef objects.
             """
             return mutate(
                 set_node_absent,
@@ -393,7 +349,7 @@ def build_interview_tools(
                 result_target=f"node:{node_id}:{property_name}",
                 node_id=node_id,
                 property_name=property_name,
-                evidence=evidence or (),
+                evidence=(),
             )
 
         return execute
@@ -404,15 +360,15 @@ def build_interview_tools(
 
         async def execute(
             node_id: str,
-            property_name: str,
-            evidence: list[dict[str, Any]] | None = None,
+            property_name: Literal[
+                "activity", "actor", "system", "reads", "writes", "rationale"
+            ],
         ) -> str:
-            """Set a node property to explicit DONT_KNOW.
+            """Set a node property to DONT_KNOW; attach evidence separately.
 
             Args:
                 node_id: Existing node ID.
                 property_name: Node property whose value is unknown.
-                evidence: Optional public EvidenceRef objects.
             """
             return mutate(
                 set_node_dont_know,
@@ -420,21 +376,21 @@ def build_interview_tools(
                 result_target=f"node:{node_id}:{property_name}",
                 node_id=node_id,
                 property_name=property_name,
-                evidence=evidence or (),
+                evidence=(),
             )
 
         return execute
 
     @tool(name="set_edge_condition")
     def set_edge_condition_tool() -> Tool:
-        """Set an edge condition to a concept ID or explicit state object."""
+        """Set an edge condition to a candidate concept ID."""
 
-        async def execute(edge_id: str, value: Any) -> str:
+        async def execute(edge_id: str, value: str) -> str:
             """Set an edge condition and return a compact mutation receipt.
 
             Args:
                 edge_id: Existing edge ID.
-                value: Concept ID or state object.
+                value: Existing candidate concept ID.
             """
             return mutate(
                 set_edge_condition,
@@ -450,22 +406,18 @@ def build_interview_tools(
     def set_edge_condition_absent_tool() -> Tool:
         """Mark an edge condition explicitly ABSENT."""
 
-        async def execute(
-            edge_id: str,
-            evidence: list[dict[str, Any]] | None = None,
-        ) -> str:
-            """Set an edge condition to ABSENT and return a compact receipt.
+        async def execute(edge_id: str) -> str:
+            """Set an edge condition to ABSENT; attach evidence separately.
 
             Args:
                 edge_id: Existing edge ID.
-                evidence: Optional public EvidenceRef objects.
             """
             return mutate(
                 set_edge_condition_absent,
                 operation_name="set_edge_condition_absent",
                 result_target=f"edge:{edge_id}:condition",
                 edge_id=edge_id,
-                evidence=evidence or (),
+                evidence=(),
             )
 
         return execute
@@ -474,22 +426,18 @@ def build_interview_tools(
     def set_edge_condition_dont_know_tool() -> Tool:
         """Mark an edge condition explicitly DONT_KNOW."""
 
-        async def execute(
-            edge_id: str,
-            evidence: list[dict[str, Any]] | None = None,
-        ) -> str:
-            """Set an edge condition to DONT_KNOW and return a compact receipt.
+        async def execute(edge_id: str) -> str:
+            """Set an edge condition to DONT_KNOW; attach evidence separately.
 
             Args:
                 edge_id: Existing edge ID.
-                evidence: Optional public EvidenceRef objects.
             """
             return mutate(
                 set_edge_condition_dont_know,
                 operation_name="set_edge_condition_dont_know",
                 result_target=f"edge:{edge_id}:condition",
                 edge_id=edge_id,
-                evidence=evidence or (),
+                evidence=(),
             )
 
         return execute
@@ -507,7 +455,7 @@ def build_interview_tools(
         async def execute(
             target: str,
             observation_id: str,
-            quote: str | None = None,
+            quote: str = "",
             occurrence: int = 0,
         ) -> str:
             """Attach evidence and return a compact mutation receipt.
@@ -524,7 +472,7 @@ def build_interview_tools(
                 result_target=target,
                 target=target,
                 observation_id=observation_id,
-                quote=quote,
+                quote=quote or None,
                 occurrence=occurrence,
                 observation_ids={
                     observation.id for observation in runtime_ref[0].observations
@@ -603,15 +551,13 @@ def build_interview_tools(
         get_agent_graph(),
         get_observations(),
         add_node_tool(),
-        update_node_tool(),
         remove_node_tool(),
         add_edge_tool(),
-        update_edge_tool(),
         remove_edge_tool(),
         define_concept_tool(),
-        update_concept_tool(),
         remove_concept_tool(),
         set_node_property_tool(),
+        set_node_property_list_tool(),
         set_node_absent_tool(),
         set_node_dont_know_tool(),
         set_edge_condition_tool(),

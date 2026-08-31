@@ -440,3 +440,19 @@ The schema-versioned summary aggregates by scenario and model, but never dumps
 Truth, exact `StakeholderKnowledge`, or the full stakeholder profile. Real
 calibration is optional; if credentials are unavailable it is not simulated by
 MockLLM.
+
+## Phase 15: OpenAI-compatible candidate tool schemas
+
+Phase 15 removes free-form JSON Schema branches from the candidate Inspect
+surface. Generic `update_node`, `update_edge`, and `update_concept` tools are
+not exposed; scalar and list-valued node properties have separate typed tools,
+explicit ABSENT/DONT_KNOW operations remain available, and public evidence is
+attached through a dedicated typed operation. The core graph mutation API and
+all evaluator semantics remain unchanged. Recursive schema invariants and the
+exact 19-tool surface are checked by
+`tests/test_phase15_tool_schemas.py`.
+
+The DeepSeek V4 Flash 0731 OpenRouter preflight and the three one-epoch
+calibration results are recorded without credentials or raw logs under
+`experiments/phase15/`; see its README and safe summary for the observed
+quality and next hardening priority.

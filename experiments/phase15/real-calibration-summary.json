@@ -1,0 +1,767 @@
+{
+  "aggregate": {
+    "accepted_empty_plan_rate": 0.0,
+    "accepted_unannotated_response_rate": 0.0,
+    "average_candidate_generations": 7.0,
+    "average_interview_turns": 2.6666666666666665,
+    "average_observation_count": 2.6666666666666665,
+    "average_question_count": 2.0,
+    "average_stakeholder_turns": 1.6666666666666667,
+    "by_candidate_model": {
+      "openrouter/deepseek/deepseek-v4-flash-0731": {
+        "accepted_empty_plan_rate": 0.0,
+        "accepted_unannotated_response_rate": 0.0,
+        "average_candidate_generations": 7.0,
+        "average_interview_turns": 2.6666666666666665,
+        "average_observation_count": 2.6666666666666665,
+        "average_question_count": 2.0,
+        "average_stakeholder_turns": 1.6666666666666667,
+        "completion_rate": 0.0,
+        "evidence_pass_rate": 0.5,
+        "fabricated_edge_total": 0,
+        "fabricated_node_total": 0,
+        "mean_edge_precision": 0.5,
+        "mean_edge_recall": 0.5,
+        "mean_node_precision": 0.5,
+        "mean_node_recall": 0.5,
+        "mean_recoverable_tool_error_count": 2.3333333333333335,
+        "mean_semantic_correctness": {
+          "activity_correctness": 0.5,
+          "actor_correctness": 0.5,
+          "concept_correctness": 0.3333333333333333,
+          "condition_correctness": 0.0,
+          "rationale_correctness": 0.0,
+          "read_correctness": 0.125,
+          "system_correctness": 0.125,
+          "write_correctness": 0.125
+        },
+        "mean_semantic_retry_count": 3.0,
+        "mean_stakeholder_semantic_rejection_count": 3.3333333333333335,
+        "protocol_pass_rate": 0.0,
+        "reconstruction_pass_rate": 0.0,
+        "run_count": 3,
+        "total_accepted_response_count": 5,
+        "total_recoverable_tool_error_count": 7,
+        "total_semantic_retry_count": 9,
+        "total_stakeholder_semantic_rejection_count": 10,
+        "usage": {
+          "candidate": {
+            "input_tokens": 34657,
+            "known_run_count": 3,
+            "mean_input_tokens": 11552.333333333334,
+            "mean_output_tokens": 2475.3333333333335,
+            "mean_total_tokens": 36897.0,
+            "output_tokens": 7426,
+            "total_cost": null,
+            "total_tokens": 110691
+          },
+          "stakeholder": {
+            "input_tokens": 56996,
+            "known_run_count": 3,
+            "mean_input_tokens": 18998.666666666668,
+            "mean_output_tokens": 164085.33333333334,
+            "mean_total_tokens": 188374.66666666666,
+            "output_tokens": 492256,
+            "total_cost": null,
+            "total_tokens": 565124
+          },
+          "total": {
+            "input_tokens": 91653,
+            "known_run_count": 3,
+            "mean_input_tokens": 30551.0,
+            "mean_output_tokens": 166560.66666666666,
+            "mean_total_tokens": 225271.66666666666,
+            "output_tokens": 499682,
+            "total_cost": null,
+            "total_tokens": 675815
+          }
+        }
+      }
+    },
+    "by_scenario": {
+      "lab_sample_flow": {
+        "accepted_empty_plan_rate": 0.0,
+        "accepted_unannotated_response_rate": 0.0,
+        "average_candidate_generations": 16.0,
+        "average_interview_turns": 5.0,
+        "average_observation_count": 5.0,
+        "average_question_count": 4.0,
+        "average_stakeholder_turns": 4.0,
+        "completion_rate": 0.0,
+        "evidence_pass_rate": 0.0,
+        "fabricated_edge_total": 0,
+        "fabricated_node_total": 0,
+        "mean_edge_precision": 1.0,
+        "mean_edge_recall": 1.0,
+        "mean_node_precision": 1.0,
+        "mean_node_recall": 1.0,
+        "mean_recoverable_tool_error_count": 7.0,
+        "mean_semantic_correctness": {
+          "activity_correctness": 1.0,
+          "actor_correctness": 1.0,
+          "concept_correctness": 0.6666666666666666,
+          "condition_correctness": 0.0,
+          "rationale_correctness": 0.0,
+          "read_correctness": 0.25,
+          "system_correctness": 0.25,
+          "write_correctness": 0.25
+        },
+        "mean_semantic_retry_count": 4.0,
+        "mean_stakeholder_semantic_rejection_count": 4.0,
+        "protocol_pass_rate": 0.0,
+        "reconstruction_pass_rate": 0.0,
+        "run_count": 1,
+        "total_accepted_response_count": 4,
+        "total_recoverable_tool_error_count": 7,
+        "total_semantic_retry_count": 4,
+        "total_stakeholder_semantic_rejection_count": 4,
+        "usage": {
+          "candidate": {
+            "input_tokens": 28378,
+            "known_run_count": 1,
+            "mean_input_tokens": 28378.0,
+            "mean_output_tokens": 6007.0,
+            "mean_total_tokens": 96849.0,
+            "output_tokens": 6007,
+            "total_cost": null,
+            "total_tokens": 96849
+          },
+          "stakeholder": {
+            "input_tokens": 20783,
+            "known_run_count": 1,
+            "mean_input_tokens": 20783.0,
+            "mean_output_tokens": 293798.0,
+            "mean_total_tokens": 330453.0,
+            "output_tokens": 293798,
+            "total_cost": null,
+            "total_tokens": 330453
+          },
+          "total": {
+            "input_tokens": 49161,
+            "known_run_count": 1,
+            "mean_input_tokens": 49161.0,
+            "mean_output_tokens": 299805.0,
+            "mean_total_tokens": 427302.0,
+            "output_tokens": 299805,
+            "total_cost": null,
+            "total_tokens": 427302
+          }
+        }
+      },
+      "quotation_workflow_1": {
+        "accepted_empty_plan_rate": null,
+        "accepted_unannotated_response_rate": null,
+        "average_candidate_generations": 2.0,
+        "average_interview_turns": 1.0,
+        "average_observation_count": 1.0,
+        "average_question_count": 1.0,
+        "average_stakeholder_turns": 0.0,
+        "completion_rate": null,
+        "evidence_pass_rate": null,
+        "fabricated_edge_total": null,
+        "fabricated_node_total": null,
+        "mean_edge_precision": null,
+        "mean_edge_recall": null,
+        "mean_node_precision": null,
+        "mean_node_recall": null,
+        "mean_recoverable_tool_error_count": 0.0,
+        "mean_semantic_correctness": {
+          "activity_correctness": null,
+          "actor_correctness": null,
+          "concept_correctness": null,
+          "condition_correctness": null,
+          "rationale_correctness": null,
+          "read_correctness": null,
+          "system_correctness": null,
+          "write_correctness": null
+        },
+        "mean_semantic_retry_count": 3.0,
+        "mean_stakeholder_semantic_rejection_count": 4.0,
+        "protocol_pass_rate": null,
+        "reconstruction_pass_rate": null,
+        "run_count": 1,
+        "total_accepted_response_count": 0,
+        "total_recoverable_tool_error_count": 0,
+        "total_semantic_retry_count": 3,
+        "total_stakeholder_semantic_rejection_count": 4,
+        "usage": {
+          "candidate": {
+            "input_tokens": 692,
+            "known_run_count": 1,
+            "mean_input_tokens": 692.0,
+            "mean_output_tokens": 194.0,
+            "mean_total_tokens": 4982.0,
+            "output_tokens": 194,
+            "total_cost": null,
+            "total_tokens": 4982
+          },
+          "stakeholder": {
+            "input_tokens": 19116,
+            "known_run_count": 1,
+            "mean_input_tokens": 19116.0,
+            "mean_output_tokens": 169885.0,
+            "mean_total_tokens": 189001.0,
+            "output_tokens": 169885,
+            "total_cost": null,
+            "total_tokens": 189001
+          },
+          "total": {
+            "input_tokens": 19808,
+            "known_run_count": 1,
+            "mean_input_tokens": 19808.0,
+            "mean_output_tokens": 170079.0,
+            "mean_total_tokens": 193983.0,
+            "output_tokens": 170079,
+            "total_cost": null,
+            "total_tokens": 193983
+          }
+        }
+      },
+      "quotation_workflow_1_ja": {
+        "accepted_empty_plan_rate": 0.0,
+        "accepted_unannotated_response_rate": 0.0,
+        "average_candidate_generations": 3.0,
+        "average_interview_turns": 2.0,
+        "average_observation_count": 2.0,
+        "average_question_count": 1.0,
+        "average_stakeholder_turns": 1.0,
+        "completion_rate": 0.0,
+        "evidence_pass_rate": 1.0,
+        "fabricated_edge_total": 0,
+        "fabricated_node_total": 0,
+        "mean_edge_precision": 0.0,
+        "mean_edge_recall": 0.0,
+        "mean_node_precision": 0.0,
+        "mean_node_recall": 0.0,
+        "mean_recoverable_tool_error_count": 0.0,
+        "mean_semantic_correctness": {
+          "activity_correctness": 0.0,
+          "actor_correctness": 0.0,
+          "concept_correctness": 0.0,
+          "condition_correctness": 0.0,
+          "rationale_correctness": 0.0,
+          "read_correctness": 0.0,
+          "system_correctness": 0.0,
+          "write_correctness": 0.0
+        },
+        "mean_semantic_retry_count": 2.0,
+        "mean_stakeholder_semantic_rejection_count": 2.0,
+        "protocol_pass_rate": 0.0,
+        "reconstruction_pass_rate": 0.0,
+        "run_count": 1,
+        "total_accepted_response_count": 1,
+        "total_recoverable_tool_error_count": 0,
+        "total_semantic_retry_count": 2,
+        "total_stakeholder_semantic_rejection_count": 2,
+        "usage": {
+          "candidate": {
+            "input_tokens": 5587,
+            "known_run_count": 1,
+            "mean_input_tokens": 5587.0,
+            "mean_output_tokens": 1225.0,
+            "mean_total_tokens": 8860.0,
+            "output_tokens": 1225,
+            "total_cost": null,
+            "total_tokens": 8860
+          },
+          "stakeholder": {
+            "input_tokens": 17097,
+            "known_run_count": 1,
+            "mean_input_tokens": 17097.0,
+            "mean_output_tokens": 28573.0,
+            "mean_total_tokens": 45670.0,
+            "output_tokens": 28573,
+            "total_cost": null,
+            "total_tokens": 45670
+          },
+          "total": {
+            "input_tokens": 22684,
+            "known_run_count": 1,
+            "mean_input_tokens": 22684.0,
+            "mean_output_tokens": 29798.0,
+            "mean_total_tokens": 54530.0,
+            "output_tokens": 29798,
+            "total_cost": null,
+            "total_tokens": 54530
+          }
+        }
+      }
+    },
+    "by_stakeholder_model": {
+      "openrouter/deepseek/deepseek-v4-flash-0731": {
+        "accepted_empty_plan_rate": 0.0,
+        "accepted_unannotated_response_rate": 0.0,
+        "average_candidate_generations": 7.0,
+        "average_interview_turns": 2.6666666666666665,
+        "average_observation_count": 2.6666666666666665,
+        "average_question_count": 2.0,
+        "average_stakeholder_turns": 1.6666666666666667,
+        "completion_rate": 0.0,
+        "evidence_pass_rate": 0.5,
+        "fabricated_edge_total": 0,
+        "fabricated_node_total": 0,
+        "mean_edge_precision": 0.5,
+        "mean_edge_recall": 0.5,
+        "mean_node_precision": 0.5,
+        "mean_node_recall": 0.5,
+        "mean_recoverable_tool_error_count": 2.3333333333333335,
+        "mean_semantic_correctness": {
+          "activity_correctness": 0.5,
+          "actor_correctness": 0.5,
+          "concept_correctness": 0.3333333333333333,
+          "condition_correctness": 0.0,
+          "rationale_correctness": 0.0,
+          "read_correctness": 0.125,
+          "system_correctness": 0.125,
+          "write_correctness": 0.125
+        },
+        "mean_semantic_retry_count": 3.0,
+        "mean_stakeholder_semantic_rejection_count": 3.3333333333333335,
+        "protocol_pass_rate": 0.0,
+        "reconstruction_pass_rate": 0.0,
+        "run_count": 3,
+        "total_accepted_response_count": 5,
+        "total_recoverable_tool_error_count": 7,
+        "total_semantic_retry_count": 9,
+        "total_stakeholder_semantic_rejection_count": 10,
+        "usage": {
+          "candidate": {
+            "input_tokens": 34657,
+            "known_run_count": 3,
+            "mean_input_tokens": 11552.333333333334,
+            "mean_output_tokens": 2475.3333333333335,
+            "mean_total_tokens": 36897.0,
+            "output_tokens": 7426,
+            "total_cost": null,
+            "total_tokens": 110691
+          },
+          "stakeholder": {
+            "input_tokens": 56996,
+            "known_run_count": 3,
+            "mean_input_tokens": 18998.666666666668,
+            "mean_output_tokens": 164085.33333333334,
+            "mean_total_tokens": 188374.66666666666,
+            "output_tokens": 492256,
+            "total_cost": null,
+            "total_tokens": 565124
+          },
+          "total": {
+            "input_tokens": 91653,
+            "known_run_count": 3,
+            "mean_input_tokens": 30551.0,
+            "mean_output_tokens": 166560.66666666666,
+            "mean_total_tokens": 225271.66666666666,
+            "output_tokens": 499682,
+            "total_cost": null,
+            "total_tokens": 675815
+          }
+        }
+      }
+    },
+    "completion_rate": 0.0,
+    "evidence_pass_rate": 0.5,
+    "fabricated_edge_total": 0,
+    "fabricated_node_total": 0,
+    "mean_edge_precision": 0.5,
+    "mean_edge_recall": 0.5,
+    "mean_node_precision": 0.5,
+    "mean_node_recall": 0.5,
+    "mean_recoverable_tool_error_count": 2.3333333333333335,
+    "mean_semantic_correctness": {
+      "activity_correctness": 0.5,
+      "actor_correctness": 0.5,
+      "concept_correctness": 0.3333333333333333,
+      "condition_correctness": 0.0,
+      "rationale_correctness": 0.0,
+      "read_correctness": 0.125,
+      "system_correctness": 0.125,
+      "write_correctness": 0.125
+    },
+    "mean_semantic_retry_count": 3.0,
+    "mean_stakeholder_semantic_rejection_count": 3.3333333333333335,
+    "protocol_pass_rate": 0.0,
+    "reconstruction_pass_rate": 0.0,
+    "run_count": 3,
+    "total_accepted_response_count": 5,
+    "total_recoverable_tool_error_count": 7,
+    "total_semantic_retry_count": 9,
+    "total_stakeholder_semantic_rejection_count": 10,
+    "usage": {
+      "candidate": {
+        "input_tokens": 34657,
+        "known_run_count": 3,
+        "mean_input_tokens": 11552.333333333334,
+        "mean_output_tokens": 2475.3333333333335,
+        "mean_total_tokens": 36897.0,
+        "output_tokens": 7426,
+        "total_cost": null,
+        "total_tokens": 110691
+      },
+      "stakeholder": {
+        "input_tokens": 56996,
+        "known_run_count": 3,
+        "mean_input_tokens": 18998.666666666668,
+        "mean_output_tokens": 164085.33333333334,
+        "mean_total_tokens": 188374.66666666666,
+        "output_tokens": 492256,
+        "total_cost": null,
+        "total_tokens": 565124
+      },
+      "total": {
+        "input_tokens": 91653,
+        "known_run_count": 3,
+        "mean_input_tokens": 30551.0,
+        "mean_output_tokens": 166560.66666666666,
+        "mean_total_tokens": 225271.66666666666,
+        "output_tokens": 499682,
+        "total_cost": null,
+        "total_tokens": 675815
+      }
+    }
+  },
+  "runs": [
+    {
+      "diagnostics": {
+        "accepted_empty_plan_response_count": 0,
+        "accepted_response_count": 4,
+        "accepted_response_with_insufficient_annotations_count": 0,
+        "accepted_response_with_text_but_no_annotations_count": 0,
+        "candidate_model_error_count": 0,
+        "failure_class": "tool/runtime_failure",
+        "quality_tags": [
+          "reconstruction_failed",
+          "evidence_failed",
+          "protocol_failed",
+          "semantic_retry_occurred"
+        ],
+        "recoverable_tool_error_count": 7,
+        "semantic_retry_count": 4,
+        "stakeholder_model_error_count": 0,
+        "stakeholder_plan_attempt_count": 6,
+        "stakeholder_realization_attempt_count": 6,
+        "stakeholder_semantic_rejection_count": 4
+      },
+      "primary_evaluation": {
+        "activity_correctness": 1.0,
+        "actor_correctness": 1.0,
+        "ambiguous_evidence_ref_count": 0,
+        "authentic_observation_count": 5,
+        "concept_correctness": 0.6666666666666666,
+        "concept_precision": 1.0,
+        "concept_recall": 0.6666666666666666,
+        "condition_correctness": 0.0,
+        "edge_evidence_coverage": 0.0,
+        "edge_precision": 1.0,
+        "edge_recall": 1.0,
+        "end_precision": 1.0,
+        "end_recall": 1.0,
+        "evidence_pass": false,
+        "fabricated_edge_count": 0,
+        "fabricated_node_count": 0,
+        "glossary_complete": false,
+        "graph_created": true,
+        "graph_valid": true,
+        "invalid_evidence_ref_count": 0,
+        "invalid_observation_reference_count": 0,
+        "invalid_observation_source_count": 0,
+        "knowledge_coverage": 1.0,
+        "marker_evidence_errors_surrogate": 0,
+        "node_evidence_coverage": 1.0,
+        "node_precision": 1.0,
+        "node_recall": 1.0,
+        "orphan_observation_count": 3,
+        "protocol_completed": false,
+        "protocol_pass": false,
+        "provenance_authenticity_pass": true,
+        "quality_pass": false,
+        "rationale_correctness": 0.0,
+        "read_correctness": 0.25,
+        "reconstruction_pass": false,
+        "ref_evidence_coverage": 0.8,
+        "start_correct": true,
+        "structural_pass": false,
+        "system_correctness": 0.25,
+        "unsupported_ref_count": 0,
+        "write_correctness": 0.25
+      },
+      "protocol": {
+        "candidate_generation_count": 16,
+        "candidate_steps": 1,
+        "candidate_turns": 5,
+        "completion_reason": null,
+        "failure_reason": "candidate_did_not_ask_question",
+        "observation_count": 5,
+        "question_count": 4,
+        "stakeholder_generation_count": 12,
+        "stakeholder_turns": 4,
+        "status": "incomplete"
+      },
+      "run": {
+        "candidate_model": "openrouter/deepseek/deepseek-v4-flash-0731",
+        "epoch": 1,
+        "eval_id": "ZpHGgGjFm7u5aVvzzujvNu",
+        "generation_parameters": {
+          "candidate": {
+            "max_retries": 0,
+            "max_tokens": 1024,
+            "temperature": 0.0
+          },
+          "stakeholder": {
+            "temperature": 0.0
+          }
+        },
+        "limits": {
+          "candidate_max_tokens": 1024,
+          "max_candidate_steps_per_turn": 8,
+          "max_interview_turns": 8
+        },
+        "log_id": "ZpHGgGjFm7u5aVvzzujvNu",
+        "run_id": "aeWn5GVNXTqYrfsDFTbDMc",
+        "run_index": 0,
+        "scenario_id": "lab_sample_flow",
+        "stakeholder_model": "openrouter/deepseek/deepseek-v4-flash-0731",
+        "stakeholder_profile_id": "phase14-lab-technician",
+        "stakeholder_seed": 1401,
+        "task": "business_interview_bench/phase13_interview"
+      },
+      "schema_version": 2,
+      "source": {
+        "file_name": "2026-08-31T17-33-41-00-00_phase13-interview_RpxZEcu7YVBCTUZahnFmuA.eval"
+      },
+      "usage": {
+        "candidate": {
+          "input_tokens": 28378,
+          "output_tokens": 6007,
+          "total_cost": null,
+          "total_tokens": 96849
+        },
+        "stakeholder": {
+          "input_tokens": 20783,
+          "output_tokens": 293798,
+          "total_cost": null,
+          "total_tokens": 330453
+        },
+        "total": {
+          "input_tokens": 49161,
+          "output_tokens": 299805,
+          "total_cost": null,
+          "total_tokens": 427302
+        }
+      }
+    },
+    {
+      "diagnostics": {
+        "accepted_empty_plan_response_count": 0,
+        "accepted_response_count": 0,
+        "accepted_response_with_insufficient_annotations_count": 0,
+        "accepted_response_with_text_but_no_annotations_count": 0,
+        "candidate_model_error_count": 0,
+        "failure_class": "stakeholder_semantic_validation_failure",
+        "quality_tags": [
+          "semantic_retry_occurred"
+        ],
+        "recoverable_tool_error_count": 0,
+        "semantic_retry_count": 3,
+        "stakeholder_model_error_count": 0,
+        "stakeholder_plan_attempt_count": 2,
+        "stakeholder_realization_attempt_count": 3,
+        "stakeholder_semantic_rejection_count": 4
+      },
+      "primary_evaluation": {},
+      "protocol": {
+        "candidate_generation_count": 2,
+        "candidate_steps": 2,
+        "candidate_turns": 1,
+        "completion_reason": null,
+        "failure_reason": null,
+        "observation_count": 1,
+        "question_count": 1,
+        "stakeholder_generation_count": 5,
+        "stakeholder_turns": 0,
+        "status": "active"
+      },
+      "run": {
+        "candidate_model": "openrouter/deepseek/deepseek-v4-flash-0731",
+        "epoch": 1,
+        "eval_id": "Vh5nfYZXXsoi8NpaC37GUR",
+        "generation_parameters": {
+          "candidate": {
+            "max_retries": 0,
+            "max_tokens": 1024,
+            "temperature": 0.0
+          },
+          "stakeholder": {
+            "temperature": 0.0
+          }
+        },
+        "limits": {
+          "candidate_max_tokens": 1024,
+          "max_candidate_steps_per_turn": 8,
+          "max_interview_turns": 8
+        },
+        "log_id": "Vh5nfYZXXsoi8NpaC37GUR",
+        "run_id": "96nqdQU4KDyvc7CwZeJddM",
+        "run_index": 1,
+        "scenario_id": "quotation_workflow_1",
+        "stakeholder_model": "openrouter/deepseek/deepseek-v4-flash-0731",
+        "stakeholder_profile_id": "phase14-sales-owner",
+        "stakeholder_seed": 1402,
+        "task": "business_interview_bench/phase13_interview"
+      },
+      "schema_version": 2,
+      "source": {
+        "file_name": "2026-08-31T18-00-27-00-00_phase13-interview_V5HjBkPLZMMweYuQ8MBmHt.eval"
+      },
+      "usage": {
+        "candidate": {
+          "input_tokens": 692,
+          "output_tokens": 194,
+          "total_cost": null,
+          "total_tokens": 4982
+        },
+        "stakeholder": {
+          "input_tokens": 19116,
+          "output_tokens": 169885,
+          "total_cost": null,
+          "total_tokens": 189001
+        },
+        "total": {
+          "input_tokens": 19808,
+          "output_tokens": 170079,
+          "total_cost": null,
+          "total_tokens": 193983
+        }
+      }
+    },
+    {
+      "diagnostics": {
+        "accepted_empty_plan_response_count": 0,
+        "accepted_response_count": 1,
+        "accepted_response_with_insufficient_annotations_count": 0,
+        "accepted_response_with_text_but_no_annotations_count": 0,
+        "candidate_model_error_count": 0,
+        "failure_class": "candidate_generation_failure",
+        "quality_tags": [
+          "reconstruction_failed",
+          "protocol_failed",
+          "low_knowledge_recovery",
+          "semantic_retry_occurred"
+        ],
+        "recoverable_tool_error_count": 0,
+        "semantic_retry_count": 2,
+        "stakeholder_model_error_count": 0,
+        "stakeholder_plan_attempt_count": 1,
+        "stakeholder_realization_attempt_count": 3,
+        "stakeholder_semantic_rejection_count": 2
+      },
+      "primary_evaluation": {
+        "activity_correctness": 0.0,
+        "actor_correctness": 0.0,
+        "ambiguous_evidence_ref_count": 0,
+        "authentic_observation_count": 2,
+        "concept_correctness": 0.0,
+        "concept_precision": 1.0,
+        "concept_recall": 0.0,
+        "condition_correctness": 0.0,
+        "edge_evidence_coverage": 1.0,
+        "edge_precision": 0.0,
+        "edge_recall": 0.0,
+        "end_precision": 0.0,
+        "end_recall": 0.0,
+        "evidence_pass": true,
+        "fabricated_edge_count": 0,
+        "fabricated_node_count": 0,
+        "glossary_complete": false,
+        "graph_created": false,
+        "graph_valid": true,
+        "invalid_evidence_ref_count": 0,
+        "invalid_observation_reference_count": 0,
+        "invalid_observation_source_count": 0,
+        "knowledge_coverage": 1.0,
+        "marker_evidence_errors_surrogate": 0,
+        "node_evidence_coverage": 1.0,
+        "node_precision": 0.0,
+        "node_recall": 0.0,
+        "orphan_observation_count": 2,
+        "protocol_completed": false,
+        "protocol_pass": false,
+        "provenance_authenticity_pass": true,
+        "quality_pass": false,
+        "rationale_correctness": 0.0,
+        "read_correctness": 0.0,
+        "reconstruction_pass": false,
+        "ref_evidence_coverage": 1.0,
+        "start_correct": false,
+        "structural_pass": false,
+        "system_correctness": 0.0,
+        "unsupported_ref_count": 0,
+        "write_correctness": 0.0
+      },
+      "protocol": {
+        "candidate_generation_count": 3,
+        "candidate_steps": 1,
+        "candidate_turns": 2,
+        "completion_reason": null,
+        "failure_reason": "candidate_did_not_ask_question",
+        "observation_count": 2,
+        "question_count": 1,
+        "stakeholder_generation_count": 4,
+        "stakeholder_turns": 1,
+        "status": "incomplete"
+      },
+      "run": {
+        "candidate_model": "openrouter/deepseek/deepseek-v4-flash-0731",
+        "epoch": 1,
+        "eval_id": "KZ5fKC2nmyPLzm9u2ijSAW",
+        "generation_parameters": {
+          "candidate": {
+            "max_retries": 0,
+            "max_tokens": 1024,
+            "temperature": 0.0
+          },
+          "stakeholder": {
+            "temperature": 0.0
+          }
+        },
+        "limits": {
+          "candidate_max_tokens": 1024,
+          "max_candidate_steps_per_turn": 8,
+          "max_interview_turns": 8
+        },
+        "log_id": "KZ5fKC2nmyPLzm9u2ijSAW",
+        "run_id": "aCwFX4dUCEHHJTN2krLoK6",
+        "run_index": 2,
+        "scenario_id": "quotation_workflow_1_ja",
+        "stakeholder_model": "openrouter/deepseek/deepseek-v4-flash-0731",
+        "stakeholder_profile_id": "phase14-sales-owner-ja",
+        "stakeholder_seed": 1403,
+        "task": "business_interview_bench/phase13_interview"
+      },
+      "schema_version": 2,
+      "source": {
+        "file_name": "2026-08-31T18-15-51-00-00_phase13-interview_FqSriQtuSgKGUUkGFh8Ri9.eval"
+      },
+      "usage": {
+        "candidate": {
+          "input_tokens": 5587,
+          "output_tokens": 1225,
+          "total_cost": null,
+          "total_tokens": 8860
+        },
+        "stakeholder": {
+          "input_tokens": 17097,
+          "output_tokens": 28573,
+          "total_cost": null,
+          "total_tokens": 45670
+        },
+        "total": {
+          "input_tokens": 22684,
+          "output_tokens": 29798,
+          "total_cost": null,
+          "total_tokens": 54530
+        }
+      }
+    }
+  ],
+  "schema_version": 2
+}
