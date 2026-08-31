@@ -11,9 +11,11 @@ import subprocess
 import sys
 from pathlib import Path
 from types import SimpleNamespace
+from typing import Any, cast
 
 import pytest
 from inspect_ai import eval as inspect_eval
+from inspect_ai._cli.eval import RunConfigInput, parse_run_config
 from inspect_ai.log import read_eval_log
 from inspect_ai.model import ModelOutput, get_model
 
@@ -25,6 +27,7 @@ from business_interview_bench.inspect_adapter.multiturn import (
     phase13_smoke_interview_task,
 )
 from business_interview_bench.phase14 import (
+    build_inspect_run_config,
     build_inspect_task_config,
     load_experiment_config,
     summarize_eval_log,
@@ -197,14 +200,17 @@ def test_phase14_calibration_config_has_three_reproducible_runs() -> None:
 def test_phase14_summary_preserves_scores_usage_and_safe_provenance(tmp_path) -> None:
     log_path = _eval_live_task(tmp_path)
     summary = summarize_eval_log(log_path)
-    assert summary["schema_version"] == 1
+    assert summary["schema_version"] == 2
     assert len(summary["runs"]) == 1
     run = summary["runs"][0]
     assert run["run"] == {
         "candidate_model": "mockllm/candidate",
         "epoch": 1,
         "eval_id": run["run"]["eval_id"],
-        "generation_parameters": {"candidate": {}, "stakeholder": {}},
+        "generation_parameters": {
+            "candidate": {"max_tokens": 1024},
+            "stakeholder": {},
+        },
         "limits": {
             "candidate_max_tokens": 1024,
             "max_candidate_steps_per_turn": 8,
@@ -227,8 +233,17 @@ def test_phase14_summary_preserves_scores_usage_and_safe_provenance(tmp_path) ->
     assert len(run["primary_evaluation"]) == 41
     assert run["primary_evaluation"]["protocol_completed"] is True
     assert run["diagnostics"]["failure_class"] == "completed"
-    assert run["diagnostics"]["empty_plan_response_count"] == 1
-    assert run["diagnostics"]["response_with_text_but_no_annotations_count"] == 1
+    assert run["diagnostics"]["accepted_response_count"] == 1
+    assert run["diagnostics"]["accepted_empty_plan_response_count"] == 1
+    assert (
+        run["diagnostics"]["accepted_response_with_text_but_no_annotations_count"] == 1
+    )
+    assert (
+        run["diagnostics"]["accepted_response_with_insufficient_annotations_count"] == 0
+    )
+    assert run["diagnostics"]["stakeholder_plan_attempt_count"] == 1
+    assert run["diagnostics"]["stakeholder_realization_attempt_count"] == 1
+    assert run["diagnostics"]["stakeholder_semantic_rejection_count"] == 0
     assert run["diagnostics"]["semantic_retry_count"] == 0
     assert run["usage"]["candidate"]["total_tokens"] is not None
     assert run["usage"]["stakeholder"]["total_tokens"] is not None
@@ -256,6 +271,7 @@ def test_phase14_missing_usage_is_reported_as_unknown(tmp_path) -> None:
     assert all(value is None for value in usage["stakeholder"].values())
     assert all(value is None for value in usage["total"].values())
     assert summary["runs"][0]["diagnostics"]["failure_class"] == "scoring_failure"
+    assert summary["runs"][0]["diagnostics"]["accepted_response_count"] == 1
     assert summary["aggregate"]["fabricated_node_total"] is None
     assert summary["aggregate"]["fabricated_edge_total"] is None
 
@@ -303,6 +319,12 @@ def test_phase14_classifies_stakeholder_semantic_retry_exhaustion(tmp_path) -> N
     assert run["diagnostics"]["failure_class"] == (
         "stakeholder_semantic_validation_failure"
     )
+    assert run["diagnostics"]["accepted_response_count"] == 0
+    assert run["diagnostics"]["accepted_empty_plan_response_count"] == 0
+    assert run["diagnostics"]["stakeholder_plan_attempt_count"] == 3
+    assert run["diagnostics"]["stakeholder_realization_attempt_count"] == 0
+    assert run["diagnostics"]["stakeholder_semantic_rejection_count"] == 3
+    assert run["diagnostics"]["semantic_retry_count"] == 2
 
 
 def test_phase14_cli_summary_has_no_model_call_or_private_dump(tmp_path) -> None:
@@ -359,3 +381,223 @@ def test_phase14_protocol_generation_counts_are_model_invocations(
     )
     protocol = summarize_eval_log(log_path)["runs"][0]["protocol"]
     assert protocol["candidate_generation_count"] == expected_count
+
+
+def test_phase14_completed_run_keeps_recoverable_tool_error_diagnostic(
+    tmp_path,
+) -> None:
+    log_path = _eval_live_task(
+        tmp_path,
+        candidate_outputs=[
+            ModelOutput.for_tool_call("mockllm", "add_node", {"node_id": "n1"}),
+            ModelOutput.for_tool_call("mockllm", "add_node", {"node_id": "n1"}),
+            ModelOutput.from_content("mockllm", "Question?"),
+            ModelOutput.for_tool_call(
+                "mockllm", "complete_interview", {"reason": "done"}
+            ),
+        ],
+    )
+    summary = summarize_eval_log(log_path)
+    run = summary["runs"][0]
+    assert run["diagnostics"]["failure_class"] == "completed"
+    assert run["diagnostics"]["recoverable_tool_error_count"] == 1
+    assert "recovered_tool_error" in run["diagnostics"]["quality_tags"]
+    assert summary["aggregate"]["completion_rate"] == 1.0
+    assert summary["aggregate"]["total_recoverable_tool_error_count"] == 1
+    assert summary["aggregate"]["mean_recoverable_tool_error_count"] == 1.0
+
+
+def test_phase14_candidate_model_crash_is_classified(tmp_path) -> None:
+    log_path = _eval_live_task(tmp_path, candidate_outputs=[])
+    diagnostics = summarize_eval_log(log_path)["runs"][0]["diagnostics"]
+    assert diagnostics["failure_class"] == "candidate_generation_failure"
+    assert diagnostics["candidate_model_error_count"] == 1
+    assert diagnostics["stakeholder_model_error_count"] == 0
+
+
+def test_phase14_stakeholder_model_crash_is_classified(tmp_path) -> None:
+    log_path = _eval_live_task(
+        tmp_path,
+        stakeholder_outputs=[ModelOutput.from_content("mockllm", '{"items": []}')],
+    )
+    diagnostics = summarize_eval_log(log_path)["runs"][0]["diagnostics"]
+    assert diagnostics["failure_class"] == "stakeholder_generation_failure"
+    assert diagnostics["candidate_model_error_count"] == 0
+    assert diagnostics["stakeholder_model_error_count"] == 1
+
+
+def test_phase14_semantic_retry_diagnostics_exclude_rejected_what(
+    tmp_path,
+) -> None:
+    invalid_plan = json.dumps({"items": [{"semantic_id": "missing", "mode": "value"}]})
+    valid_plan = json.dumps(
+        {"items": [{"semantic_id": "node:skn_001:activity", "mode": "value"}]}
+    )
+    valid_response = json.dumps(
+        {
+            "message": "I review requests.",
+            "annotations": [
+                {
+                    "semantic_id": "node:skn_001:activity",
+                    "mode": "value",
+                    "quote": "review requests",
+                }
+            ],
+            "alignments": [],
+            "terminology": [],
+        }
+    )
+    log_path = _eval_live_task(
+        tmp_path,
+        candidate_outputs=[
+            ModelOutput.from_content("mockllm", "Question?"),
+            ModelOutput.for_tool_call(
+                "mockllm", "complete_interview", {"reason": "done"}
+            ),
+        ],
+        stakeholder_outputs=[
+            ModelOutput.from_content("mockllm", invalid_plan),
+            ModelOutput.from_content("mockllm", valid_plan),
+            ModelOutput.from_content("mockllm", valid_response),
+        ],
+    )
+    diagnostics = summarize_eval_log(log_path)["runs"][0]["diagnostics"]
+    assert diagnostics["failure_class"] == "completed"
+    assert diagnostics["accepted_response_count"] == 1
+    assert diagnostics["stakeholder_plan_attempt_count"] == 2
+    assert diagnostics["stakeholder_realization_attempt_count"] == 1
+    assert diagnostics["stakeholder_semantic_rejection_count"] == 1
+    assert diagnostics["semantic_retry_count"] == 1
+
+
+def test_phase14_semantic_retry_diagnostics_exclude_rejected_how(
+    tmp_path,
+) -> None:
+    plan = json.dumps(
+        {"items": [{"semantic_id": "node:skn_001:activity", "mode": "value"}]}
+    )
+    invalid_response = json.dumps(
+        {"message": "Answer.", "annotations": [], "alignments": [], "terminology": []}
+    )
+    valid_response = json.dumps(
+        {
+            "message": "I review requests.",
+            "annotations": [
+                {
+                    "semantic_id": "node:skn_001:activity",
+                    "mode": "value",
+                    "quote": "review requests",
+                }
+            ],
+            "alignments": [],
+            "terminology": [],
+        }
+    )
+    log_path = _eval_live_task(
+        tmp_path,
+        candidate_outputs=[
+            ModelOutput.from_content("mockllm", "Question?"),
+            ModelOutput.for_tool_call(
+                "mockllm", "complete_interview", {"reason": "done"}
+            ),
+        ],
+        stakeholder_outputs=[
+            ModelOutput.from_content("mockllm", plan),
+            ModelOutput.from_content("mockllm", invalid_response),
+            ModelOutput.from_content("mockllm", valid_response),
+        ],
+    )
+    run = summarize_eval_log(log_path)["runs"][0]
+    diagnostics = run["diagnostics"]
+    assert diagnostics["failure_class"] == "completed"
+    assert diagnostics["accepted_response_with_text_but_no_annotations_count"] == 0
+    assert diagnostics["accepted_response_with_insufficient_annotations_count"] == 0
+    assert diagnostics["stakeholder_plan_attempt_count"] == 1
+    assert diagnostics["stakeholder_realization_attempt_count"] == 2
+    assert diagnostics["stakeholder_semantic_rejection_count"] == 1
+    assert diagnostics["semantic_retry_count"] == 1
+
+
+def test_phase14_run_config_is_formal_and_resolves_models(
+    tmp_path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("PHASE14_CANDIDATE_MODEL", "mockllm/candidate")
+    monkeypatch.setenv("PHASE14_STAKEHOLDER_MODEL", "mockllm/stakeholder")
+    config = load_experiment_config("experiments/phase14/calibration.json")
+    run_config = build_inspect_run_config(config.runs[0])
+
+    parsed = RunConfigInput.model_validate(run_config)
+    assert parsed.task is not None
+    model_entry = parsed.model
+    assert model_entry is not None
+    assert not isinstance(model_entry, str)
+    assert model_entry.model == "mockllm/candidate"
+    assert parsed.model_roles["stakeholder"].model == "mockllm/stakeholder"
+    assert parsed.generate_config.temperature == 0.0
+    assert parsed.eval_config.epochs == 1
+    assert run_config["task"]["args"]["candidate_max_tokens"] == 1024
+    assert "stakeholder_knowledge" not in json.dumps(run_config)
+    assert "${PHASE14_" not in json.dumps(run_config)
+
+    config_path = tmp_path / "run-config.json"
+    config_path.write_text(json.dumps(run_config), encoding="utf-8")
+    params = parse_run_config(str(config_path))
+    candidate = get_model(
+        "mockllm/candidate",
+        custom_outputs=[
+            ModelOutput.from_content("mockllm", "Question?"),
+            ModelOutput.for_tool_call(
+                "mockllm", "complete_interview", {"reason": "done"}
+            ),
+        ],
+    )
+    stakeholder = get_model(
+        "mockllm/stakeholder",
+        custom_outputs=[
+            ModelOutput.from_content("mockllm", '{"items": []}'),
+            ModelOutput.from_content(
+                "mockllm",
+                '{"message":"Answer.","annotations":[],"alignments":[],"terminology":[]}',
+            ),
+        ],
+    )
+    logs = inspect_eval(
+        params["tasks"],
+        model=candidate,
+        task_args=params["task_args"],
+        model_roles={"stakeholder": stakeholder},
+        temperature=params["temperature"],
+        epochs=params["epochs"],
+        display="none",
+        log_dir=str(tmp_path),
+    )
+    assert len(logs) == 1
+    assert logs[0].status == "success"
+    assert logs[0].samples
+    scores = logs[0].samples[0].scores
+    assert scores is not None
+    score_value = cast(dict[str, Any], scores["phase13_primary_scorer"].value)
+    assert score_value["protocol_completed"] is True
+
+
+def test_phase14_run_config_rejects_token_bound_mismatch(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("PHASE14_CANDIDATE_MODEL", "mockllm/candidate")
+    monkeypatch.setenv("PHASE14_STAKEHOLDER_MODEL", "mockllm/stakeholder")
+    config = load_experiment_config("experiments/phase14/calibration.json")
+    run = config.runs[0].model_copy(
+        update={"candidate_generation": {"max_tokens": 512}}
+    )
+    with pytest.raises(ValueError, match="candidate_generation.max_tokens"):
+        build_inspect_run_config(run)
+
+
+def test_phase14_missing_model_placeholder_is_explicit(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("PHASE14_CANDIDATE_MODEL", raising=False)
+    monkeypatch.setenv("PHASE14_STAKEHOLDER_MODEL", "mockllm/stakeholder")
+    config = load_experiment_config("experiments/phase14/calibration.json")
+    with pytest.raises(ValueError, match="PHASE14_CANDIDATE_MODEL"):
+        build_inspect_run_config(config.runs[0])

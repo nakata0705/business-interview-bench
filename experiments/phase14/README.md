@@ -7,36 +7,35 @@ reproducible run for each initial calibration scenario:
 - `quotation_workflow_1` — profile `phase14-sales-owner`, seed `1402`
 - `quotation_workflow_1_ja` — profile `phase14-sales-owner-ja`, seed `1403`
 
-Each entry fixes the scenario, profile, projection seed, interview/generation
-limits, candidate generation parameters, epoch, and run index. Model names are
-environment placeholders; no API key or credential is stored here:
+Each entry fixes the scenario, profile, projection seed, runtime limits,
+generation settings, epoch, and run index. Model names are environment
+placeholders; no API key or credential is stored here:
 
 ```bash
 export PHASE14_CANDIDATE_MODEL='your-provider/your-candidate-model'
 export PHASE14_STAKEHOLDER_MODEL='your-provider/your-stakeholder-model'
 ```
 
-The manifest is not a provider credential file. Render the task arguments for
-one run, then supply the model names and generation parameters through the
-normal Inspect CLI/provider configuration:
+The authoritative Phase 14 launch artifact is one complete Inspect run config.
+Rendering resolves both model placeholders and fails clearly if either variable
+is unavailable:
 
 ```bash
-python -m business_interview_bench.phase14 task-config \
+python -m business_interview_bench.phase14 run-config \
   experiments/phase14/calibration.json --run-index 0 \
-  --output /tmp/phase14-task.json
-
-inspect eval business_interview_bench/phase13_interview \
-  --task-config /tmp/phase14-task.json \
-  --model "$PHASE14_CANDIDATE_MODEL" \
-  --model-role "stakeholder={model: $PHASE14_STAKEHOLDER_MODEL, temperature: 0}" \
-  --temperature 0
+  --output /tmp/phase14-run-0.yaml
+inspect eval --run-config /tmp/phase14-run-0.yaml
 ```
 
-Set Inspect's `--epochs` to the `epoch` value in the selected manifest entry.
-The `candidate_generation` and `stakeholder_generation` objects are explicit
-launch settings; apply them through the corresponding Inspect generation/model
-role options. The initial set uses temperature `0.0` and one epoch, but the
-harness does not claim statistical significance.
+The generated config contains the registered task and all task args, the
+candidate model, the `stakeholder` model role and generation config, the
+candidate `generate_config`, and `eval_config.epochs`. The runtime hard bound
+`candidate_max_tokens` remains a task argument; if candidate GenerateConfig
+also specifies `max_tokens`, it must match that bound. Provider credentials
+remain in the provider's normal environment configuration.
+
+`task-config` remains available as a task-argument helper, but it is not the
+reproduction artifact for Phase 14.
 
 After an eval, extract a safe per-run summary and aggregate one or more logs:
 
@@ -46,7 +45,8 @@ python -m business_interview_bench.phase14 summarize logs/*.eval \
   --output phase14-summary.json
 ```
 
-The JSON contains model/runtime usage where Inspect recorded it, all 41
-primary-evaluation fields, deterministic failure/quality diagnostics, and
-scenario/model groups. It does not dump Truth, exact stakeholder knowledge,
-or the full stakeholder profile.
+The schema-versioned JSON contains all 41 primary-evaluation fields,
+authoritative terminal completion/failure classification, separate recoverable
+error and semantic attempt diagnostics, model/runtime usage where Inspect
+recorded it, and scenario/model groups. It does not dump Truth, exact
+`StakeholderKnowledge`, or the full stakeholder profile.

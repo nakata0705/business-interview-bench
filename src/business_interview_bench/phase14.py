@@ -13,34 +13,36 @@ from __future__ import annotations
 
 import argparse
 import json
-from collections.abc import Mapping, Sequence
+import os
+import re
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import fields
 from pathlib import Path
 from typing import Any
 
 from inspect_ai.log import EvalLog, read_eval_log
+from inspect_ai.model import GenerateConfig
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from business_interview.evaluation import PrimaryEvaluation
 from business_interview.scenarios import get_scenario
 from business_interview.stakeholders import StakeholderProfile, project_knowledge
 
-SUMMARY_SCHEMA_VERSION = 1
+SUMMARY_SCHEMA_VERSION = 2
 _USAGE_FIELDS = ("input_tokens", "output_tokens", "total_tokens", "total_cost")
-_GENERATION_FIELDS = (
-    "max_tokens",
-    "temperature",
-    "top_p",
-    "seed",
-    "stop_seqs",
-    "frequency_penalty",
-    "presence_penalty",
-    "parallel_tool_calls",
-    "num_choices",
-    "reasoning_effort",
-    "effort",
-)
+# Keep the run-config renderer aligned with the installed Inspect schema rather
+# than maintaining a second, incomplete list of GenerateConfig fields.
+_GENERATION_FIELDS = frozenset(GenerateConfig.model_fields)
+# These fields can carry credentials or private prompt material and are not
+# allowed in the Phase 14 launch artifact or safe summaries.
+_SENSITIVE_GENERATION_FIELDS = {"extra_headers", "extra_body", "system_message"}
+_SAFE_GENERATION_FIELDS = _GENERATION_FIELDS - _SENSITIVE_GENERATION_FIELDS
 _PRIMARY_FIELDS = tuple(item.name for item in fields(PrimaryEvaluation))
+_MODEL_PLACEHOLDER = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*)\}")
+_PLAN_PROMPT_MARKER = "choose only the semantic assertions"
+_REALIZATION_PROMPT_MARKER = "validated private plan:"
+_RETRY_PROMPT_MARKER = "previous output rejected:"
+_PHASE14_TASK = "business_interview_bench/phase13_interview"
 
 
 class Phase14RunConfig(BaseModel):
@@ -67,13 +69,108 @@ class Phase14RunConfig(BaseModel):
 
 
 class Phase14ExperimentConfig(BaseModel):
-    """Small, explicit calibration set suitable for Inspect task-config use."""
+    """Small, explicit calibration set suitable for Inspect run-config use."""
 
     model_config = ConfigDict(extra="forbid")
 
     name: str = Field(default="phase14-calibration", min_length=1)
     schema_version: int = Field(default=1, ge=1)
     runs: list[Phase14RunConfig] = Field(min_length=1)
+
+
+def _resolve_environment_placeholders(value: str, *, field_name: str) -> str:
+    """Resolve ``${VAR}`` model names without ever passing them to a provider."""
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError(f"{field_name} must be a non-empty model name")
+
+    def replace(match: re.Match[str]) -> str:
+        variable = match.group(1)
+        resolved = os.environ.get(variable)
+        if resolved is None or not resolved.strip():
+            raise ValueError(
+                f"missing required environment variable {variable} for {field_name}"
+            )
+        return resolved.strip()
+
+    rendered = _MODEL_PLACEHOLDER.sub(replace, value).strip()
+    if "${" in rendered:
+        raise ValueError(f"unresolved environment placeholder in {field_name}")
+    if not rendered:
+        raise ValueError(f"{field_name} resolved to an empty model name")
+    return rendered
+
+
+def _validated_generation_config(
+    value: Mapping[str, Any] | dict[str, Any], *, field_name: str
+) -> dict[str, Any]:
+    """Validate and JSON-render one Inspect ``GenerateConfig`` mapping."""
+    payload = dict(value)
+    unknown = sorted(set(payload) - _GENERATION_FIELDS)
+    if unknown:
+        raise ValueError(
+            f"{field_name} contains unsupported GenerateConfig fields: "
+            f"{', '.join(unknown)}"
+        )
+    sensitive = sorted(_SENSITIVE_GENERATION_FIELDS.intersection(payload))
+    if sensitive:
+        fields_text = ", ".join(sensitive)
+        raise ValueError(
+            f"{field_name} must not contain {fields_text}; use provider environment "
+            "configuration so credentials are not saved in the run config"
+        )
+    try:
+        config = GenerateConfig.model_validate(payload)
+    except (TypeError, ValueError, ValidationError) as exc:
+        raise ValueError(f"invalid {field_name} GenerateConfig: {exc}") from exc
+    return config.model_dump(mode="json", exclude_none=True)
+
+
+def build_inspect_run_config(run: Phase14RunConfig) -> dict[str, Any]:
+    """Build one complete, reproducible Inspect ``--run-config`` document.
+
+    The candidate's runtime token bound deliberately stays in task arguments;
+    the optional GenerateConfig ``max_tokens`` value must agree with it when
+    supplied.  Stakeholder knowledge is never part of this launch artifact.
+    """
+    candidate_model = _resolve_environment_placeholders(
+        run.candidate_model, field_name="candidate_model"
+    )
+    stakeholder_model = _resolve_environment_placeholders(
+        run.stakeholder_model, field_name="stakeholder_model"
+    )
+    candidate_generation = _validated_generation_config(
+        run.candidate_generation,
+        field_name="candidate_generation",
+    )
+    stakeholder_generation = _validated_generation_config(
+        run.stakeholder_generation,
+        field_name="stakeholder_generation",
+    )
+    configured_max_tokens = candidate_generation.get("max_tokens")
+    if (
+        configured_max_tokens is not None
+        and configured_max_tokens != run.candidate_max_tokens
+    ):
+        raise ValueError(
+            "candidate_generation.max_tokens must equal candidate_max_tokens "
+            f"({run.candidate_max_tokens})"
+        )
+
+    return {
+        "task": {
+            "task": _PHASE14_TASK,
+            "args": build_inspect_task_config(run),
+        },
+        "model": {"model": candidate_model},
+        "model_roles": {
+            "stakeholder": {
+                "model": stakeholder_model,
+                "config": stakeholder_generation,
+            }
+        },
+        "generate_config": candidate_generation,
+        "eval_config": {"epochs": run.epoch},
+    }
 
 
 def build_inspect_task_config(run: Phase14RunConfig) -> dict[str, Any]:
@@ -203,6 +300,10 @@ def _event_completion(event: object) -> str:
 def _event_error(event: object) -> str:
     error = getattr(event, "error", None)
     if error is None:
+        # Content-moderation refusals can be represented on ModelOutput rather
+        # than on ModelEvent by Inspect providers.
+        error = getattr(getattr(event, "output", None), "error", None)
+    if error is None:
         return ""
     return error if isinstance(error, str) else str(error)
 
@@ -243,21 +344,46 @@ def _safe_generation_config(value: object) -> dict[str, Any]:
     payload = _as_mapping(value)
     return {
         key: payload[key]
-        for key in _GENERATION_FIELDS
+        for key in _SAFE_GENERATION_FIELDS
         if key in payload and payload[key] is not None
     }
 
 
-def _generation_parameters(log: EvalLog) -> dict[str, dict[str, Any]]:
-    candidate = _safe_generation_config(
-        getattr(log.eval, "model_generate_config", None)
+def _merged_generation_config(values: Iterable[object]) -> dict[str, Any]:
+    config: dict[str, Any] = {}
+    for value in values:
+        config.update(_safe_generation_config(value))
+    return config
+
+
+def _generation_parameters(
+    log: EvalLog, sample: object | None = None
+) -> dict[str, dict[str, Any]]:
+    plan = getattr(log, "plan", None)
+    candidate = _merged_generation_config(
+        (
+            getattr(log.eval, "model_generate_config", None),
+            getattr(plan, "config", None),
+        )
     )
+    if not candidate:
+        candidate = _merged_generation_config(
+            getattr(event, "config", None)
+            for event in _events(sample)
+            if _is_model_event(event) and getattr(event, "role", None) != "stakeholder"
+        )
     stakeholder: dict[str, Any] = {}
     roles = _as_mapping(getattr(log.eval, "model_roles", None))
     role_config = roles.get("stakeholder")
     if role_config is not None:
         role_payload = _as_mapping(role_config)
         stakeholder = _safe_generation_config(role_payload.get("config", role_config))
+    if not stakeholder:
+        stakeholder = _merged_generation_config(
+            getattr(event, "config", None)
+            for event in _events(sample)
+            if _is_model_event(event) and getattr(event, "role", None) == "stakeholder"
+        )
     return {"candidate": candidate, "stakeholder": stakeholder}
 
 
@@ -450,59 +576,204 @@ def _json_payload(event: object) -> dict[str, Any] | None:
     return dict(value) if isinstance(value, Mapping) else None
 
 
-def _empty_plan_diagnostics(sample: object) -> dict[str, int | None]:
+def _as_sequence(value: object) -> list[object]:
+    if isinstance(value, Sequence) and not isinstance(value, (str, bytes)):
+        return list(value)
+    return []
+
+
+def _accepted_stakeholder_entries(
+    sample: object,
+) -> list[tuple[dict[str, Any], dict[str, Any]]]:
+    """Return only ledger entries paired with accepted public observations.
+
+    Initial catalog observations have empty ledger entries and are excluded by
+    ``initial_observation_count``.  No raw model completion is used here:
+    rejected WHAT/HOW attempts never enter this authoritative accepted set.
+    """
+    runtime = _runtime_payload(sample)
+    ledger = _as_mapping(runtime.get("semantic_ledger"))
+    entries = _as_sequence(ledger.get("entries", ledger.get("records")))
+    initial_count = _int_or_none(runtime.get("initial_observation_count")) or 0
+    observations: dict[str, dict[str, Any]] = {}
+    for raw_observation in _as_sequence(runtime.get("observations")):
+        observation = _as_mapping(raw_observation)
+        identifier = observation.get("id")
+        if isinstance(identifier, str) and identifier:
+            observations[identifier] = observation
+
+    accepted: list[tuple[dict[str, Any], dict[str, Any]]] = []
+    for index, raw_entry in enumerate(entries):
+        if index < initial_count:
+            continue
+        entry = _as_mapping(raw_entry)
+        observation_id = entry.get("observation_id")
+        if not isinstance(observation_id, str):
+            continue
+        observation = observations.get(observation_id)
+        if observation is None:
+            continue
+        entry_turn = entry.get(
+            "public_message_turn", entry.get("turn", entry.get("message_turn"))
+        )
+        observation_turn = observation.get(
+            "turn",
+            observation.get("public_message_turn", observation.get("message_turn")),
+        )
+        if entry_turn != observation_turn:
+            continue
+        accepted.append((entry, observation))
+    return accepted
+
+
+def _accepted_response_diagnostics(sample: object) -> dict[str, int]:
     empty_plan = 0
     no_annotations = 0
     insufficient_annotations = 0
-    pending_plan: dict[str, Any] | None = None
+    accepted_entries = _accepted_stakeholder_entries(sample)
+
+    for entry, observation in accepted_entries:
+        annotations = _as_sequence(entry.get("annotations"))
+        message = _text(observation.get("text", observation.get("content")))
+        plan_payload = _as_mapping(entry.get("plan"))
+        plan_items = _as_sequence(plan_payload.get("items")) if plan_payload else []
+
+        # Phase 13 historically persisted the accepted sidecar, not WHAT. A
+        # valid accepted response with no annotations can only have had an
+        # empty plan; keep that inference over the historical state shape.
+        if not plan_items and not annotations:
+            empty_plan += 1
+        if message.strip() and not annotations:
+            no_annotations += 1
+
+        if plan_payload:
+            planned = {
+                (item.get("semantic_id"), item.get("mode"))
+                for item in plan_items
+                if isinstance(item, Mapping)
+            }
+            covered = {
+                (item.get("semantic_id"), item.get("mode"))
+                for item in annotations
+                if isinstance(item, Mapping)
+            }
+            if len(covered) < len(planned):
+                insufficient_annotations += 1
+
+    return {
+        "accepted_response_count": len(accepted_entries),
+        "accepted_empty_plan_response_count": empty_plan,
+        "accepted_response_with_text_but_no_annotations_count": no_annotations,
+        "accepted_response_with_insufficient_annotations_count": insufficient_annotations,
+    }
+
+
+def _event_input_text(event: object) -> str:
+    parts: list[str] = []
+    for raw_message in _as_sequence(getattr(event, "input", None)):
+        if isinstance(raw_message, Mapping):
+            value = raw_message.get("text", raw_message.get("content"))
+        else:
+            value = getattr(raw_message, "text", None)
+            if not isinstance(value, str):
+                value = getattr(raw_message, "content", None)
+        if isinstance(value, str) and value:
+            parts.append(value)
+    return "\n".join(parts)
+
+
+def _stakeholder_attempt_phase(event: object) -> str | None:
+    """Identify WHAT/HOW from adapter instructions, not natural-language facts."""
+    input_text = _event_input_text(event).lower()
+    if _REALIZATION_PROMPT_MARKER in input_text:
+        return "realization"
+    if _PLAN_PROMPT_MARKER in input_text:
+        return "plan"
+    payload = _json_payload(event)
+    if payload is not None:
+        if "message" in payload:
+            return "realization"
+        if "items" in payload:
+            return "plan"
+    return None
+
+
+def _is_retry_attempt(event: object) -> bool:
+    return _RETRY_PROMPT_MARKER in _event_input_text(event).lower()
+
+
+def _stakeholder_attempt_diagnostics(sample: object) -> dict[str, int]:
     stakeholder_events = [
         event
         for event in _events(sample)
         if _is_model_event(event) and getattr(event, "role", None) == "stakeholder"
     ]
-    for event in stakeholder_events:
-        payload = _json_payload(event)
-        if payload is None:
-            continue
-        if "items" in payload and "message" not in payload:
-            pending_plan = payload
-            continue
-        if "message" not in payload:
-            continue
-        message = _text(payload.get("message"))
-        annotations = payload.get("annotations")
-        has_annotations = isinstance(annotations, list) and bool(annotations)
-        if message.strip() and not has_annotations:
-            no_annotations += 1
-        if pending_plan is not None:
-            items = pending_plan.get("items")
-            if isinstance(items, list) and not items and message.strip():
-                empty_plan += 1
-            if (
-                isinstance(items, list)
-                and message.strip()
-                and (not isinstance(annotations, list) or len(annotations) < len(items))
-            ):
-                insufficient_annotations += 1
-        pending_plan = None
+    groups: list[dict[str, list[object]]] = []
+    current: dict[str, list[object]] | None = None
+    retry_markers = 0
 
-    metadata = _sample_metadata(sample)
-    explicit_retry = _int_or_none(metadata.get("semantic_retry_count"))
-    if explicit_retry is not None:
-        retry_count: int | None = explicit_retry
-    else:
-        runtime = _runtime_payload(sample)
-        stakeholder_turns = _int_or_none(runtime.get("stakeholder_turns"))
-        retry_count = (
-            max(0, len(stakeholder_events) - 2 * stakeholder_turns)
-            if stakeholder_turns is not None and stakeholder_turns > 0
-            else None
-        )
+    for event in stakeholder_events:
+        phase = _stakeholder_attempt_phase(event)
+        if phase is None:
+            # ModelEvent input normally carries the phase marker. For a
+            # lightweight fake log, infer the first unlabelled call as WHAT
+            # and subsequent calls after a plan as HOW.
+            phase = "realization" if current is not None and current["plan"] else "plan"
+        if phase == "plan" and current is not None and current["realization"]:
+            groups.append(current)
+            current = None
+        if current is None:
+            current = {"plan": [], "realization": []}
+        current[phase].append(event)
+        try:
+            is_retry = _is_retry_attempt(event)
+        except (AttributeError, TypeError):
+            is_retry = False
+        if is_retry:
+            retry_markers += 1
+    if current is not None:
+        groups.append(current)
+
+    accepted_count = len(_accepted_stakeholder_entries(sample))
+    plan_attempt_count = sum(len(group["plan"]) for group in groups)
+    realization_attempt_count = sum(len(group["realization"]) for group in groups)
+    semantic_rejections = 0
+    inferred_retries = 0
+
+    for group_index, group in enumerate(groups):
+        non_error_plan = [event for event in group["plan"] if not _event_error(event)]
+        non_error_realization = [
+            event for event in group["realization"] if not _event_error(event)
+        ]
+        # A later attempt in a phase means the preceding non-provider output
+        # was rejected. This also handles terminal retry exhaustion where no
+        # accepted ledger entry exists.
+        inferred_retries += max(0, len(non_error_plan) - 1)
+        inferred_retries += max(0, len(non_error_realization) - 1)
+        if group_index < accepted_count:
+            semantic_rejections += max(0, len(non_error_plan) - 1)
+            semantic_rejections += max(0, len(non_error_realization) - 1)
+        elif group["realization"]:
+            # Reaching HOW proves that the final WHAT was accepted. HOW has no
+            # accepted ledger entry when the overall response failed.
+            semantic_rejections += max(0, len(non_error_plan) - 1)
+            semantic_rejections += len(non_error_realization)
+        else:
+            semantic_rejections += len(non_error_plan)
+
     return {
-        "empty_plan_response_count": empty_plan,
-        "response_with_text_but_no_annotations_count": no_annotations,
-        "response_with_insufficient_annotations_count": insufficient_annotations,
-        "semantic_retry_count": retry_count,
+        "stakeholder_plan_attempt_count": plan_attempt_count,
+        "stakeholder_realization_attempt_count": realization_attempt_count,
+        "stakeholder_semantic_rejection_count": semantic_rejections,
+        "semantic_retry_count": max(retry_markers, inferred_retries),
+    }
+
+
+def _empty_plan_diagnostics(sample: object) -> dict[str, int]:
+    """Separate accepted-response counters from raw WHAT/HOW attempts."""
+    return {
+        **_accepted_response_diagnostics(sample),
+        **_stakeholder_attempt_diagnostics(sample),
     }
 
 
@@ -542,13 +813,67 @@ def _is_stakeholder_semantic_error(text: str) -> bool:
     )
 
 
+def _classify_error_text(event_type: str, role: str | None, text: str) -> str | None:
+    if event_type == "ToolEvent":
+        return "tool/runtime_failure"
+    if event_type == "ModelEvent":
+        # Semantic output rejection is raised after a successful ModelEvent;
+        # an error attached to the event itself is a provider/generation error.
+        if role == "stakeholder":
+            return "stakeholder_generation_failure"
+        return "candidate_generation_failure"
+    if _contains_any(text, ("stakeholder",)):
+        if _is_stakeholder_semantic_error(text):
+            return "stakeholder_semantic_validation_failure"
+        return "stakeholder_generation_failure"
+    if _contains_any(text, ("candidate", "generation", "generate")):
+        return "candidate_generation_failure"
+    if _contains_any(text, ("tool", "runtime")):
+        return "tool/runtime_failure"
+    if _contains_any(text, ("score", "scorer")):
+        return "scoring_failure"
+    return None
+
+
+def _authoritative_completion_flag(
+    protocol: Mapping[str, Any], primary_evaluation: Mapping[str, Any]
+) -> bool | None:
+    """Read completion from the score first, then the persisted protocol."""
+    scored = primary_evaluation.get("protocol_completed")
+    if isinstance(scored, bool):
+        return scored
+    status = protocol.get("status")
+    if status == "completed":
+        return True
+    if status == "incomplete":
+        return False
+    return None
+
+
 def classify_failure(
     log: EvalLog,
     sample: object,
     protocol: Mapping[str, Any],
     primary_evaluation: Mapping[str, Any],
 ) -> str:
-    """Classify execution failure without changing evaluator predicates."""
+    """Classify the authoritative terminal outcome before incidental errors.
+
+    Tool/model events are diagnostics unless the runtime never reached a
+    terminal completion. This prevents a recovered tool error or semantic
+    retry from downgrading an otherwise completed interview.
+    """
+    status = _text(protocol.get("status"))
+    scored_completion = primary_evaluation.get("protocol_completed")
+    scored_completion_is_false = (
+        isinstance(scored_completion, bool) and not scored_completion
+    )
+    if status == "completed" and not scored_completion_is_false:
+        # A missing primary score is still a scoring failure; a valid primary
+        # score (including the minimal protocol flag) is authoritative.
+        return "completed" if primary_evaluation else "scoring_failure"
+    if isinstance(scored_completion, bool) and scored_completion:
+        return "completed"
+
     reason = _text(protocol.get("failure_reason"))
     if reason == "candidate_step_limit_exhausted":
         return "candidate_step_limit"
@@ -560,29 +885,20 @@ def classify_failure(
     if not primary_evaluation and _contains_any(all_errors, ("score", "scorer")):
         return "scoring_failure"
     for event_type, role, text in records:
-        if event_type == "ToolEvent":
-            return "tool/runtime_failure"
-        if event_type == "ModelEvent":
-            if role == "stakeholder":
-                if _is_stakeholder_semantic_error(text):
-                    return "stakeholder_semantic_validation_failure"
-                return "stakeholder_generation_failure"
-            return "candidate_generation_failure"
-        if _contains_any(text, ("stakeholder",)):
-            if _is_stakeholder_semantic_error(text):
-                return "stakeholder_semantic_validation_failure"
-            return "stakeholder_generation_failure"
-        if _contains_any(text, ("candidate", "generation", "generate")):
-            return "candidate_generation_failure"
-        if _contains_any(text, ("tool", "runtime")):
-            return "tool/runtime_failure"
-        if _contains_any(text, ("score", "scorer")):
-            return "scoring_failure"
+        classification = _classify_error_text(event_type, role, text)
+        if classification is not None:
+            return classification
 
-    status = _text(protocol.get("status"))
-    if status == "completed":
-        return "completed" if primary_evaluation else "scoring_failure"
-    if status == "incomplete":
+    reason_classification = _classify_error_text("reason", None, reason)
+    if reason_classification is not None:
+        return reason_classification
+
+    authoritative_completion = _authoritative_completion_flag(
+        protocol, primary_evaluation
+    )
+    if status == "incomplete" or (
+        isinstance(authoritative_completion, bool) and not authoritative_completion
+    ):
         return "incomplete_other"
     if _text(getattr(log, "status", None)) == "success":
         return "completed" if primary_evaluation else "scoring_failure"
@@ -614,6 +930,29 @@ def _quality_tags(primary_evaluation: Mapping[str, Any]) -> list[str]:
     return tags
 
 
+def _error_diagnostics(sample: object) -> dict[str, int]:
+    """Count incidental model/tool errors separately from terminal outcome."""
+    recoverable_tool_errors = 0
+    candidate_model_errors = 0
+    stakeholder_model_errors = 0
+    for event in _events(sample):
+        error = _event_error(event)
+        if not error:
+            continue
+        if type(event).__name__ == "ToolEvent":
+            recoverable_tool_errors += 1
+        elif _is_model_event(event):
+            if getattr(event, "role", None) == "stakeholder":
+                stakeholder_model_errors += 1
+            else:
+                candidate_model_errors += 1
+    return {
+        "recoverable_tool_error_count": recoverable_tool_errors,
+        "candidate_model_error_count": candidate_model_errors,
+        "stakeholder_model_error_count": stakeholder_model_errors,
+    }
+
+
 def _run_summary(log: EvalLog, sample: object, source_name: str) -> dict[str, Any]:
     runtime = _runtime_payload(sample)
     metadata = _sample_metadata(sample)
@@ -629,6 +968,18 @@ def _run_summary(log: EvalLog, sample: object, source_name: str) -> dict[str, An
         seed = None
     eval_id = _text(getattr(log.eval, "eval_id", None)) or None
     run_id = _text(getattr(log.eval, "run_id", None)) or None
+    failure_class = classify_failure(log, sample, protocol, primary_evaluation)
+    diagnostics = {
+        "failure_class": failure_class,
+        **_error_diagnostics(sample),
+        **_empty_plan_diagnostics(sample),
+    }
+    tags = _quality_tags(primary_evaluation)
+    if failure_class == "completed" and diagnostics["recoverable_tool_error_count"] > 0:
+        tags.append("recovered_tool_error")
+    if diagnostics["semantic_retry_count"] > 0:
+        tags.append("semantic_retry_occurred")
+    diagnostics["quality_tags"] = tags
     return {
         "schema_version": SUMMARY_SCHEMA_VERSION,
         "run": {
@@ -648,18 +999,12 @@ def _run_summary(log: EvalLog, sample: object, source_name: str) -> dict[str, An
             "epoch": _int_or_none(getattr(sample, "epoch", None)),
             "run_index": _run_index(log, sample),
             "limits": _limit_parameters(log, sample),
-            "generation_parameters": _generation_parameters(log),
+            "generation_parameters": _generation_parameters(log, sample),
         },
         "protocol": protocol,
         "primary_evaluation": primary_evaluation,
         "usage": _usage_by_role(sample, candidate_model, stakeholder_model),
-        "diagnostics": {
-            "failure_class": classify_failure(
-                log, sample, protocol, primary_evaluation
-            ),
-            "quality_tags": _quality_tags(primary_evaluation),
-            **_empty_plan_diagnostics(sample),
-        },
+        "diagnostics": diagnostics,
         "source": {"file_name": source_name},
     }
 
@@ -671,7 +1016,8 @@ def extract_run_summaries(
     samples = getattr(log, "samples", None)
     if not isinstance(samples, Sequence) or isinstance(samples, str) or not samples:
         return []
-    return [_run_summary(log, sample, source_name) for sample in samples]
+    safe_source_name = Path(source_name).name
+    return [_run_summary(log, sample, safe_source_name) for sample in samples]
 
 
 def _numeric_values(runs: Sequence[Mapping[str, Any]], key: str) -> list[float]:
@@ -694,6 +1040,44 @@ def _is_true(value: object) -> bool:
 def _rate(runs: Sequence[Mapping[str, Any]], key: str) -> float | None:
     values = [run[key] for run in runs if key in run and run[key] is not None]
     return sum(_is_true(value) for value in values) / len(values) if values else None
+
+
+def _run_completion_flag(run: Mapping[str, Any]) -> bool | None:
+    score = _as_mapping(run.get("primary_evaluation"))
+    scored = score.get("protocol_completed")
+    if isinstance(scored, bool):
+        return scored
+    protocol = _as_mapping(run.get("protocol"))
+    return (
+        True
+        if protocol.get("status") == "completed"
+        else (False if protocol.get("status") == "incomplete" else None)
+    )
+
+
+def _diagnostic_values(runs: Sequence[Mapping[str, Any]], key: str) -> list[float]:
+    return _numeric_values(
+        [_as_mapping(run.get("diagnostics")) for run in runs],
+        key,
+    )
+
+
+def _diagnostic_total(
+    runs: Sequence[Mapping[str, Any]], key: str
+) -> int | float | None:
+    return _sum_usage_field(
+        [_as_mapping(run.get("diagnostics")) for run in runs],
+        key,
+    )
+
+
+def _accepted_response_rate(
+    runs: Sequence[Mapping[str, Any]], numerator_key: str
+) -> float | None:
+    diagnostics = [_as_mapping(run.get("diagnostics")) for run in runs]
+    numerator = _sum_usage_field(diagnostics, numerator_key)
+    denominator = _sum_usage_field(diagnostics, "accepted_response_count")
+    return numerator / denominator if numerator is not None and denominator else None
 
 
 def _sum_usage_field(
@@ -747,17 +1131,17 @@ def _aggregate_base(runs: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
         "condition_correctness",
         "concept_correctness",
     )
+    completion_values = [
+        completed
+        for run in runs
+        if isinstance(completed := _run_completion_flag(run), bool)
+    ]
+    completion_rate = (
+        sum(completion_values) / len(completion_values) if completion_values else None
+    )
     return {
         "run_count": len(runs),
-        "completion_rate": (
-            sum(
-                _as_mapping(run.get("diagnostics")).get("failure_class") == "completed"
-                for run in runs
-            )
-            / len(runs)
-            if runs
-            else None
-        ),
+        "completion_rate": completion_rate,
         "reconstruction_pass_rate": _rate(score_runs, "reconstruction_pass"),
         "protocol_pass_rate": _rate(score_runs, "protocol_pass"),
         "evidence_pass_rate": _rate(score_runs, "evidence_pass"),
@@ -785,6 +1169,31 @@ def _aggregate_base(runs: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
         ),
         "average_observation_count": _mean(
             _numeric_values(protocol_runs, "observation_count")
+        ),
+        "total_recoverable_tool_error_count": _diagnostic_total(
+            runs, "recoverable_tool_error_count"
+        ),
+        "mean_recoverable_tool_error_count": _mean(
+            _diagnostic_values(runs, "recoverable_tool_error_count")
+        ),
+        "total_stakeholder_semantic_rejection_count": _diagnostic_total(
+            runs, "stakeholder_semantic_rejection_count"
+        ),
+        "mean_stakeholder_semantic_rejection_count": _mean(
+            _diagnostic_values(runs, "stakeholder_semantic_rejection_count")
+        ),
+        "total_semantic_retry_count": _diagnostic_total(runs, "semantic_retry_count"),
+        "mean_semantic_retry_count": _mean(
+            _diagnostic_values(runs, "semantic_retry_count")
+        ),
+        "total_accepted_response_count": _diagnostic_total(
+            runs, "accepted_response_count"
+        ),
+        "accepted_empty_plan_rate": _accepted_response_rate(
+            runs, "accepted_empty_plan_response_count"
+        ),
+        "accepted_unannotated_response_rate": _accepted_response_rate(
+            runs, "accepted_response_with_text_but_no_annotations_count"
         ),
         "usage": _aggregate_usage(runs),
     }
@@ -844,6 +1253,17 @@ def _json_text(value: object) -> str:
     return json.dumps(value, ensure_ascii=False, sort_keys=True, indent=2) + "\n"
 
 
+def _yaml_text(value: object) -> str:
+    import yaml
+
+    return yaml.safe_dump(
+        value,
+        allow_unicode=True,
+        default_flow_style=False,
+        sort_keys=False,
+    )
+
+
 def _main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Phase 14 .eval diagnostics")
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -853,25 +1273,41 @@ def _main(argv: Sequence[str] | None = None) -> int:
         )
         command.add_argument("logs", nargs="+", type=Path)
         command.add_argument("--output", "-o", type=Path)
-    task_config = subparsers.add_parser(
-        "task-config", help="render registered Phase 13 task args for one run"
-    )
-    task_config.add_argument("config", type=Path)
-    task_config.add_argument("--run-index", type=int, required=True)
-    task_config.add_argument("--output", "-o", type=Path)
+    for name, help_text in (
+        ("task-config", "render registered Phase 13 task args for one run"),
+        ("run-config", "render one complete Inspect run config for one run"),
+    ):
+        command = subparsers.add_parser(name, help=help_text)
+        command.add_argument("config", type=Path)
+        command.add_argument("--run-index", type=int, required=True)
+        command.add_argument("--output", "-o", type=Path)
+        if name == "run-config":
+            command.add_argument("--format", choices=("json", "yaml"))
 
     args = parser.parse_args(argv)
-    if args.command == "task-config":
-        config = load_experiment_config(args.config)
-        matching = [run for run in config.runs if run.run_index == args.run_index]
-        if len(matching) != 1:
-            parser.error(
-                f"experiment config must contain exactly one run_index={args.run_index}"
-            )
-        value: object = build_inspect_task_config(matching[0])
-    else:
-        value = summarize_eval_logs(args.logs)
-    text = _json_text(value)
+    try:
+        if args.command in {"task-config", "run-config"}:
+            config = load_experiment_config(args.config)
+            matching = [run for run in config.runs if run.run_index == args.run_index]
+            if len(matching) != 1:
+                parser.error(
+                    "experiment config must contain exactly one "
+                    f"run_index={args.run_index}"
+                )
+            if args.command == "task-config":
+                value: object = build_inspect_task_config(matching[0])
+            else:
+                value = build_inspect_run_config(matching[0])
+        else:
+            value = summarize_eval_logs(args.logs)
+    except ValueError as exc:
+        parser.error(str(exc))
+
+    output_format = getattr(args, "format", None)
+    if output_format is None and getattr(args, "output", None) is not None:
+        if args.output.suffix.lower() in {".yaml", ".yml"}:
+            output_format = "yaml"
+    text = _yaml_text(value) if output_format == "yaml" else _json_text(value)
     if args.output is None:
         print(text, end="")
     else:
@@ -887,6 +1323,7 @@ __all__ = [
     "Phase14ExperimentConfig",
     "Phase14RunConfig",
     "aggregate_run_summaries",
+    "build_inspect_run_config",
     "build_inspect_task_config",
     "classify_failure",
     "extract_run_summaries",

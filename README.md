@@ -2,11 +2,11 @@
 
 Standalone migration target for the `business-interview` benchmark.
 
-This repository is currently at **Phase 13**. It is an intentionally small
+This repository is currently at **Phase 14**. It is an intentionally small
 Python 3.12 project managed with [`uv`](https://docs.astral.sh/uv/). The
 existing `tau2-bench` checkout remains the migration oracle; this project does
-not vendor tau2, copy the legacy evaluator, or run real-provider benchmark
-calibration.
+not vendor tau2 or copy the legacy evaluator. Real-provider calibration is
+explicitly optional and credential-gated.
 
 ## Setup and checks
 
@@ -53,6 +53,7 @@ business-interview-bench/
     ├── test_inspect_adapter.py # deterministic Inspect replay/rescore checks
     ├── test_phase13_runtime.py # live state, ledger, and graph mutation checks
     ├── test_phase13_inspect.py # MockLLM multi-turn Inspect integration
+    ├── test_phase14.py # run-config and .eval diagnostics
     ├── test_stakeholders.py # private runtime contract checks
     └── test_serialization.py
 ```
@@ -397,23 +398,45 @@ migration details.
 ## Phase 14: real-provider calibration harness
 
 Phase 14 keeps the registered `business_interview_bench/phase13_interview`
-task and adds only experiment configuration and offline `.eval` analysis. The
-small initial manifest is `experiments/phase14/calibration.json`; it defines
-one deterministic profile/seed run for each of `lab_sample_flow`,
-`quotation_workflow_1`, and `quotation_workflow_1_ja`. Model names are
-environment placeholders and provider credentials remain under the provider's
-normal environment configuration.
+task and adds a reproducible Inspect run-config renderer plus offline `.eval`
+analysis. The small initial manifest is
+`experiments/phase14/calibration.json`; it defines one deterministic
+profile/seed run for each of `lab_sample_flow`, `quotation_workflow_1`, and
+`quotation_workflow_1_ja`. Model names are environment placeholders and
+provider credentials remain under the provider's normal environment
+configuration.
 
-The analysis utility extracts all 41 primary fields, runtime/failure
-classification, candidate/stakeholder usage, and empty-plan diagnostics without
-calling a model or rerunning stakeholder projection:
+Render the authoritative launch artifact for one experiment entry. Both model
+placeholders are resolved at render time; missing variables are a hard error:
+
+```bash
+export PHASE14_CANDIDATE_MODEL='your-provider/your-candidate-model'
+export PHASE14_STAKEHOLDER_MODEL='your-provider/your-stakeholder-model'
+python -m business_interview_bench.phase14 run-config \\
+  experiments/phase14/calibration.json --run-index 0 \\
+  --output /tmp/phase14-run-0.yaml
+inspect eval --run-config /tmp/phase14-run-0.yaml
+```
+
+The run config contains the registered task and task args, candidate model,
+`stakeholder` model role/config, candidate `generate_config`, and
+`eval_config.epochs`. `candidate_max_tokens` remains the Phase 13 runtime hard
+bound in task args; any GenerateConfig `max_tokens` must agree with it. The
+legacy `task-config` helper remains available, but is not the Phase 14
+reproduction artifact.
+
+The analysis utility extracts all 41 primary fields, authoritative terminal
+completion/failure classification, separate recoverable model/tool errors,
+accepted-response versus semantic-attempt diagnostics, candidate/stakeholder
+usage, and safe provenance without calling a model or rerunning stakeholder
+projection:
 
 ```bash
 python -m business_interview_bench.phase14 summarize logs/*.eval \\
   --output phase14-summary.json
 ```
 
-The summary contains safe model/provenance identifiers and aggregates by
-scenario and model, but never dumps Truth, exact stakeholder knowledge, or the
-full stakeholder profile. Real-provider execution is an optional manual
-integration step; no provider result is represented by MockLLM output.
+The schema-versioned summary aggregates by scenario and model, but never dumps
+Truth, exact `StakeholderKnowledge`, or the full stakeholder profile. Real
+calibration is optional; if credentials are unavailable it is not simulated by
+MockLLM.
