@@ -390,5 +390,30 @@ MockLLM tests and connects the final state to the unchanged 41-field
 `evaluate_primary()` evaluator.
 
 Phase 13 intentionally does not add real-provider E2E, model comparison,
-calibration, judge logic, or tau2 Environment/InterviewDB. Those remain Phase
-14 work. See `migration/README.md` and `migration/inventory.md` for details.
+calibration, judge logic, or tau2 Environment/InterviewDB. Those remain outside
+this runtime layer. See `migration/README.md` and `migration/inventory.md` for
+migration details.
+
+## Phase 14: real-provider calibration harness
+
+Phase 14 keeps the registered `business_interview_bench/phase13_interview`
+task and adds only experiment configuration and offline `.eval` analysis. The
+small initial manifest is `experiments/phase14/calibration.json`; it defines
+one deterministic profile/seed run for each of `lab_sample_flow`,
+`quotation_workflow_1`, and `quotation_workflow_1_ja`. Model names are
+environment placeholders and provider credentials remain under the provider's
+normal environment configuration.
+
+The analysis utility extracts all 41 primary fields, runtime/failure
+classification, candidate/stakeholder usage, and empty-plan diagnostics without
+calling a model or rerunning stakeholder projection:
+
+```bash
+python -m business_interview_bench.phase14 summarize logs/*.eval \\
+  --output phase14-summary.json
+```
+
+The summary contains safe model/provenance identifiers and aggregates by
+scenario and model, but never dumps Truth, exact stakeholder knowledge, or the
+full stakeholder profile. Real-provider execution is an optional manual
+integration step; no provider result is represented by MockLLM output.

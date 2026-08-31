@@ -7,7 +7,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
-from typing import cast
+from typing import Any, cast
 
 from inspect_ai import Task, task
 from inspect_ai.dataset import MemoryDataset, Sample
@@ -577,14 +577,15 @@ def phase13_interview_task(
     max_interview_turns: int | None = None,
     max_candidate_steps_per_turn: int = _DEFAULT_MAX_CANDIDATE_STEPS_PER_TURN,
     candidate_max_tokens: int = _DEFAULT_CANDIDATE_MAX_TOKENS,
+    run_index: int | None = None,
     initial_graph: AgentGraph | None = None,
     initial_messages: Sequence[ChatMessage] | None = None,
     max_turn_count: int | None = None,
 ) -> Task:
-    """Build a real Inspect Task for deterministic MockLLM integration tests.
+    """Build a real Inspect Task for live runs and MockLLM integration tests.
 
     ``max_candidate_steps_per_turn`` is the maximum number of candidate model
-    generations allowed within one interview turn. Tests can pass
+    generations allowed within one interview turn. Callers can pass
     ``model="mockllm/candidate"`` to ``inspect_eval`` and a
     custom ``model_roles={"stakeholder": get_model(...)}``; no private state is
     placed in the Sample input or candidate system message.
@@ -629,6 +630,16 @@ def phase13_interview_task(
         max_candidate_steps_per_turn,
         candidate_max_tokens,
     )
+    if run_index is not None and run_index < 0:
+        raise MultiTurnInterviewError("run_index must be non-negative")
+    sample_metadata: dict[str, Any] = {
+        "scenario_id": resolved_scenario_id,
+        "phase13_max_interview_turns": max_turns,
+        "phase13_max_candidate_steps_per_turn": max_candidate_steps_per_turn,
+        "phase13_candidate_max_tokens": candidate_max_tokens,
+    }
+    if run_index is not None:
+        sample_metadata["phase14_run_index"] = run_index
     # Leave one message of headroom because Inspect checks the limit before a
     # generation. Each tool-producing generation contributes assistant+tool
     # messages; a question-producing generation contributes assistant+
@@ -648,7 +659,7 @@ def phase13_interview_task(
                 Sample(
                     id=sample_id,
                     input=initial,
-                    metadata={"scenario_id": resolved_scenario_id},
+                    metadata=sample_metadata,
                 )
             ]
         ),
@@ -706,6 +717,7 @@ def phase13_interview(
     max_interview_turns: int | None = None,
     max_candidate_steps_per_turn: int = _DEFAULT_MAX_CANDIDATE_STEPS_PER_TURN,
     candidate_max_tokens: int = _DEFAULT_CANDIDATE_MAX_TOKENS,
+    run_index: int = 0,
 ) -> Task:
     """Build the registered live task from public profile/seed config.
 
@@ -721,6 +733,7 @@ def phase13_interview(
         max_interview_turns=max_interview_turns,
         max_candidate_steps_per_turn=max_candidate_steps_per_turn,
         candidate_max_tokens=candidate_max_tokens,
+        run_index=run_index,
     )
 
 

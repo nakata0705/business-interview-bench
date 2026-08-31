@@ -266,6 +266,7 @@ def test_registered_task_validates_plain_profile_task_config(tmp_path) -> None:
             "stakeholder_profile": profile.model_dump(mode="json"),
             "stakeholder_seed": 17,
             "max_interview_turns": 2,
+            "run_index": 7,
         },
         model=get_model(
             "mockllm/candidate",
@@ -288,7 +289,11 @@ def test_registered_task_validates_plain_profile_task_config(tmp_path) -> None:
     assert len(logs) == 1
     log = read_eval_log(logs[0].location)
     assert log.status == "success"
+    assert log.samples is not None
+    assert len(log.samples) == 1
+    assert log.samples[0].metadata is not None
     store = _sample_store(log)
+    assert log.samples[0].metadata["phase14_run_index"] == 7
     assert StakeholderProfile.model_validate(store.stakeholder_profile) == profile
     assert store.stakeholder_seed == 17
     assert store.stakeholder_knowledge
