@@ -803,21 +803,26 @@ SemanticLedger.
 `multi_turn_interview_solver` uses Inspect's supplied default/current candidate
 model and the existing required stakeholder role. Its explicit bounded loop
 uses `candidate_turns` for interview turns and
-`max_candidate_steps_per_turn` for tool-execution steps; it does not delegate
-runtime safety to `Generate(tool_calls="loop")`. Every question invokes the
-stakeholder once at the runtime level, then appends one validated public
+`max_candidate_steps_per_turn` for candidate model generations (including the
+question generation); it does not delegate runtime safety to
+`Generate(tool_calls="loop")`. Every question invokes the stakeholder once at
+the runtime level, then appends one validated public
 response/observation before the next candidate turn. `complete_interview`
 prevents later stakeholder calls and graph mutations. The public-only
 `get_observations` tool exposes stable observation IDs/turns/text for exact
 EvidenceRef attachment and no private ledger fields. Exhausting either hard
 limit records an explicit incomplete protocol rather than completion.
 
-`phase13_interview_task()` requires exact `StakeholderKnowledge` or an explicit
-`StakeholderProfile` plus projection seed, and persists exact private setup
-JSON for replay. Terminology confirmations retain exact interviewer proposal
-and stakeholder-agreement provenance. `phase13_primary_scorer()` provides the
-real Inspect path used by deterministic MockLLM integration tests; final
-scoring delegates to the unchanged 41-field `evaluate_primary()`.
+The registered `phase13_interview` task accepts a scenario ID, plain
+JSON/YAML `StakeholderProfile` mapping, projection seed, and bounded runtime
+options. The programmatic `phase13_interview_task()` additionally accepts
+exact `StakeholderKnowledge`. Live construction persists exact private setup
+JSON for replay. Offline scoring validates that exact historical knowledge and
+its coverage view without rerunning current projection code; profile/seed are
+provenance metadata. Terminology confirmations retain exact interviewer
+proposal and stakeholder-agreement provenance. `phase13_primary_scorer()`
+provides the real Inspect path used by deterministic MockLLM integration tests;
+final scoring delegates to the unchanged 41-field `evaluate_primary()`.
 
 Phase 13 does not add real-provider E2E, calibration, model comparison,
 LLM-as-judge, aggregate-score redesign, tau2 Environment/InterviewDB, or other

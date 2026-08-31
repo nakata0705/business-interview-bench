@@ -14,6 +14,7 @@ from inspect_ai.log import read_eval_log
 from inspect_ai.model import ModelName, ModelOutput, get_model
 from inspect_ai.solver import TaskState
 
+import business_interview_bench.inspect_adapter.live_scorer as live_scorer
 from business_interview.scenarios import get_scenario
 from business_interview.stakeholders import (
     StakeholderKnowledge,
@@ -27,6 +28,7 @@ from business_interview_bench.inspect_adapter.live_store import (
 )
 from business_interview_bench.inspect_adapter.multiturn import (
     MultiTurnInterviewError,
+    phase13_interview,
     phase13_interview_task,
     phase13_smoke_interview_task,
 )
@@ -83,6 +85,25 @@ def _stakeholder_outputs(messages: tuple[str, ...]) -> list[ModelOutput]:
             ]
         )
     return outputs
+
+
+def _lab_profile(scenario_id: str = "lab_sample_flow") -> StakeholderProfile:
+    truth = get_scenario(scenario_id).truth
+    business_nodes = tuple(
+        node_id for node_id, node in truth.nodes.items() if not node.is_structural
+    )
+    business_edges = tuple(
+        edge_id for edge_id, edge in truth.edges.items() if not edge.is_structural
+    )
+    return StakeholderProfile(
+        stakeholder_id="phase13-test-profile",
+        name="Phase 13 test profile",
+        role="lab technician",
+        visible_node_ids=business_nodes,
+        visible_edge_ids=business_edges,
+        visible_node_attributes={node_id: ("activity",) for node_id in business_nodes},
+        visible_edge_attributes={edge_id: ("condition",) for edge_id in business_edges},
+    )
 
 
 def _run(
@@ -232,6 +253,60 @@ def test_multiturn_mockllm_tools_observations_and_primary_score(tmp_path) -> Non
 def test_missing_stakeholder_setup_is_an_explicit_error() -> None:
     with pytest.raises(MultiTurnInterviewError, match="stakeholder setup is required"):
         phase13_interview_task()
+    with pytest.raises(MultiTurnInterviewError, match="stakeholder setup is required"):
+        phase13_interview()
+
+
+def test_registered_task_validates_plain_profile_task_config(tmp_path) -> None:
+    profile = _lab_profile()
+    logs = inspect_eval(
+        "business_interview_bench/phase13_interview",
+        task_args={
+            "scenario_id": "lab_sample_flow",
+            "stakeholder_profile": profile.model_dump(mode="json"),
+            "stakeholder_seed": 17,
+            "max_interview_turns": 2,
+        },
+        model=get_model(
+            "mockllm/candidate",
+            custom_outputs=[
+                ModelOutput.from_content("mockllm", "What do you do?"),
+                ModelOutput.for_tool_call(
+                    "mockllm", "complete_interview", {"reason": "done"}
+                ),
+            ],
+        ),
+        model_roles={
+            "stakeholder": get_model(
+                "mockllm/stakeholder",
+                custom_outputs=_stakeholder_outputs(("Answer.",)),
+            )
+        },
+        display="none",
+        log_dir=str(tmp_path),
+    )
+    assert len(logs) == 1
+    log = read_eval_log(logs[0].location)
+    assert log.status == "success"
+    store = _sample_store(log)
+    assert StakeholderProfile.model_validate(store.stakeholder_profile) == profile
+    assert store.stakeholder_seed == 17
+    assert store.stakeholder_knowledge
+
+
+def test_registered_task_rejects_invalid_profile_config() -> None:
+    with pytest.raises(MultiTurnInterviewError, match="invalid stakeholder_profile"):
+        phase13_interview(
+            stakeholder_profile={"stakeholder_id": "incomplete"},
+            stakeholder_seed=17,
+        )
+
+
+def test_smoke_helper_is_the_only_full_visibility_default() -> None:
+    smoke_task = phase13_smoke_interview_task()
+    assert smoke_task.dataset is not None
+    with pytest.raises(MultiTurnInterviewError, match="stakeholder setup is required"):
+        phase13_interview()
 
 
 def test_profile_seed_and_exact_knowledge_round_trip_in_private_store() -> None:
@@ -272,7 +347,191 @@ def test_profile_seed_and_exact_knowledge_round_trip_in_private_store() -> None:
     assert restored_knowledge.model_dump(mode="json") == restored.stakeholder_knowledge
 
 
-def test_candidate_tool_steps_stop_without_a_stakeholder_call(tmp_path) -> None:
+def test_historical_scorer_requires_exact_knowledge() -> None:
+    truth = get_scenario("lab_sample_flow").truth
+    profile = _lab_profile()
+    knowledge = project_knowledge(truth, profile, seed=17)
+    coverage = knowledge_coverage_view(truth, knowledge)
+    store = BusinessInterviewLiveStore(instance="phase13-missing-knowledge")
+    persist_evaluation_inputs(store, truth, coverage)
+    with pytest.raises(ValueError, match="exact stakeholder knowledge is required"):
+        live_scorer._load_validated_stakeholder_knowledge(store, truth, coverage)
+
+
+def test_historical_scorer_rejects_knowledge_coverage_mismatch() -> None:
+    truth = get_scenario("lab_sample_flow").truth
+    profile = _lab_profile()
+    knowledge = project_knowledge(truth, profile, seed=17)
+    coverage = knowledge_coverage_view(truth, knowledge)
+    store = BusinessInterviewLiveStore()
+    persist_evaluation_inputs(
+        store,
+        truth,
+        coverage,
+        stakeholder_profile=profile,
+        stakeholder_seed=17,
+        stakeholder_knowledge=knowledge,
+    )
+    wrong_coverage = coverage.model_copy(update={"nodes_by_truth_id": {}})
+    with pytest.raises(ValueError, match="stored knowledge coverage"):
+        live_scorer._load_validated_stakeholder_knowledge(store, truth, wrong_coverage)
+
+
+def test_historical_scorer_uses_exact_knowledge_without_projection(
+    tmp_path, monkeypatch
+) -> None:
+    profile = _lab_profile()
+    task = phase13_interview_task(
+        scenario_id="lab_sample_flow",
+        stakeholder_profile=profile,
+        stakeholder_seed=17,
+        max_turns=2,
+    )
+
+    def forbidden_projection(*_args: Any, **_kwargs: Any) -> Any:
+        raise AssertionError("historical scorer reran project_knowledge")
+
+    # The task constructor may project once to create the live run. Once the
+    # exact result is persisted, the scorer must not depend on that function.
+    monkeypatch.setattr(
+        live_scorer, "project_knowledge", forbidden_projection, raising=False
+    )
+    logs = inspect_eval(
+        task,
+        model=get_model(
+            "mockllm/candidate",
+            custom_outputs=[
+                ModelOutput.from_content("mockllm", "Question?"),
+                ModelOutput.for_tool_call(
+                    "mockllm", "complete_interview", {"reason": "done"}
+                ),
+            ],
+        ),
+        model_roles={
+            "stakeholder": get_model(
+                "mockllm/stakeholder",
+                custom_outputs=_stakeholder_outputs(("Answer.",)),
+            )
+        },
+        display="none",
+        log_dir=str(tmp_path),
+    )
+    assert len(logs) == 1
+    log = read_eval_log(logs[0].location)
+    assert log.status == "success"
+    assert log.samples is not None
+    assert len(log.samples) == 1
+    assert log.samples[0].scores is not None
+    score = log.samples[0].scores["phase13_primary_scorer"]
+    assert isinstance(score.value, dict)
+    assert len(score.value) == 41
+    assert _sample_store(log).stakeholder_knowledge
+
+
+def test_candidate_generation_limit_allows_first_question(tmp_path) -> None:
+    log = _run(
+        tmp_path,
+        [ModelOutput.from_content("mockllm", "Question?")],
+        ("Answer.",),
+        max_turns=1,
+        max_candidate_steps_per_turn=1,
+    )
+    assert log.status == "success"
+    runtime = _sample_store(log).live_state
+    assert runtime["candidate_steps"] == 1
+    assert runtime["stakeholder_turns"] == 1
+    assert runtime["protocol_state"]["failure_reason"] == "max_turns_exhausted"
+
+
+def test_candidate_generation_limit_one_tool_executes_then_exhausts(tmp_path) -> None:
+    log = _run(
+        tmp_path,
+        [ModelOutput.for_tool_call("mockllm", "add_node", {"node_id": "n1"})],
+        (),
+        max_turns=1,
+        max_candidate_steps_per_turn=1,
+    )
+    assert log.status == "success"
+    runtime = _sample_store(log).live_state
+    assert runtime["candidate_steps"] == 1
+    assert runtime["stakeholder_turns"] == 0
+    assert runtime["protocol_state"]["failure_reason"] == (
+        "candidate_step_limit_exhausted"
+    )
+    assert (
+        len([event for event in _model_events(log) if event.role != "stakeholder"]) == 1
+    )
+
+
+def test_candidate_generation_limit_three_allows_tool_tool_question(tmp_path) -> None:
+    log = _run(
+        tmp_path,
+        [
+            ModelOutput.for_tool_call("mockllm", "add_node", {"node_id": "n1"}),
+            ModelOutput.for_tool_call("mockllm", "get_agent_graph", {}),
+            ModelOutput.from_content("mockllm", "Question?"),
+        ],
+        ("Answer.",),
+        max_turns=1,
+        max_candidate_steps_per_turn=3,
+    )
+    assert log.status == "success"
+    runtime = _sample_store(log).live_state
+    assert runtime["candidate_steps"] == 3
+    assert runtime["stakeholder_turns"] == 1
+    assert runtime["protocol_state"]["failure_reason"] == "max_turns_exhausted"
+    assert (
+        len([event for event in _model_events(log) if event.role != "stakeholder"]) == 3
+    )
+
+
+def test_candidate_generation_limit_three_exhausts_after_third_tool(tmp_path) -> None:
+    log = _run(
+        tmp_path,
+        [
+            ModelOutput.for_tool_call("mockllm", "get_observations", {}),
+            ModelOutput.for_tool_call("mockllm", "get_observations", {}),
+            ModelOutput.for_tool_call("mockllm", "get_observations", {}),
+        ],
+        (),
+        max_turns=1,
+        max_candidate_steps_per_turn=3,
+    )
+    assert log.status == "success"
+    runtime = _sample_store(log).live_state
+    assert runtime["candidate_steps"] == 3
+    assert runtime["stakeholder_turns"] == 0
+    assert runtime["protocol_state"]["failure_reason"] == (
+        "candidate_step_limit_exhausted"
+    )
+    assert (
+        len([event for event in _model_events(log) if event.role != "stakeholder"]) == 3
+    )
+
+
+def test_completion_generation_is_terminal_without_stakeholder_call(tmp_path) -> None:
+    log = _run(
+        tmp_path,
+        [
+            ModelOutput.for_tool_call(
+                "mockllm", "complete_interview", {"reason": "done"}
+            )
+        ],
+        (),
+        max_turns=4,
+        max_candidate_steps_per_turn=1,
+    )
+    assert log.status == "success"
+    runtime = _sample_store(log).live_state
+    assert runtime["protocol_state"]["status"] == "completed"
+    assert runtime["candidate_steps"] == 1
+    assert runtime["stakeholder_turns"] == 0
+    assert not any(event.role == "stakeholder" for event in _model_events(log))
+
+
+def test_candidate_generation_steps_stop_without_a_stakeholder_call(
+    tmp_path,
+) -> None:
     candidate_outputs = [
         ModelOutput.for_tool_call("mockllm", "get_observations", {}) for _ in range(5)
     ]

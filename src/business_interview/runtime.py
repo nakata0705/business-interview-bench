@@ -636,7 +636,7 @@ class LiveInterviewStore(BaseModel):
 
     @property
     def candidate_step(self) -> int:
-        """Short alias for the current interview turn's tool-step count."""
+        """Short alias for the current interview turn's generation count."""
         return self.candidate_steps
 
     @property
@@ -673,7 +673,7 @@ class LiveInterviewStore(BaseModel):
             )
 
     def record_candidate_turn(self) -> LiveInterviewStore:
-        """Start one interview turn and reset its candidate tool-step count."""
+        """Start one interview turn and reset its generation-step count."""
         self._require_active()
         if self.candidate_turns >= self.max_turns:
             raise InterviewRuntimeError("maximum interview turn count exhausted")
@@ -683,7 +683,7 @@ class LiveInterviewStore(BaseModel):
         )
 
     def record_candidate_step(self) -> LiveInterviewStore:
-        """Record one bounded candidate generation/tool execution step."""
+        """Record one bounded candidate model generation."""
         self._require_active()
         if self.candidate_steps >= self.max_candidate_steps_per_turn:
             raise InterviewRuntimeError(

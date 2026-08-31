@@ -756,24 +756,30 @@ SemanticLedger are not exposed to candidate tools.
 `multi_turn_interview_solver` invokes the default/current candidate model
 through Inspect's supplied `Generate` callback and invokes the stakeholder
 through `get_model(role="stakeholder", required=True)`. It uses an explicit
-bounded candidate tool-step loop rather than Inspect's unbounded `loop`; the
+bounded candidate-generation loop rather than Inspect's unbounded `loop`; the
 interview-level `candidate_turns` counter is separate from
-`max_candidate_steps_per_turn`. Tool calls can mutate the graph before a
-natural-language question. Each question receives one validated stakeholder
-response, then one observation/ledger ingestion, before the next candidate
+`max_candidate_steps_per_turn`, which counts every candidate model generation,
+including a natural-language question. Tool calls can mutate the graph before
+a question. Each question receives one validated stakeholder response, then
+one observation/ledger ingestion, before the next candidate
 turn. `complete_interview` is explicit and prevents all later stakeholder
 calls and graph mutations. The public-only `get_observations` tool supplies
 stable observation IDs/turns/text for exact EvidenceRef attachment without
-exposing the private ledger. Hard interview-turn or candidate-step exhaustion
-is stored as an incomplete protocol, not as completion.
+exposing the private ledger. Hard interview-turn or candidate-generation
+exhaustion is stored as an incomplete protocol, not as completion.
 
-`phase13_interview_task()` requires exact `StakeholderKnowledge` or an explicit
-`StakeholderProfile` plus projection seed, and persists the exact knowledge,
-profile, and seed in evaluator-private Store JSON. Terminology confirmations
-carry exact interviewer proposal and stakeholder-agreement provenance.
-`phase13_primary_scorer()` exercises the actual Inspect eval path used by
-deterministic MockLLM tests and passes the resulting context/graph through the
-unchanged 41-field `evaluate_primary()`.
+The registered `phase13_interview` task accepts a scenario ID, plain
+JSON/YAML `StakeholderProfile` mapping, projection seed, and bounded runtime
+options; it validates the mapping into the core profile model. The
+programmatic `phase13_interview_task()` additionally accepts exact
+`StakeholderKnowledge`. Live construction persists exact knowledge, profile,
+and seed in evaluator-private Store JSON. Offline scoring treats that exact
+knowledge as the authoritative historical input, validates its structure and
+coverage, and never reruns the current projection implementation. Terminology
+confirmations carry exact interviewer proposal and stakeholder-agreement
+provenance. `phase13_primary_scorer()` exercises the actual Inspect eval path
+used by deterministic MockLLM tests and passes the resulting context/graph
+through the unchanged 41-field `evaluate_primary()`.
 
 Phase 13 does not implement real-provider E2E, model comparison, calibration,
 LLM-as-judge, aggregate-score redesign, or generic Environment/InterviewDB.

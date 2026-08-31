@@ -6,7 +6,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from typing import cast
 
 from inspect_ai import Task, task
@@ -167,6 +167,20 @@ def _validate_candidate_limits(
         raise ValueError("candidate_max_tokens must be positive")
 
 
+def _coerce_stakeholder_profile(
+    value: StakeholderProfile | Mapping[str, object] | None,
+) -> StakeholderProfile | None:
+    """Convert JSON/YAML task configuration into the core profile model."""
+    if value is None or isinstance(value, StakeholderProfile):
+        return value
+    try:
+        return StakeholderProfile.model_validate(value)
+    except ValueError as exc:
+        raise MultiTurnInterviewError(
+            f"invalid stakeholder_profile configuration: {exc}"
+        ) from exc
+
+
 def _resolve_setup(
     scenario_id: str | None,
     truth: BusinessProcessGraph | None,
@@ -209,11 +223,24 @@ def _resolve_setup(
         )
     else:
         # A task factory may pass the already projected exact object together
-        # with its profile/seed solely to persist reproducibility metadata.
-        if stakeholder_profile is not None and stakeholder_seed is None:
-            raise MultiTurnInterviewError(
-                "stakeholder_seed is required when stakeholder_profile is supplied"
+        # with its profile/seed to persist reproducibility metadata. Validate
+        # that provenance now, while live construction still owns projection;
+        # the offline scorer deliberately does not repeat this check.
+        if stakeholder_profile is not None:
+            if stakeholder_seed is None:
+                raise MultiTurnInterviewError(
+                    "stakeholder_seed is required when stakeholder_profile is supplied"
+                )
+            projected = project_knowledge(
+                resolved_truth,
+                stakeholder_profile,
+                seed=stakeholder_seed,
             )
+            if projected != knowledge:
+                raise MultiTurnInterviewError(
+                    "stakeholder_knowledge does not match stakeholder_profile "
+                    "and stakeholder_seed"
+                )
         resolved_knowledge = knowledge
     validate_stakeholder_knowledge(resolved_knowledge)
 
@@ -283,7 +310,9 @@ def multi_turn_interview_solver(
     The candidate is generated through Inspect's normal ``Generate`` solver
     callback, so its default/current model and durable tool-call handling are
     preserved.  Stakeholder calls use the existing required ``stakeholder``
-    model role.  Private sidecar output is retained only in ``live_state``.
+    model role.  ``max_candidate_steps_per_turn`` counts candidate model
+    generations, including tool-producing and question-producing calls.
+    Private sidecar output is retained only in ``live_state``.
     """
     (
         resolved_scenario_id,
@@ -415,10 +444,25 @@ def multi_turn_interview_solver(
                     persist(runtime)
                     break
                 try:
+                    # Count the model generation before calling Inspect. This
+                    # makes candidate_steps mean exactly one candidate model
+                    # invocation, whether it emits tools or a question.
+                    runtime = runtime_ref[0].record_candidate_step()
+                except InterviewRuntimeError:
+                    runtime = mark_max_turn_exhausted(
+                        runtime_ref[0],
+                        "candidate_step_limit_exhausted",
+                    )
+                    runtime_ref[0] = runtime
+                    persist(runtime)
+                    break
+                runtime_ref[0] = runtime
+                persist(runtime)
+                try:
                     # Inspect's ``loop`` is intentionally not used here: it
                     # can keep invoking the candidate until a provider stops
-                    # emitting tools.  One explicit ``single`` call is one
-                    # bounded candidate generation/tool-execution step.
+                    # emitting tools. One explicit ``single`` call is one
+                    # bounded candidate model generation.
                     state = await generate(
                         state,
                         tool_calls="single",
@@ -434,33 +478,13 @@ def multi_turn_interview_solver(
 
                 runtime = runtime_ref[0]
                 tool_calls = state.output.message.tool_calls or []
-                if tool_calls and runtime.completed:
-                    # complete_interview is terminal by construction; do not
-                    # spend another step or attempt any follow-up call.
-                    persist(runtime)
-                    break
                 if tool_calls:
-                    try:
-                        runtime = runtime.record_candidate_step()
-                    except InterviewRuntimeError:
-                        runtime = mark_max_turn_exhausted(
-                            runtime,
-                            "candidate_step_limit_exhausted",
-                        )
-                    runtime_ref[0] = runtime
+                    # Tool-only output is not a public question. Generate the
+                    # next candidate generation within this same interview
+                    # turn, unless a terminal tool already completed it.
                     persist(runtime)
                     if runtime.completed or runtime.incomplete:
                         break
-                    if runtime.candidate_steps >= max_candidate_steps_per_turn:
-                        runtime = mark_max_turn_exhausted(
-                            runtime,
-                            "candidate_step_limit_exhausted",
-                        )
-                        runtime_ref[0] = runtime
-                        persist(runtime)
-                        break
-                    # Tool-only output is not a public question.  Generate the
-                    # next candidate step within this same interview turn.
                     continue
                 if runtime.completed or runtime.incomplete:
                     break
@@ -559,7 +583,9 @@ def phase13_interview_task(
 ) -> Task:
     """Build a real Inspect Task for deterministic MockLLM integration tests.
 
-    Tests can pass ``model="mockllm/candidate"`` to ``inspect_eval`` and a
+    ``max_candidate_steps_per_turn`` is the maximum number of candidate model
+    generations allowed within one interview turn. Tests can pass
+    ``model="mockllm/candidate"`` to ``inspect_eval`` and a
     custom ``model_roles={"stakeholder": get_model(...)}``; no private state is
     placed in the Sample input or candidate system message.
     """
@@ -604,8 +630,9 @@ def phase13_interview_task(
         candidate_max_tokens,
     )
     # Leave one message of headroom because Inspect checks the limit before a
-    # generation.  Each tool step contributes assistant+tool messages; a
-    # completed interview step contributes assistant question+stakeholder.
+    # generation. Each tool-producing generation contributes assistant+tool
+    # messages; a question-producing generation contributes assistant+
+    # stakeholder.
     message_limit = (
         len(initial) + max_turns * (2 * max_candidate_steps_per_turn + 2) + 1
     )
@@ -671,9 +698,30 @@ def phase13_smoke_interview_task(
 
 
 @task(name="phase13_interview")
-def phase13_interview() -> Task:
-    """Registered task requiring explicit stakeholder knowledge configuration."""
-    return phase13_interview_task()
+def phase13_interview(
+    scenario_id: str = "lab_sample_flow",
+    stakeholder_profile: StakeholderProfile | Mapping[str, object] | None = None,
+    stakeholder_seed: int | None = None,
+    max_turns: int = 8,
+    max_interview_turns: int | None = None,
+    max_candidate_steps_per_turn: int = _DEFAULT_MAX_CANDIDATE_STEPS_PER_TURN,
+    candidate_max_tokens: int = _DEFAULT_CANDIDATE_MAX_TOKENS,
+) -> Task:
+    """Build the registered live task from public profile/seed config.
+
+    Inspect CLI/task-config supplies ``stakeholder_profile`` as a plain JSON or
+    YAML mapping. Exact knowledge remains a programmatic-factory capability;
+    this registered contract keeps large private knowledge out of task args.
+    """
+    return phase13_interview_task(
+        scenario_id=scenario_id,
+        stakeholder_profile=_coerce_stakeholder_profile(stakeholder_profile),
+        stakeholder_seed=stakeholder_seed,
+        max_turns=max_turns,
+        max_interview_turns=max_interview_turns,
+        max_candidate_steps_per_turn=max_candidate_steps_per_turn,
+        candidate_max_tokens=candidate_max_tokens,
+    )
 
 
 __all__ = [

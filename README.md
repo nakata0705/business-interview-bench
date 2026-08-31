@@ -335,22 +335,56 @@ operations.
 
 `multi_turn_interview_solver` uses Inspect's supplied default/current candidate
 model and the required `get_model(role="stakeholder", required=True)` role.
-Each interview turn has an explicit `max_candidate_steps_per_turn` bound;
-Inspect's unbounded tool loop is not used. Each candidate question receives
-one validated stakeholder response, and only its public text is appended to
-the candidate history. The public-only `get_observations` tool exposes stable
-observation IDs/turns/text when exact EvidenceRef attachment is needed;
-mutation receipts are compact and `get_agent_graph` is the explicit full-graph
-read. `complete_interview` stops further stakeholder calls and graph
-mutations. A hard interview-turn or candidate-step exhaustion is stored as
-`incomplete`, not as protocol completion.
+Each interview turn has an explicit `max_candidate_steps_per_turn` bound,
+where one candidate step is exactly one candidate model generation, whether it
+emits a tool call or a natural-language question. Inspect's unbounded tool loop
+is not used. Each candidate question receives one validated stakeholder
+response, and only its public text is appended to the candidate history. The
+public-only `get_observations` tool exposes stable observation IDs/turns/text
+when exact EvidenceRef attachment is needed; mutation receipts are compact and
+`get_agent_graph` is the explicit full-graph read. `complete_interview` stops
+further stakeholder calls and graph mutations. A hard interview-turn or
+candidate-generation exhaustion is stored as `incomplete`, not as protocol
+completion.
 
-Live `phase13_interview_task()` requires either exact `StakeholderKnowledge` or
-an explicit `StakeholderProfile` plus projection seed. The exact knowledge,
-profile, and seed are persisted in evaluator-private Store JSON; the
-full-visibility `phase13_smoke_interview_task()` helper is reserved for
-infrastructure tests. Terminology confirmations retain exact interviewer
-proposal and stakeholder-agreement provenance. Together with
+The registered `phase13_interview` task accepts a catalog `scenario_id`, a
+plain JSON/YAML `stakeholder_profile` mapping, `stakeholder_seed`, and bounded
+runtime options. It validates the mapping into the core `StakeholderProfile`
+model, so a live task can be configured without putting a large exact
+knowledge JSON object in CLI args:
+
+```bash
+inspect eval business_interview_bench/phase13_interview \\
+  --task-config phase13-task.yaml --model <candidate-model> \\
+  --model-role stakeholder=<stakeholder-model>
+```
+
+where `phase13-task.yaml` contains, for example:
+
+```yaml
+scenario_id: lab_sample_flow
+stakeholder_seed: 17
+stakeholder_profile:
+  stakeholder_id: phase13-lab-tech
+  name: Lab technician
+  role: lab technician
+  visible_node_ids: [n1, n2]
+  visible_edge_ids: [l1]
+  visible_node_attributes:
+    n1: [activity, actor]
+    n2: [activity, actor]
+  visible_edge_attributes:
+    l1: [condition]
+```
+
+Programmatic `phase13_interview_task()` additionally accepts exact
+`StakeholderKnowledge`. Exact knowledge, profile, and seed are persisted in
+evaluator-private Store JSON; the full-visibility
+`phase13_smoke_interview_task()` helper is reserved for infrastructure tests.
+Offline scoring treats the stored exact knowledge as authoritative and only
+validates its model/structure and coverage consistency; it does not rerun the
+current projection algorithm. Terminology confirmations retain exact
+interviewer proposal and stakeholder-agreement provenance. Together with
 `phase13_primary_scorer()`, this provides a real Inspect path for deterministic
 MockLLM tests and connects the final state to the unchanged 41-field
 `evaluate_primary()` evaluator.

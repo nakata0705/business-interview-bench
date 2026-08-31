@@ -15,7 +15,7 @@ from business_interview.stakeholders import (
     StakeholderKnowledge,
     StakeholderProfile,
     knowledge_coverage_view,
-    project_knowledge,
+    validate_stakeholder_knowledge,
 )
 
 from .live_store import BusinessInterviewLiveStore, load_live_state
@@ -26,26 +26,25 @@ def _load_validated_stakeholder_knowledge(
     store: BusinessInterviewLiveStore,
     truth: BusinessProcessGraph,
     coverage: KnowledgeCoverageView,
-) -> StakeholderKnowledge | None:
-    """Validate persisted exact knowledge and optional projection provenance."""
+) -> StakeholderKnowledge:
+    """Validate exact historical knowledge and its provenance metadata.
+
+    The exact knowledge logged with an evaluation is authoritative for offline
+    scoring. Profile/seed fields document how a live run was configured, but
+    rescoring must remain independent of future projection implementations.
+    """
     if not store.stakeholder_knowledge:
-        if store.stakeholder_profile or store.stakeholder_seed is not None:
-            raise ValueError(
-                "stakeholder projection metadata requires exact stakeholder knowledge"
-            )
-        return None
+        raise ValueError(
+            "exact stakeholder knowledge is required for Phase 13 offline scoring"
+        )
     knowledge = StakeholderKnowledge.model_validate(store.stakeholder_knowledge)
+    validate_stakeholder_knowledge(knowledge)
     if store.stakeholder_profile:
         if store.stakeholder_seed is None:
             raise ValueError(
                 "stored stakeholder profile is missing its projection seed"
             )
-        profile = StakeholderProfile.model_validate(store.stakeholder_profile)
-        projected = project_knowledge(truth, profile, seed=store.stakeholder_seed)
-        if projected != knowledge:
-            raise ValueError(
-                "stored StakeholderKnowledge does not match profile and seed"
-            )
+        StakeholderProfile.model_validate(store.stakeholder_profile)
     if knowledge_coverage_view(truth, knowledge) != coverage:
         raise ValueError(
             "stored knowledge coverage does not match exact StakeholderKnowledge"
@@ -55,11 +54,9 @@ def _load_validated_stakeholder_knowledge(
 
 def _validated_terminology_terms(
     store: BusinessInterviewLiveStore,
-    knowledge: StakeholderKnowledge | None,
+    knowledge: StakeholderKnowledge,
 ) -> dict[str, list[str]]:
     """Translate validated private terminology into evaluator term hints."""
-    if knowledge is None:
-        return {}
     terms: dict[str, set[str]] = {}
     runtime = load_live_state(store)
     for entry in runtime.semantic_ledger.entries:
