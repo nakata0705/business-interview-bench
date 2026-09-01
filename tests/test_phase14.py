@@ -211,6 +211,11 @@ def test_phase14_summary_preserves_scores_usage_and_safe_provenance(tmp_path) ->
             "candidate": {"max_tokens": 1024},
             "stakeholder": {},
         },
+        "reasoning_capability_metadata": {
+            "available": False,
+            "reason": "not_recorded",
+            "source": "Inspect eval/model metadata",
+        },
         "limits": {
             "candidate_max_tokens": 1024,
             "max_candidate_steps_per_turn": 8,
@@ -221,6 +226,7 @@ def test_phase14_summary_preserves_scores_usage_and_safe_provenance(tmp_path) ->
         "run_index": 4,
         "scenario_id": "lab_sample_flow",
         "stakeholder_model": "mockllm/stakeholder",
+        "requested_reasoning_effort": None,
         "stakeholder_profile_id": "phase14-test-profile",
         "stakeholder_seed": 17,
         "task": "task",

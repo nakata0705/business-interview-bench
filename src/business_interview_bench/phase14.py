@@ -395,6 +395,65 @@ def _generation_parameters(
     return {"candidate": candidate, "stakeholder": stakeholder}
 
 
+def _reasoning_capability_metadata(log: EvalLog, sample: object) -> dict[str, Any]:
+    """Extract only explicit, safe reasoning capability metadata.
+
+    Inspect/OpenRouter do not consistently persist provider capability data in
+    eval logs. In the absence of an explicit supported/default field, report
+    that fact rather than inferring capability from the requested policy or
+    measured token usage.
+    """
+    sources: list[object] = [
+        getattr(log, "metadata", None),
+        getattr(getattr(log, "eval", None), "metadata", None),
+    ]
+    for event in _events(sample):
+        if not _is_model_event(event):
+            continue
+        sources.extend(
+            (
+                getattr(event, "metadata", None),
+                getattr(getattr(event, "output", None), "metadata", None),
+            )
+        )
+
+    result: dict[str, Any] = {
+        "available": False,
+        "source": "Inspect eval/model metadata",
+    }
+    for raw_source in sources:
+        source = _as_mapping(raw_source)
+        supported = source.get(
+            "reasoning_supported",
+            source.get("supports_reasoning", source.get("reasoning_enabled")),
+        )
+        if isinstance(supported, bool):
+            result["reasoning_supported"] = supported
+        default_effort = source.get(
+            "documented_default_effort",
+            source.get("default_reasoning_effort"),
+        )
+        if isinstance(default_effort, str) and default_effort:
+            result["documented_default_effort"] = default_effort
+        supported_efforts = source.get(
+            "supported_efforts", source.get("supported_reasoning_efforts")
+        )
+        if isinstance(supported_efforts, Sequence) and not isinstance(
+            supported_efforts, (str, bytes)
+        ):
+            efforts = [
+                effort
+                for effort in supported_efforts
+                if isinstance(effort, str) and effort
+            ]
+            result["supported_efforts"] = efforts
+    if len(result) > 2:
+        result["available"] = True
+    else:
+        result["reason"] = "not_recorded"
+    return result
+
+
 def _append_usage_warning(warnings: list[str] | None, warning: str) -> None:
     if warnings is not None and warning not in warnings:
         warnings.append(warning)
@@ -853,6 +912,7 @@ def _generation_usage_record(
     *,
     role: str,
     phase: str,
+    requested_reasoning_effort: str | None,
     attempt_index: int,
     retry: bool,
     accepted: bool | None,
@@ -862,6 +922,7 @@ def _generation_usage_record(
     record: dict[str, Any] = {
         "role": role,
         "phase": phase,
+        "requested_reasoning_effort": requested_reasoning_effort,
         "response_index": response_index,
         "attempt_index": attempt_index,
         "retry": retry,
@@ -876,7 +937,10 @@ def _generation_usage_record(
 
 
 def _per_generation_usage(
-    sample: object, *, warnings: list[str] | None = None
+    sample: object,
+    *,
+    requested_reasoning_effort: str | None = None,
+    warnings: list[str] | None = None,
 ) -> dict[str, list[dict[str, Any]]]:
     """Return safe usage metadata for every candidate/stakeholder ModelEvent."""
     stakeholder_details: dict[int, dict[str, Any]] = {}
@@ -908,6 +972,7 @@ def _per_generation_usage(
                     event,
                     role="stakeholder",
                     phase=phase,
+                    requested_reasoning_effort=requested_reasoning_effort,
                     response_index=response_index,
                     attempt_index=attempt_index,
                     retry=explicit_retry or attempt_index > 1,
@@ -937,6 +1002,7 @@ def _per_generation_usage(
                 event,
                 role="candidate",
                 phase="unknown",
+                requested_reasoning_effort=None,
                 response_index=None,
                 attempt_index=candidate_index,
                 retry=explicit_retry,
@@ -1249,8 +1315,18 @@ def _run_summary(log: EvalLog, sample: object, source_name: str) -> dict[str, An
     eval_id = _text(getattr(log.eval, "eval_id", None)) or None
     run_id = _text(getattr(log.eval, "run_id", None)) or None
     failure_class = classify_failure(log, sample, protocol, primary_evaluation)
+    generation_parameters = _generation_parameters(log, sample)
+    requested_reasoning_effort = generation_parameters["stakeholder"].get(
+        "reasoning_effort"
+    )
+    if not isinstance(requested_reasoning_effort, str):
+        requested_reasoning_effort = None
     usage_warnings: list[str] = []
-    generation_usage = _per_generation_usage(sample, warnings=usage_warnings)
+    generation_usage = _per_generation_usage(
+        sample,
+        requested_reasoning_effort=requested_reasoning_effort,
+        warnings=usage_warnings,
+    )
     usage = _usage_by_role(
         sample,
         candidate_model,
@@ -1277,6 +1353,7 @@ def _run_summary(log: EvalLog, sample: object, source_name: str) -> dict[str, An
             "scenario_id": scenario_id,
             "candidate_model": candidate_model,
             "stakeholder_model": stakeholder_model,
+            "requested_reasoning_effort": requested_reasoning_effort,
             "stakeholder_profile_id": _profile_identifier(sample),
             "stakeholder_seed": seed,
             "eval_id": eval_id,
@@ -1290,7 +1367,10 @@ def _run_summary(log: EvalLog, sample: object, source_name: str) -> dict[str, An
             "epoch": _int_or_none(getattr(sample, "epoch", None)),
             "run_index": _run_index(log, sample),
             "limits": _limit_parameters(log, sample),
-            "generation_parameters": _generation_parameters(log, sample),
+            "generation_parameters": generation_parameters,
+            "reasoning_capability_metadata": _reasoning_capability_metadata(
+                log, sample
+            ),
         },
         "protocol": protocol,
         "primary_evaluation": primary_evaluation,
@@ -1565,6 +1645,9 @@ def aggregate_run_summaries(runs: Sequence[Mapping[str, Any]]) -> dict[str, Any]
     aggregate["by_scenario"] = _grouped(run_list, "scenario_id")
     aggregate["by_candidate_model"] = _grouped(run_list, "candidate_model")
     aggregate["by_stakeholder_model"] = _grouped(run_list, "stakeholder_model")
+    aggregate["by_requested_reasoning_effort"] = _grouped(
+        run_list, "requested_reasoning_effort"
+    )
     return aggregate
 
 
