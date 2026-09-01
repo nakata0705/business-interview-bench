@@ -28,8 +28,16 @@ from business_interview.evaluation import PrimaryEvaluation
 from business_interview.scenarios import get_scenario
 from business_interview.stakeholders import StakeholderProfile, project_knowledge
 
-SUMMARY_SCHEMA_VERSION = 2
-_USAGE_FIELDS = ("input_tokens", "output_tokens", "total_tokens", "total_cost")
+SUMMARY_SCHEMA_VERSION = 3
+_USAGE_FIELDS = (
+    "input_tokens",
+    "output_tokens",
+    "reasoning_tokens",
+    "total_tokens",
+    "total_cost",
+)
+_DERIVED_USAGE_FIELDS = ("non_reasoning_output_tokens",)
+_ALL_USAGE_FIELDS = (*_USAGE_FIELDS, *_DERIVED_USAGE_FIELDS)
 # Keep the run-config renderer aligned with the installed Inspect schema rather
 # than maintaining a second, incomplete list of GenerateConfig fields.
 _GENERATION_FIELDS = frozenset(GenerateConfig.model_fields)
@@ -387,26 +395,86 @@ def _generation_parameters(
     return {"candidate": candidate, "stakeholder": stakeholder}
 
 
+def _append_usage_warning(warnings: list[str] | None, warning: str) -> None:
+    if warnings is not None and warning not in warnings:
+        warnings.append(warning)
+
+
+def _finalize_usage(
+    result: dict[str, Any], *, warnings: list[str] | None = None
+) -> dict[str, Any]:
+    output_tokens = result.get("output_tokens")
+    reasoning_tokens = result.get("reasoning_tokens")
+    non_reasoning_output_tokens: int | float | None = None
+    reasoning_share: float | None = None
+    has_negative_token = any(
+        value is not None and value < 0
+        for field in (
+            "input_tokens",
+            "output_tokens",
+            "reasoning_tokens",
+            "total_tokens",
+        )
+        for value in (result.get(field),)
+    )
+    has_inverted_accounting = (
+        output_tokens is not None
+        and reasoning_tokens is not None
+        and reasoning_tokens > output_tokens
+    )
+    if has_negative_token or has_inverted_accounting:
+        _append_usage_warning(warnings, "invalid_reasoning_token_accounting")
+    elif output_tokens is not None and reasoning_tokens is not None:
+        non_reasoning_output_tokens = output_tokens - reasoning_tokens
+        if output_tokens > 0:
+            reasoning_share = reasoning_tokens / output_tokens
+    result["non_reasoning_output_tokens"] = non_reasoning_output_tokens
+    result["reasoning_share"] = reasoning_share
+    return result
+
+
 def _empty_usage() -> dict[str, Any]:
-    return {field: None for field in _USAGE_FIELDS}
+    return {field: None for field in (*_ALL_USAGE_FIELDS, "reasoning_share")}
 
 
-def _usage(value: object) -> dict[str, Any]:
+def _usage(value: object, *, warnings: list[str] | None = None) -> dict[str, Any]:
     payload = _as_mapping(value)
-    return {field: _numeric_or_none(payload.get(field)) for field in _USAGE_FIELDS}
+    result = {field: _numeric_or_none(payload.get(field)) for field in _USAGE_FIELDS}
+    return _finalize_usage(result, warnings=warnings)
 
 
-def _sum_usage(values: Sequence[dict[str, Any]]) -> dict[str, Any]:
+def _sum_usage(
+    values: Sequence[dict[str, Any]], *, warnings: list[str] | None = None
+) -> dict[str, Any]:
     if not values:
         return _empty_usage()
     result: dict[str, Any] = {}
     for field in _USAGE_FIELDS:
-        present = [value[field] for value in values if value[field] is not None]
+        present: list[int | float] = []
+        for value in values:
+            numeric = _numeric_or_none(value.get(field))
+            if numeric is not None:
+                present.append(numeric)
         result[field] = sum(present) if len(present) == len(values) else None
-    return result
+    return _finalize_usage(result, warnings=warnings)
 
 
-def _event_usages(sample: object, *, stakeholder: bool) -> list[dict[str, Any]]:
+def _event_usage(event: object, *, warnings: list[str] | None = None) -> dict[str, Any]:
+    output = getattr(event, "output", None)
+    output_payload = _as_mapping(output)
+    output_usage = getattr(output, "usage", None)
+    raw_usage = (
+        output_usage if output_usage is not None else output_payload.get("usage")
+    )
+    return _usage(raw_usage, warnings=warnings)
+
+
+def _event_usages(
+    sample: object,
+    *,
+    stakeholder: bool,
+    warnings: list[str] | None = None,
+) -> list[dict[str, Any]]:
     values: list[dict[str, Any]] = []
     for event in _events(sample):
         if not _is_model_event(event):
@@ -414,60 +482,69 @@ def _event_usages(sample: object, *, stakeholder: bool) -> list[dict[str, Any]]:
         is_stakeholder = getattr(event, "role", None) == "stakeholder"
         if is_stakeholder != stakeholder:
             continue
-        output = getattr(event, "output", None)
-        output_payload = _as_mapping(output)
-        output_usage = getattr(output, "usage", None)
-        values.append(_usage(output_usage or output_payload.get("usage")))
+        values.append(_event_usage(event, warnings=warnings))
     return values
 
 
 def _subtract_usage(
-    total: dict[str, Any], stakeholder: dict[str, Any]
+    total: dict[str, Any],
+    stakeholder: dict[str, Any],
+    *,
+    warnings: list[str] | None = None,
 ) -> dict[str, Any]:
     result: dict[str, Any] = {}
     for field in _USAGE_FIELDS:
-        left = total[field]
-        right = stakeholder[field]
+        left = total.get(field)
+        right = stakeholder.get(field)
         result[field] = left - right if left is not None and right is not None else None
-    return result
+    return _finalize_usage(result, warnings=warnings)
 
 
 def _usage_by_role(
     sample: object,
     candidate_model: str | None,
     stakeholder_model: str | None,
+    *,
+    warnings: list[str] | None = None,
 ) -> dict[str, dict[str, Any]]:
     model_usage = _as_mapping(getattr(sample, "model_usage", None))
     role_usage = _as_mapping(getattr(sample, "role_usage", None))
-    candidate_event_usage = _event_usages(sample, stakeholder=False)
+    candidate_event_usage = _event_usages(sample, stakeholder=False, warnings=warnings)
     candidate = (
-        _sum_usage(candidate_event_usage) if candidate_event_usage else _empty_usage()
+        _sum_usage(candidate_event_usage, warnings=warnings)
+        if candidate_event_usage
+        else _empty_usage()
     )
     if "stakeholder" in role_usage:
-        stakeholder = _usage(role_usage["stakeholder"])
+        stakeholder = _usage(role_usage["stakeholder"], warnings=warnings)
     else:
-        stakeholder_event_usage = _event_usages(sample, stakeholder=True)
+        stakeholder_event_usage = _event_usages(
+            sample, stakeholder=True, warnings=warnings
+        )
         stakeholder = (
-            _sum_usage(stakeholder_event_usage)
+            _sum_usage(stakeholder_event_usage, warnings=warnings)
             if stakeholder_event_usage
             else (
-                _usage(model_usage[stakeholder_model])
+                _usage(model_usage[stakeholder_model], warnings=warnings)
                 if stakeholder_model is not None and stakeholder_model in model_usage
                 else _empty_usage()
             )
         )
     if not candidate_event_usage and candidate_model is not None:
         if candidate_model in model_usage:
-            candidate_total = _usage(model_usage[candidate_model])
+            candidate_total = _usage(model_usage[candidate_model], warnings=warnings)
             candidate = (
-                _subtract_usage(candidate_total, stakeholder)
+                _subtract_usage(candidate_total, stakeholder, warnings=warnings)
                 if candidate_model == stakeholder_model
                 else candidate_total
             )
     total = (
-        _sum_usage([_usage(value) for value in model_usage.values()])
+        _sum_usage(
+            [_usage(value, warnings=warnings) for value in model_usage.values()],
+            warnings=warnings,
+        )
         if model_usage
-        else _sum_usage([candidate, stakeholder])
+        else _sum_usage([candidate, stakeholder], warnings=warnings)
     )
     return {"candidate": candidate, "stakeholder": stakeholder, "total": total}
 
@@ -702,37 +779,236 @@ def _is_retry_attempt(event: object) -> bool:
     return _RETRY_PROMPT_MARKER in _event_input_text(event).lower()
 
 
-def _stakeholder_attempt_diagnostics(sample: object) -> dict[str, int]:
-    stakeholder_events = [
-        event
-        for event in _events(sample)
-        if _is_model_event(event) and getattr(event, "role", None) == "stakeholder"
-    ]
+def _stakeholder_attempt_groups(sample: object) -> list[dict[str, list[object]]]:
+    """Group stakeholder WHAT/HOW generations into response attempts.
+
+    Inspect may omit the adapter's phase prompt from logged inputs when the
+    provider serializes messages as attachments. In that case, JSON shape and
+    whether a candidate generation occurred since the last stakeholder event
+    distinguish a semantic retry from the next interview response.
+    """
     groups: list[dict[str, list[object]]] = []
     current: dict[str, list[object]] | None = None
-    retry_markers = 0
+    candidate_since_last_stakeholder = False
 
-    for event in stakeholder_events:
+    for event in _events(sample):
+        if not _is_model_event(event):
+            continue
+        if getattr(event, "role", None) != "stakeholder":
+            candidate_since_last_stakeholder = True
+            continue
+
         phase = _stakeholder_attempt_phase(event)
         if phase is None:
-            # ModelEvent input normally carries the phase marker. For a
-            # lightweight fake log, infer the first unlabelled call as WHAT
-            # and subsequent calls after a plan as HOW.
-            phase = "realization" if current is not None and current["plan"] else "plan"
+            if current is None or not current["plan"]:
+                phase = "plan"
+            elif not current["realization"]:
+                phase = "realization"
+            elif candidate_since_last_stakeholder:
+                phase = "plan"
+            else:
+                phase = "realization"
         if phase == "plan" and current is not None and current["realization"]:
             groups.append(current)
             current = None
         if current is None:
             current = {"plan": [], "realization": []}
         current[phase].append(event)
-        try:
-            is_retry = _is_retry_attempt(event)
-        except (AttributeError, TypeError):
-            is_retry = False
-        if is_retry:
-            retry_markers += 1
+        candidate_since_last_stakeholder = False
+
     if current is not None:
         groups.append(current)
+    return groups
+
+
+def _visible_completion_chars(event: object) -> int | None:
+    output = getattr(event, "output", None)
+    completion = getattr(output, "completion", None)
+    if isinstance(completion, str):
+        return len(completion)
+    completion = _as_mapping(output).get("completion")
+    return len(completion) if isinstance(completion, str) else None
+
+
+def _visible_completion_estimated_tokens(event: object) -> int | None:
+    """Read an explicitly provider-reported visible-token field, if present.
+
+    Inspect's standard ``ModelUsage.output_tokens`` includes reasoning tokens
+    and therefore is not treated as a visible-completion estimate.
+    """
+    output = getattr(event, "output", None)
+    output_payload = _as_mapping(output)
+    sources = [output_payload, _as_mapping(output_payload.get("metadata"))]
+    usage = getattr(output, "usage", None)
+    sources.append(_as_mapping(usage))
+    for source in sources:
+        value = source.get("visible_completion_tokens")
+        if isinstance(value, int) and not isinstance(value, bool) and value >= 0:
+            return value
+    return None
+
+
+def _generation_usage_record(
+    event: object,
+    *,
+    role: str,
+    phase: str,
+    attempt_index: int,
+    retry: bool,
+    accepted: bool | None,
+    response_index: int | None,
+    warnings: list[str] | None,
+) -> dict[str, Any]:
+    record: dict[str, Any] = {
+        "role": role,
+        "phase": phase,
+        "response_index": response_index,
+        "attempt_index": attempt_index,
+        "retry": retry,
+        "accepted": accepted,
+    }
+    record.update(_event_usage(event, warnings=warnings))
+    record["visible_completion_chars"] = _visible_completion_chars(event)
+    record["visible_completion_estimated_tokens"] = (
+        _visible_completion_estimated_tokens(event)
+    )
+    return record
+
+
+def _per_generation_usage(
+    sample: object, *, warnings: list[str] | None = None
+) -> dict[str, list[dict[str, Any]]]:
+    """Return safe usage metadata for every candidate/stakeholder ModelEvent."""
+    stakeholder_details: dict[int, dict[str, Any]] = {}
+    accepted_count = len(_accepted_stakeholder_entries(sample))
+    for response_index, group in enumerate(_stakeholder_attempt_groups(sample), 1):
+        response_accepted = response_index <= accepted_count
+        for phase in ("plan", "realization"):
+            attempts = group[phase]
+            for attempt_index, event in enumerate(attempts, 1):
+                event_is_valid = not _event_error(event)
+                if phase == "plan":
+                    accepted = (
+                        event_is_valid
+                        and bool(group["realization"])
+                        and attempt_index == len(attempts)
+                    )
+                else:
+                    accepted = (
+                        event_is_valid
+                        and response_accepted
+                        and attempt_index == len(attempts)
+                    )
+                explicit_retry = False
+                try:
+                    explicit_retry = _is_retry_attempt(event)
+                except (AttributeError, TypeError):
+                    explicit_retry = False
+                stakeholder_details[id(event)] = _generation_usage_record(
+                    event,
+                    role="stakeholder",
+                    phase=phase,
+                    response_index=response_index,
+                    attempt_index=attempt_index,
+                    retry=explicit_retry or attempt_index > 1,
+                    accepted=accepted,
+                    warnings=warnings,
+                )
+
+    candidate_records: list[dict[str, Any]] = []
+    stakeholder_records: list[dict[str, Any]] = []
+    candidate_index = 0
+    for event in _events(sample):
+        if not _is_model_event(event):
+            continue
+        if getattr(event, "role", None) == "stakeholder":
+            record = stakeholder_details.get(id(event))
+            if record is not None:
+                stakeholder_records.append(record)
+            continue
+        candidate_index += 1
+        explicit_retry = False
+        try:
+            explicit_retry = _is_retry_attempt(event)
+        except (AttributeError, TypeError):
+            explicit_retry = False
+        candidate_records.append(
+            _generation_usage_record(
+                event,
+                role="candidate",
+                phase="unknown",
+                response_index=None,
+                attempt_index=candidate_index,
+                retry=explicit_retry,
+                accepted=None,
+                warnings=warnings,
+            )
+        )
+    return {"candidate": candidate_records, "stakeholder": stakeholder_records}
+
+
+def _strict_generation_sum(
+    records: Sequence[Mapping[str, Any]], field: str
+) -> int | float | None:
+    if not records:
+        return None
+    values: list[int | float] = []
+    for record in records:
+        value = _numeric_or_none(record.get(field))
+        if value is None:
+            return None
+        values.append(value)
+    return sum(values)
+
+
+def _stakeholder_attempt_usage_diagnostics(
+    records: Sequence[Mapping[str, Any]],
+) -> dict[str, int | float | None]:
+    """Split stakeholder usage by phase acceptance and inferred retry status."""
+    accepted = [
+        record
+        for record in records
+        if isinstance(record.get("accepted"), bool) and record.get("accepted")
+    ]
+    rejected = [
+        record
+        for record in records
+        if isinstance(record.get("accepted"), bool) and not record.get("accepted")
+    ]
+    retries = [record for record in records if bool(record.get("retry"))]
+    result: dict[str, int | float | None] = {
+        "stakeholder_accepted_attempt_count": len(accepted),
+        "stakeholder_rejected_attempt_count": len(rejected),
+        "stakeholder_retry_attempt_count": len(retries),
+    }
+    fields = (
+        "output_tokens",
+        "reasoning_tokens",
+        "non_reasoning_output_tokens",
+        "total_tokens",
+        "visible_completion_chars",
+    )
+    for label, selected in (
+        ("accepted", accepted),
+        ("rejected", rejected),
+        ("retry", retries),
+    ):
+        for field in fields:
+            result[f"stakeholder_{field}_on_{label}_attempts"] = _strict_generation_sum(
+                selected, field
+            )
+    return result
+
+
+def _stakeholder_attempt_diagnostics(sample: object) -> dict[str, int]:
+    groups = _stakeholder_attempt_groups(sample)
+    retry_markers = sum(
+        1
+        for event in _events(sample)
+        if _is_model_event(event)
+        and getattr(event, "role", None) == "stakeholder"
+        and _is_retry_attempt(event)
+    )
 
     accepted_count = len(_accepted_stakeholder_entries(sample))
     plan_attempt_count = sum(len(group["plan"]) for group in groups)
@@ -875,10 +1151,18 @@ def classify_failure(
         return "completed"
 
     reason = _text(protocol.get("failure_reason"))
+    if reason == "candidate_did_not_ask_question":
+        return "candidate_did_not_ask_question"
     if reason == "candidate_step_limit_exhausted":
         return "candidate_step_limit"
     if reason in {"max_turns_exhausted", "max_interview_turns_exhausted"}:
         return "interview_turn_limit"
+
+    # Runtime terminal reasons take precedence over incidental provider/tool
+    # events; those events remain available in the separate error counters.
+    reason_classification = _classify_error_text("reason", None, reason)
+    if reason_classification is not None:
+        return reason_classification
 
     records = _error_records(log, sample)
     all_errors = " ".join(text for _, _, text in records)
@@ -888,10 +1172,6 @@ def classify_failure(
         classification = _classify_error_text(event_type, role, text)
         if classification is not None:
             return classification
-
-    reason_classification = _classify_error_text("reason", None, reason)
-    if reason_classification is not None:
-        return reason_classification
 
     authoritative_completion = _authoritative_completion_flag(
         protocol, primary_evaluation
@@ -969,10 +1249,21 @@ def _run_summary(log: EvalLog, sample: object, source_name: str) -> dict[str, An
     eval_id = _text(getattr(log.eval, "eval_id", None)) or None
     run_id = _text(getattr(log.eval, "run_id", None)) or None
     failure_class = classify_failure(log, sample, protocol, primary_evaluation)
+    usage_warnings: list[str] = []
+    generation_usage = _per_generation_usage(sample, warnings=usage_warnings)
+    usage = _usage_by_role(
+        sample,
+        candidate_model,
+        stakeholder_model,
+        warnings=usage_warnings,
+    )
     diagnostics = {
         "failure_class": failure_class,
         **_error_diagnostics(sample),
         **_empty_plan_diagnostics(sample),
+        **_stakeholder_attempt_usage_diagnostics(generation_usage["stakeholder"]),
+        "usage_warning_count": len(usage_warnings),
+        "usage_warnings": usage_warnings,
     }
     tags = _quality_tags(primary_evaluation)
     if failure_class == "completed" and diagnostics["recoverable_tool_error_count"] > 0:
@@ -1003,7 +1294,8 @@ def _run_summary(log: EvalLog, sample: object, source_name: str) -> dict[str, An
         },
         "protocol": protocol,
         "primary_evaluation": primary_evaluation,
-        "usage": _usage_by_role(sample, candidate_model, stakeholder_model),
+        "usage": usage,
+        "generation_usage": generation_usage,
         "diagnostics": diagnostics,
         "source": {"file_name": source_name},
     }
@@ -1096,15 +1388,32 @@ def _aggregate_usage(runs: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
     for role in ("candidate", "stakeholder", "total"):
         values = [_usage(_as_mapping(run.get("usage")).get(role)) for run in runs]
         costs = [value["total_cost"] for value in values]
+        output_tokens = _sum_usage_field(values, "output_tokens")
+        reasoning_tokens = _sum_usage_field(values, "reasoning_tokens")
         aggregate[role] = {
             "known_run_count": sum(
                 any(value is not None for value in usage.values()) for usage in values
             ),
             "input_tokens": _sum_usage_field(values, "input_tokens"),
-            "output_tokens": _sum_usage_field(values, "output_tokens"),
+            "output_tokens": output_tokens,
+            "reasoning_tokens": reasoning_tokens,
+            "non_reasoning_output_tokens": _sum_usage_field(
+                values, "non_reasoning_output_tokens"
+            ),
             "total_tokens": _sum_usage_field(values, "total_tokens"),
+            "reasoning_share": (
+                reasoning_tokens / output_tokens
+                if reasoning_tokens is not None and output_tokens
+                else None
+            ),
             "mean_input_tokens": _mean(_numeric_values(values, "input_tokens")),
             "mean_output_tokens": _mean(_numeric_values(values, "output_tokens")),
+            "mean_reasoning_tokens": _mean(_numeric_values(values, "reasoning_tokens")),
+            "mean_non_reasoning_output_tokens": _mean(
+                _numeric_values(values, "non_reasoning_output_tokens")
+            ),
+            "mean_total_tokens": _mean(_numeric_values(values, "total_tokens")),
+            "mean_reasoning_share": _mean(_numeric_values(values, "reasoning_share")),
             # Cost is null unless every input run has provider-reported cost.
             "total_cost": (
                 sum(costs)
@@ -1113,9 +1422,49 @@ def _aggregate_usage(runs: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
                 and all(cost is not None for cost in costs)
                 else None
             ),
-            "mean_total_tokens": _mean(_numeric_values(values, "total_tokens")),
+            "mean_total_cost": _mean(_numeric_values(values, "total_cost")),
         }
     return aggregate
+
+
+def _aggregate_attempt_diagnostics(
+    runs: Sequence[Mapping[str, Any]],
+) -> dict[str, Any]:
+    fields = (
+        "stakeholder_accepted_attempt_count",
+        "stakeholder_rejected_attempt_count",
+        "stakeholder_retry_attempt_count",
+        "stakeholder_output_tokens_on_accepted_attempts",
+        "stakeholder_output_tokens_on_rejected_attempts",
+        "stakeholder_output_tokens_on_retry_attempts",
+        "stakeholder_reasoning_tokens_on_accepted_attempts",
+        "stakeholder_reasoning_tokens_on_rejected_attempts",
+        "stakeholder_reasoning_tokens_on_retry_attempts",
+        "stakeholder_non_reasoning_output_tokens_on_accepted_attempts",
+        "stakeholder_non_reasoning_output_tokens_on_rejected_attempts",
+        "stakeholder_non_reasoning_output_tokens_on_retry_attempts",
+        "stakeholder_total_tokens_on_accepted_attempts",
+        "stakeholder_total_tokens_on_rejected_attempts",
+        "stakeholder_total_tokens_on_retry_attempts",
+        "stakeholder_visible_completion_chars_on_accepted_attempts",
+        "stakeholder_visible_completion_chars_on_rejected_attempts",
+        "stakeholder_visible_completion_chars_on_retry_attempts",
+    )
+    result: dict[str, Any] = {}
+    for field in fields:
+        result[f"total_{field}"] = _diagnostic_total(runs, field)
+        result[f"mean_{field}"] = _mean(_diagnostic_values(runs, field))
+    warning_codes = {
+        warning
+        for run in runs
+        for warning in _as_sequence(
+            _as_mapping(run.get("diagnostics")).get("usage_warnings")
+        )
+        if isinstance(warning, str)
+    }
+    result["usage_warning_count"] = _diagnostic_total(runs, "usage_warning_count")
+    result["usage_warnings"] = sorted(warning_codes)
+    return result
 
 
 def _aggregate_base(runs: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
@@ -1195,6 +1544,7 @@ def _aggregate_base(runs: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
         "accepted_unannotated_response_rate": _accepted_response_rate(
             runs, "accepted_response_with_text_but_no_annotations_count"
         ),
+        **_aggregate_attempt_diagnostics(runs),
         "usage": _aggregate_usage(runs),
     }
 

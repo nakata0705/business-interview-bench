@@ -200,7 +200,7 @@ def test_phase14_calibration_config_has_three_reproducible_runs() -> None:
 def test_phase14_summary_preserves_scores_usage_and_safe_provenance(tmp_path) -> None:
     log_path = _eval_live_task(tmp_path)
     summary = summarize_eval_log(log_path)
-    assert summary["schema_version"] == 2
+    assert summary["schema_version"] == 3
     assert len(summary["runs"]) == 1
     run = summary["runs"][0]
     assert run["run"] == {
@@ -247,7 +247,18 @@ def test_phase14_summary_preserves_scores_usage_and_safe_provenance(tmp_path) ->
     assert run["diagnostics"]["semantic_retry_count"] == 0
     assert run["usage"]["candidate"]["total_tokens"] is not None
     assert run["usage"]["stakeholder"]["total_tokens"] is not None
+    assert run["usage"]["stakeholder"]["reasoning_tokens"] is None
+    assert run["usage"]["stakeholder"]["non_reasoning_output_tokens"] is None
+    assert run["usage"]["stakeholder"]["reasoning_share"] is None
     assert run["usage"]["total"]["total_cost"] is None
+    assert len(run["generation_usage"]["candidate"]) == 2
+    assert len(run["generation_usage"]["stakeholder"]) == 2
+    assert run["generation_usage"]["stakeholder"][0]["phase"] == "plan"
+    assert run["generation_usage"]["stakeholder"][0]["visible_completion_chars"] > 0
+    assert (
+        run["generation_usage"]["stakeholder"][0]["visible_completion_estimated_tokens"]
+        is None
+    )
 
     serialized = json.dumps(summary, ensure_ascii=False, sort_keys=True)
     assert "stakeholder_knowledge" not in serialized
