@@ -22,6 +22,7 @@ from inspect_ai.model import (
     ResponseSchema,
     get_model,
 )
+from inspect_ai.util import JSONSchema
 
 from business_interview.runtime import SemanticLedger
 from business_interview.scenarios import StakeholderPrompt
@@ -72,7 +73,7 @@ _REALIZATION_INSTRUCTION = (
 
 def _inspect_json_schema(
     model: type[SemanticResponsePlan] | type[StakeholderResponse],
-) -> dict[str, object]:
+) -> JSONSchema:
     """Inline Pydantic definitions into Inspect's portable JSONSchema type."""
     raw_schema = model.model_json_schema()
     definitions = raw_schema.get("$defs", {})
@@ -122,7 +123,7 @@ def _inspect_json_schema(
                 result[key] = value
         return result
 
-    return inline(raw_schema)
+    return JSONSchema.model_validate(inline(raw_schema))
 
 
 # Inspect passes these schemas to OpenAI-compatible providers as the native
