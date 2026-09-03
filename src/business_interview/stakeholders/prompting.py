@@ -11,6 +11,7 @@ from .knowledge import (
     StakeholderKnowledgeGraph,
     is_dont_know,
 )
+from .response import canonical_semantic_mode
 
 _NODE_PROPERTIES = ("activity", "actor", "system", "rationale", "reads", "writes")
 
@@ -54,13 +55,20 @@ def _render_node(graph: StakeholderKnowledgeGraph, node_id: str) -> str:
         attributes.append('structural="true"')
         return f"<position {' '.join(attributes)}/>"
 
-    attributes.insert(0, f'semantic_id="node:{_text(node_id)}"')
+    node_semantic_id = f"node:{node_id}"
+    attributes = [
+        f'semantic_id="{_text(node_semantic_id)}"',
+        f'required_mode="{canonical_semantic_mode(graph, node_semantic_id)}"',
+        *attributes,
+    ]
     lines = [f"<position {' '.join(attributes)}>"]
     for property_name in _NODE_PROPERTIES:
         semantic_id = f"node:{node_id}:{property_name}"
         value = node.slot_value(property_name)
         lines.append(
-            f'  <slot semantic_id="{_text(semantic_id)}" {_slot_state(value)}/>'
+            f'  <slot semantic_id="{_text(semantic_id)}" '
+            f'required_mode="{canonical_semantic_mode(graph, semantic_id)}" '
+            f"{_slot_state(value)}/>"
         )
         if property_name in ("reads", "writes") and isinstance(value, (tuple, list)):
             for ref in value:
@@ -68,7 +76,9 @@ def _render_node(graph: StakeholderKnowledgeGraph, node_id: str) -> str:
                     element_id = f"{semantic_id}:{ref.concept_id}"
                     lines.append(
                         f'  <element semantic_id="{_text(element_id)}" '
-                        f'concept_id="{_text(ref.concept_id)}" state="value"/>'
+                        f'concept_id="{_text(ref.concept_id)}" '
+                        f'required_mode="{canonical_semantic_mode(graph, element_id)}" '
+                        'state="value"/>'
                     )
     lines.append("</position>")
     return "\n".join(lines)
@@ -91,12 +101,15 @@ def _render_edge(graph: StakeholderKnowledgeGraph, edge_id: str) -> str:
             f'kind="{_text(edge.edge_kind)}" structural="true"/>'
         )
     semantic_id = f"edge:{edge_id}"
+    condition_id = f"{semantic_id}:condition"
     lines = [
         f'<relation semantic_id="{_text(semantic_id)}" '
+        f'required_mode="{canonical_semantic_mode(graph, semantic_id)}" '
         f'from="{_text(_endpoint(graph, edge.from_node))}" '
         f'to="{_text(_endpoint(graph, edge.to_node))}" '
         f'kind="{_text(edge.edge_kind)}">',
-        f'  <slot semantic_id="{_text(semantic_id)}:condition" '
+        f'  <slot semantic_id="{_text(condition_id)}" '
+        f'required_mode="{canonical_semantic_mode(graph, condition_id)}" '
         f"{_slot_state(edge.condition)}/>",
         "</relation>",
     ]
@@ -116,7 +129,11 @@ def _render_concept(graph: StakeholderKnowledgeGraph, concept_id: str) -> str:
         if not isinstance(terms_value, tuple):
             raise TypeError("invalid knowledge concept terms")
         terms = f'terms="{_text(",".join(terms_value))}"'
-    return f'<concept semantic_id="{_text(concept_id)}" {description} {terms}/>'
+    return (
+        f'<concept semantic_id="{_text(concept_id)}" '
+        f'required_mode="{canonical_semantic_mode(graph, concept_id)}" '
+        f"{description} {terms}/>"
+    )
 
 
 def render_knowledge_prompt(
@@ -141,7 +158,9 @@ def render_knowledge_prompt(
     return (
         "You are a stakeholder. Use only the private knowledge below. "
         "Local semantic IDs are private annotation handles and must never "
-        "appear in the public message. Do not invent unknown values.\n"
+        "appear in the public message. Do not invent unknown values. "
+        "Every selectable semantic_id includes its canonical required_mode; "
+        "copy that mode exactly when planning an assertion.\n"
         "<private_knowledge>\n"
         "<positions>\n"
         f"{positions}\n"

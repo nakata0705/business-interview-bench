@@ -238,14 +238,16 @@ def test_valid_plan_is_accepted() -> None:
     ],
 )
 def test_wrong_plan_mode_is_rejected(semantic_id: str, mode: str) -> None:
-    with pytest.raises(ResponseValidationError, match="requires"):
+    with pytest.raises(ResponseValidationError, match="requires") as error:
         validate_response_plan(_knowledge(), _plan((semantic_id, mode)))
+    assert error.value.code == "canonical_mode_mismatch"
 
 
 def test_unknown_and_truth_only_ids_are_rejected() -> None:
     for semantic_id in ("node:missing", "node:truth_node_secret", "truth_activity"):
-        with pytest.raises(ResponseValidationError, match="not resolvable"):
+        with pytest.raises(ResponseValidationError, match="not resolvable") as error:
             validate_response_plan(_knowledge(), _plan((semantic_id, "exists")))
+        assert error.value.code == "unresolvable_semantic_address"
 
 
 def test_empty_plan_and_empty_annotations_are_allowed() -> None:
@@ -350,12 +352,13 @@ def test_annotation_mode_must_match_knowledge() -> None:
             quote="I do not know",
         ),
     )
-    with pytest.raises(ResponseValidationError, match="requires 'dont_know'"):
+    with pytest.raises(ResponseValidationError, match="requires 'dont_know'") as error:
         validate_stakeholder_response(
             _knowledge(),
             _plan(("node:skn_001:system", "dont_know")),
             response,
         )
+    assert error.value.code == "canonical_mode_mismatch"
 
 
 def test_public_message_cannot_leak_local_handles_but_allows_truth_words() -> None:
@@ -563,6 +566,13 @@ def test_prompt_renders_only_local_knowledge_and_distinguishes_slot_states() -> 
     assert 'state="value"' in prompt
     assert 'state="absent"' in prompt
     assert 'state="dont_know"' in prompt
+    assert 'semantic_id="node:skn_001" required_mode="exists"' in prompt
+    assert 'semantic_id="node:skn_001:activity" required_mode="value"' in prompt
+    assert 'semantic_id="node:skn_001:actor" required_mode="absent"' in prompt
+    assert 'semantic_id="node:skn_001:system" required_mode="dont_know"' in prompt
+    assert 'semantic_id="edge:ske_001" required_mode="exists"' in prompt
+    assert 'semantic_id="edge:ske_001:condition" required_mode="value"' in prompt
+    assert 'semantic_id="skc_activity" required_mode="mention"' in prompt
     assert "truth_node_secret" not in prompt
     assert "truth_edge_secret" not in prompt
     assert "truth_activity" not in prompt

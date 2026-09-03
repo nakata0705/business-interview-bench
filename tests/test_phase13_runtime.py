@@ -188,6 +188,7 @@ def test_live_ingestion_is_atomic_and_preserves_public_provenance() -> None:
     assert observation.text == response.message
     assert entry.observation_id == observation.id
     assert entry.public_message_turn == observation.turn
+    assert entry.plan == plan
     assert entry.annotations == response.annotations
     assert entry.alignments == response.alignments
     assert entry.terminology == response.terminology

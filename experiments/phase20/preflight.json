@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "phase": 20,
+  "status": "success",
+  "provider": "openrouter",
+  "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+  "scenario_id": "lab_sample_flow",
+  "question_scope": "the activity performed when a sample first arrives at the lab",
+  "structured_output_mode": "inspect_response_schema",
+  "provider_retries": 0,
+  "adapter_semantic_retry_bound": 3,
+  "accepted_public_response_count": 1,
+  "accepted_nonempty_plan_response_count": 1,
+  "accepted_annotated_response_count": 1,
+  "what_item_count": 9,
+  "how_annotation_count": 9,
+  "what_structural_rejection_count": 0,
+  "what_semantic_rejection_count": 0,
+  "how_structural_rejection_count": 0,
+  "how_semantic_rejection_count": 0,
+  "output_exhaustion_count": 0,
+  "provider_error_count": 0
+}

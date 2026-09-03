@@ -8,9 +8,9 @@ from __future__ import annotations
 
 import json
 import re
-from collections.abc import Mapping, Sequence
+from collections.abc import Sequence
 from dataclasses import dataclass, field
-from typing import Literal
+from typing import Literal, cast
 
 from inspect_ai.model import (
     ChatMessage,
@@ -22,7 +22,7 @@ from inspect_ai.model import (
     ResponseSchema,
     get_model,
 )
-from inspect_ai.util import JSONSchema
+from inspect_ai.util import json_schema
 
 from business_interview.runtime import SemanticLedger
 from business_interview.scenarios import StakeholderPrompt
@@ -33,6 +33,7 @@ from business_interview.stakeholders.knowledge import (
 from business_interview.stakeholders.prompting import render_knowledge_prompt
 from business_interview.stakeholders.response import (
     ResponseParseError,
+    ResponseValidationCode,
     ResponseValidationError,
     SemanticResponsePlan,
     StakeholderResponse,
@@ -48,9 +49,12 @@ _PLAN_INSTRUCTION = (
     "Choose only the semantic assertions supported by the private knowledge. "
     'Return only JSON in this shape: {"items": [{"semantic_id": "...", '
     '"mode": "value|absent|dont_know|exists|mention"}]} . '
-    "Use local IDs exactly as shown. Plan only what you will actually name or "
-    "realize in the answer; keep the plan focused on the question. An empty "
-    "plan is valid only when the answer carries no knowledge."
+    "Use local IDs exactly as shown. Copy the exact required_mode listed "
+    "beside each selected semantic_id; do not infer or substitute a mode. "
+    "Plan only what you will actually name or realize in the answer; keep the "
+    "plan focused on the question. For a knowledge-backed answer, choose one "
+    "or more relevant listed items; an empty plan is valid only when the answer "
+    "carries no knowledge."
 )
 _REALIZATION_INSTRUCTION = (
     "Return only JSON in this shape: {"
@@ -71,74 +75,20 @@ _REALIZATION_INSTRUCTION = (
 )
 
 
-def _inspect_json_schema(
-    model: type[SemanticResponsePlan] | type[StakeholderResponse],
-) -> JSONSchema:
-    """Inline Pydantic definitions into Inspect's portable JSONSchema type."""
-    raw_schema = model.model_json_schema()
-    definitions = raw_schema.get("$defs", {})
-    allowed = {
-        "type",
-        "format",
-        "description",
-        "default",
-        "enum",
-        "items",
-        "properties",
-        "additionalProperties",
-        "anyOf",
-        "required",
-        "pattern",
-        "minLength",
-        "maxLength",
-        "minimum",
-        "maximum",
-        "examples",
-    }
-
-    def inline(node: object) -> dict[str, object]:
-        if not isinstance(node, Mapping):
-            return {}
-        reference = node.get("$ref")
-        if isinstance(reference, str) and reference.startswith("#/$defs/"):
-            definition = definitions.get(reference.removeprefix("#/$defs/"))
-            if isinstance(definition, Mapping):
-                return inline(definition)
-        result: dict[str, object] = {}
-        for key, value in node.items():
-            if key not in allowed:
-                continue
-            if key == "properties" and isinstance(value, Mapping):
-                result[key] = {
-                    str(name): inline(property_schema)
-                    for name, property_schema in value.items()
-                }
-            elif key == "items":
-                result[key] = inline(value)
-            elif key == "anyOf" and isinstance(value, list):
-                result[key] = [inline(option) for option in value]
-            elif key == "additionalProperties" and isinstance(value, Mapping):
-                result[key] = inline(value)
-            else:
-                result[key] = value
-        return result
-
-    return JSONSchema.model_validate(inline(raw_schema))
-
-
 # Inspect passes these schemas to OpenAI-compatible providers as the native
-# ``response_format=json_schema`` request field.  ``strict=False`` keeps the
-# defaults for the optional sidecar arrays provider-compatible; deterministic
-# semantic validation below remains authoritative after parsing.
+# ``response_format=json_schema`` request field.  The official helper resolves
+# Pydantic definitions into Inspect's portable JSONSchema type. ``strict=False``
+# keeps the optional sidecar arrays provider-compatible; deterministic semantic
+# validation below remains authoritative after parsing.
 _PLAN_RESPONSE_SCHEMA = ResponseSchema(
     name="semantic_response_plan",
-    json_schema=_inspect_json_schema(SemanticResponsePlan),
+    json_schema=json_schema(SemanticResponsePlan),
     description="A private knowledge-backed plan of stakeholder assertions.",
     strict=False,
 )
 _RESPONSE_RESPONSE_SCHEMA = ResponseSchema(
     name="stakeholder_response",
-    json_schema=_inspect_json_schema(StakeholderResponse),
+    json_schema=json_schema(StakeholderResponse),
     description="A public stakeholder message with its private sidecar.",
     strict=False,
 )
@@ -159,8 +109,14 @@ class StakeholderAttemptDiagnostics:
 
     what_structural_rejections: int = 0
     what_semantic_rejections: int = 0
+    what_unresolvable_address_count: int = 0
+    what_mode_mismatch_count: int = 0
+    what_realization_semantic_mismatch_count: int = 0
     how_structural_rejections: int = 0
     how_semantic_rejections: int = 0
+    how_unresolvable_address_count: int = 0
+    how_mode_mismatch_count: int = 0
+    how_realization_semantic_mismatch_count: int = 0
     output_exhaustion_count: int = 0
     provider_error_count: int = 0
     retry_count: int = 0
@@ -171,6 +127,7 @@ class StakeholderAttemptDiagnostics:
         kind: StakeholderFailureKind,
         *,
         will_retry: bool,
+        semantic_code: ResponseValidationCode | None = None,
     ) -> None:
         if kind == "provider":
             self.provider_error_count += 1
@@ -185,10 +142,22 @@ class StakeholderAttemptDiagnostics:
                 self.what_structural_rejections += 1
             else:
                 self.what_semantic_rejections += 1
+                if semantic_code == "unresolvable_semantic_address":
+                    self.what_unresolvable_address_count += 1
+                elif semantic_code == "canonical_mode_mismatch":
+                    self.what_mode_mismatch_count += 1
+                elif semantic_code == "realization_semantic_mismatch":
+                    self.what_realization_semantic_mismatch_count += 1
         elif kind == "structural":
             self.how_structural_rejections += 1
         else:
             self.how_semantic_rejections += 1
+            if semantic_code == "unresolvable_semantic_address":
+                self.how_unresolvable_address_count += 1
+            elif semantic_code == "canonical_mode_mismatch":
+                self.how_mode_mismatch_count += 1
+            elif semantic_code == "realization_semantic_mismatch":
+                self.how_realization_semantic_mismatch_count += 1
         if will_retry:
             self.retry_count += 1
 
@@ -202,11 +171,33 @@ class StakeholderAttemptDiagnostics:
             what_semantic_rejections=(
                 self.what_semantic_rejections + other.what_semantic_rejections
             ),
+            what_unresolvable_address_count=(
+                self.what_unresolvable_address_count
+                + other.what_unresolvable_address_count
+            ),
+            what_mode_mismatch_count=(
+                self.what_mode_mismatch_count + other.what_mode_mismatch_count
+            ),
+            what_realization_semantic_mismatch_count=(
+                self.what_realization_semantic_mismatch_count
+                + other.what_realization_semantic_mismatch_count
+            ),
             how_structural_rejections=(
                 self.how_structural_rejections + other.how_structural_rejections
             ),
             how_semantic_rejections=(
                 self.how_semantic_rejections + other.how_semantic_rejections
+            ),
+            how_unresolvable_address_count=(
+                self.how_unresolvable_address_count
+                + other.how_unresolvable_address_count
+            ),
+            how_mode_mismatch_count=(
+                self.how_mode_mismatch_count + other.how_mode_mismatch_count
+            ),
+            how_realization_semantic_mismatch_count=(
+                self.how_realization_semantic_mismatch_count
+                + other.how_realization_semantic_mismatch_count
             ),
             output_exhaustion_count=(
                 self.output_exhaustion_count + other.output_exhaustion_count
@@ -221,8 +212,18 @@ class StakeholderAttemptDiagnostics:
         return {
             "what_structural_rejections": self.what_structural_rejections,
             "what_semantic_rejections": self.what_semantic_rejections,
+            "what_unresolvable_address_count": self.what_unresolvable_address_count,
+            "what_mode_mismatch_count": self.what_mode_mismatch_count,
+            "what_realization_semantic_mismatch_count": (
+                self.what_realization_semantic_mismatch_count
+            ),
             "how_structural_rejections": self.how_structural_rejections,
             "how_semantic_rejections": self.how_semantic_rejections,
+            "how_unresolvable_address_count": self.how_unresolvable_address_count,
+            "how_mode_mismatch_count": self.how_mode_mismatch_count,
+            "how_realization_semantic_mismatch_count": (
+                self.how_realization_semantic_mismatch_count
+            ),
             "output_exhaustion_count": self.output_exhaustion_count,
             "provider_error_count": self.provider_error_count,
             "retry_count": self.retry_count,
@@ -275,17 +276,21 @@ class _StakeholderAttemptFailure(ValueError):
     phase: StakeholderFailurePhase
     kind: Literal["structural", "semantic", "output_exhaustion"]
     reason: str
+    semantic_code: ResponseValidationCode | None
 
     def __init__(
         self,
         phase: StakeholderFailurePhase,
         kind: Literal["structural", "semantic", "output_exhaustion"],
         reason: str,
+        *,
+        semantic_code: ResponseValidationCode | None = None,
     ) -> None:
         super().__init__(reason)
         self.phase = phase
         self.kind = kind
         self.reason = reason
+        self.semantic_code = semantic_code
 
 
 @dataclass(frozen=True, slots=True)
@@ -495,21 +500,30 @@ def _safe_schema_reason(error: ResponseParseError) -> str:
     return "invalid JSON object for the requested response schema"
 
 
-def _safe_semantic_reason(error: ResponseValidationError) -> str:
-    text = str(error).lower()
-    if "missing planned semantic items" in text:
-        return "every item in the validated plan must be realized"
-    if "unplanned semantic item" in text:
-        return "do not add assertions outside the validated plan"
-    if "exact span" in text or "quote" in text:
-        return "each quote must be an exact message span with the correct occurrence"
-    if "terminology" in text or "proposal" in text:
-        return "terminology entries must preserve validated proposal provenance"
-    if "private identifier" in text:
-        return "never place private local identifiers in the public message"
-    if "mode" in text or "requires" in text:
-        return "use the mode required by the validated stakeholder knowledge"
-    return "response did not satisfy the validated semantic contract"
+def _safe_semantic_reason(
+    error: ResponseValidationError,
+    *,
+    phase: StakeholderFailurePhase,
+) -> str:
+    if error.code == "unresolvable_semantic_address":
+        subject = "plan" if phase == "plan" else "response annotation"
+        return (
+            f"The previous {subject} used a semantic_id that is not present in "
+            "the supplied stakeholder knowledge. Use only exact semantic_id "
+            "values listed in the private knowledge."
+        )
+    if error.code == "canonical_mode_mismatch":
+        subject = "plan" if phase == "plan" else "response annotation"
+        return (
+            f"The previous {subject} used the wrong mode for a semantic item. "
+            "Use the exact required mode shown for each semantic_id in the "
+            "stakeholder knowledge."
+        )
+    return (
+        "The previous response did not satisfy the realization semantic "
+        "contract. Realize exactly the validated plan with exact public "
+        "message spans and no private identifiers."
+    )
 
 
 def _contract_failure(
@@ -525,7 +539,8 @@ def _contract_failure(
     return _StakeholderAttemptFailure(
         phase,
         "semantic",
-        _safe_semantic_reason(error),
+        _safe_semantic_reason(error, phase=phase),
+        semantic_code=cast(ResponseValidationCode, error.code),
     )
 
 
@@ -591,7 +606,12 @@ def _record_attempt_failure(
     *,
     will_retry: bool,
 ) -> None:
-    diagnostics.record(failure.phase, failure.kind, will_retry=will_retry)
+    diagnostics.record(
+        failure.phase,
+        failure.kind,
+        will_retry=will_retry,
+        semantic_code=failure.semantic_code,
+    )
 
 
 def _merge_error_diagnostics(

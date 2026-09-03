@@ -241,6 +241,8 @@ def test_phase14_summary_preserves_scores_usage_and_safe_provenance(tmp_path) ->
     assert run["diagnostics"]["failure_class"] == "completed"
     assert run["diagnostics"]["accepted_response_count"] == 1
     assert run["diagnostics"]["accepted_empty_plan_response_count"] == 1
+    assert run["diagnostics"]["accepted_nonempty_plan_response_count"] == 0
+    assert run["diagnostics"]["accepted_annotated_response_count"] == 0
     assert (
         run["diagnostics"]["accepted_response_with_text_but_no_annotations_count"] == 1
     )
@@ -272,6 +274,49 @@ def test_phase14_summary_preserves_scores_usage_and_safe_provenance(tmp_path) ->
     assert "generation_seed" not in serialized
     assert "skn_" not in serialized
     assert "phase14-test-profile" in serialized
+
+
+def test_phase14_summary_counts_authoritative_nonempty_plan_and_annotations(
+    tmp_path,
+) -> None:
+    stakeholder_outputs = [
+        ModelOutput.from_content(
+            "mockllm",
+            '{"items": [{"semantic_id": "node:skn_001:activity", "mode": "value"}]}',
+        ),
+        ModelOutput.from_content(
+            "mockllm",
+            json.dumps(
+                {
+                    "message": "I review samples.",
+                    "annotations": [
+                        {
+                            "semantic_id": "node:skn_001:activity",
+                            "mode": "value",
+                            "quote": "review samples",
+                        }
+                    ],
+                    "alignments": [],
+                    "terminology": [],
+                }
+            ),
+        ),
+    ]
+    log_path = _eval_live_task(
+        tmp_path,
+        stakeholder_outputs=stakeholder_outputs,
+    )
+    run = summarize_eval_log(log_path)["runs"][0]
+    diagnostics = run["diagnostics"]
+    assert diagnostics["accepted_response_count"] == 1
+    assert diagnostics["accepted_empty_plan_response_count"] == 0
+    assert diagnostics["accepted_nonempty_plan_response_count"] == 1
+    assert diagnostics["accepted_annotated_response_count"] == 1
+    aggregate = phase14.aggregate_run_summaries([run])
+    assert aggregate["total_accepted_nonempty_plan_response_count"] == 1
+    assert aggregate["total_accepted_annotated_response_count"] == 1
+    assert aggregate["accepted_nonempty_plan_rate"] == 1.0
+    assert aggregate["accepted_annotated_response_rate"] == 1.0
 
 
 def test_phase14_missing_usage_is_reported_as_unknown(tmp_path) -> None:
@@ -345,6 +390,11 @@ def test_phase14_classifies_stakeholder_semantic_retry_exhaustion(tmp_path) -> N
     assert run["diagnostics"]["stakeholder_structural_rejection_count"] == 0
     assert run["diagnostics"]["stakeholder_semantic_validation_rejection_count"] == 3
     assert run["diagnostics"]["stakeholder_what_semantic_rejection_count"] == 3
+    assert run["diagnostics"]["stakeholder_what_unresolvable_address_count"] == 3
+    assert run["diagnostics"]["stakeholder_what_mode_mismatch_count"] == 0
+    assert (
+        run["diagnostics"]["stakeholder_what_realization_semantic_mismatch_count"] == 0
+    )
     assert run["diagnostics"]["stakeholder_how_semantic_rejection_count"] == 0
     assert run["diagnostics"]["stakeholder_retry_count"] == 2
     assert run["diagnostics"]["stakeholder_output_exhaustion_count"] == 0
@@ -358,11 +408,32 @@ def test_phase14_classifies_stakeholder_semantic_retry_exhaustion(tmp_path) -> N
     aggregate = phase14.aggregate_run_summaries([run])
     assert aggregate["total_stakeholder_rejection_count"] == 3
     assert aggregate["total_stakeholder_what_semantic_rejection_count"] == 3
+    assert aggregate["total_stakeholder_what_unresolvable_address_count"] == 3
+    assert aggregate["total_stakeholder_what_mode_mismatch_count"] == 0
     assert aggregate["stakeholder_retry_exhaustion_count"] == 1
     assert run["diagnostics"]["stakeholder_structured_output_modes"] == [
         "inspect_response_schema"
     ]
     assert run["run"]["generation_parameters"]["stakeholder"] == {}
+
+
+def test_phase14_mode_mismatch_summary_counter_is_distinct(tmp_path) -> None:
+    invalid_plan = json.dumps(
+        {"items": [{"semantic_id": "node:skn_001", "mode": "value"}]}
+    )
+    log_path = _eval_live_task(
+        tmp_path,
+        candidate_outputs=[ModelOutput.from_content("mockllm", "Question?")],
+        stakeholder_outputs=[
+            ModelOutput.from_content("mockllm", invalid_plan) for _ in range(3)
+        ],
+    )
+    run = summarize_eval_log(log_path)["runs"][0]
+    diagnostics = run["diagnostics"]
+    assert diagnostics["stakeholder_what_unresolvable_address_count"] == 0
+    assert diagnostics["stakeholder_what_mode_mismatch_count"] == 3
+    aggregate = phase14.aggregate_run_summaries([run])
+    assert aggregate["total_stakeholder_what_mode_mismatch_count"] == 3
 
 
 def test_phase14_cli_summary_has_no_model_call_or_private_dump(tmp_path) -> None:

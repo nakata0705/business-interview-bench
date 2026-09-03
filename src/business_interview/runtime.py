@@ -125,10 +125,14 @@ class InterviewProtocolState(BaseModel):
 
 
 class SemanticLedgerEntry(BaseModel):
-    """Private sidecar facts associated with exactly one public observation."""
+    """Private WHAT/HOW artifacts associated with one public observation."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
+    # The validated WHAT is retained beside the HOW sidecar so accepted
+    # knowledge-bearing responses remain observable without inspecting raw
+    # model completions.  The default keeps historical runtime payloads valid.
+    plan: SemanticResponsePlan = Field(default_factory=SemanticResponsePlan)
     public_message_turn: int = Field(
         ge=0,
         validation_alias=AliasChoices("public_message_turn", "turn", "message_turn"),
@@ -218,6 +222,7 @@ class SemanticLedger(BaseModel):
         )
         return self.append_validated(
             validated,
+            plan=plan,
             public_message_turn=public_message_turn,
             observation_id=observation_id,
             interviewer_messages=interviewer_messages,
@@ -227,6 +232,7 @@ class SemanticLedger(BaseModel):
         self,
         response: StakeholderResponse,
         *,
+        plan: SemanticResponsePlan | None = None,
         public_message_turn: int,
         observation_id: str,
         interviewer_messages: Sequence[object] | None = None,
@@ -247,6 +253,7 @@ class SemanticLedger(BaseModel):
             response_public_message_turn=public_message_turn,
         )
         entry = SemanticLedgerEntry(
+            plan=plan if plan is not None else SemanticResponsePlan(),
             public_message_turn=public_message_turn,
             observation_id=observation_id,
             annotations=response.annotations,
@@ -773,6 +780,7 @@ class LiveInterviewStore(BaseModel):
         )
         ledger = self.semantic_ledger.append_validated(
             validated,
+            plan=plan,
             public_message_turn=public_turn,
             observation_id=resolved_observation_id,
             interviewer_messages=self.public_message_ledger,

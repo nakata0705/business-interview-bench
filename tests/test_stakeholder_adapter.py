@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
+import pytest
 from inspect_ai import Task
 from inspect_ai import eval as inspect_eval
 from inspect_ai.dataset import Sample
@@ -19,8 +20,10 @@ from inspect_ai.model import (
     get_model,
 )
 from inspect_ai.solver import Solver, TaskState, solver
+from inspect_ai.util import json_schema
 
 from business_interview.models import STRUCTURAL_SINK_ID, STRUCTURAL_SOURCE_ID
+from business_interview.runtime import create_live_interview_store
 from business_interview.stakeholders.knowledge import (
     KnowledgeConceptRef,
     StakeholderEdge,
@@ -29,9 +32,14 @@ from business_interview.stakeholders.knowledge import (
     StakeholderKnowledgeGraph,
     StakeholderNode,
 )
+from business_interview.stakeholders.response import (
+    SemanticResponsePlan,
+    StakeholderResponse,
+)
 from business_interview_bench.inspect_adapter.stakeholder import (
     StakeholderResponseError,
     invoke_stakeholder_response,
+    invoke_stakeholder_response_with_plan,
 )
 
 _SOURCE_EDGE = "__tau2_structural_boundary__source_001"
@@ -195,6 +203,70 @@ def test_mock_stakeholder_role_uses_exactly_two_successful_calls(tmp_path) -> No
     assert all(event.error is None for event in events)
 
 
+def test_nonempty_what_to_annotated_how_is_ingested_in_semantic_ledger(
+    tmp_path,
+) -> None:
+    captured: list[tuple[Any, Any]] = []
+    stakeholder_model = get_model(
+        "mockllm/stakeholder",
+        custom_outputs=[_plan_output(), _response_output()],
+    )
+
+    @solver
+    def mock_stakeholder_solver() -> Solver:
+        async def solve(state: TaskState, generate: Any) -> TaskState:
+            del generate
+            runtime = create_live_interview_store("response")
+            runtime = runtime.record_candidate_turn()
+            runtime = runtime.record_candidate_question("What do you do?")
+            turn = await invoke_stakeholder_response_with_plan(
+                [ChatMessageUser(content="What do you do?")],
+                _knowledge(),
+            )
+            runtime = runtime.ingest_stakeholder_response(
+                _knowledge(), turn.plan, turn.response
+            )
+            captured.append((turn, runtime))
+            state.completed = True
+            return state
+
+        return solve
+
+    logs = inspect_eval(
+        Task(
+            dataset=[Sample(id="response", input="What do you do?")],
+            solver=mock_stakeholder_solver(),
+            model="none",
+        ),
+        model="none",
+        model_roles={"stakeholder": stakeholder_model},
+        score=False,
+        display="none",
+        log_dir=str(tmp_path),
+    )
+
+    assert len(logs) == 1
+    assert logs[0].status == "success"
+    assert len(captured) == 1
+    turn, runtime = captured[0]
+    assert len(turn.plan.items) == 1
+    assert len(turn.response.annotations) == 1
+    annotation = turn.response.annotations[0]
+    planned = turn.plan.items[0]
+    assert (annotation.semantic_id, annotation.mode) == (
+        planned.semantic_id,
+        planned.mode,
+    )
+    assert annotation.quote in turn.response.message
+    entry = runtime.semantic_ledger.entries[-1]
+    assert entry.plan == turn.plan
+    assert entry.annotations == turn.response.annotations
+    assert runtime.observations[-1].text == turn.response.message
+    assert runtime.public_message_ledger[-1].content == turn.response.message
+    assert "semantic_id" not in runtime.public_message_ledger[-1].content
+    assert "skn_001" not in runtime.public_message_ledger[-1].content
+
+
 def test_native_response_schema_is_used_for_both_phases(tmp_path) -> None:
     log, captured, errors = _run_mock_response(
         tmp_path,
@@ -212,6 +284,8 @@ def test_native_response_schema_is_used_for_both_phases(tmp_path) -> None:
     assert all(schema.strict is False for schema in schemas)
     assert all(schema.json_schema.type == "object" for schema in schemas)
     assert all(schema.json_schema.additionalProperties is False for schema in schemas)
+    assert schemas[0].json_schema == json_schema(SemanticResponsePlan)
+    assert schemas[1].json_schema == json_schema(StakeholderResponse)
     assert all(
         "$ref" not in json.dumps(schema.json_schema.model_dump(mode="json"))
         for schema in schemas
@@ -272,6 +346,51 @@ def test_semantic_retry_diagnostic_is_distinct_and_safe(tmp_path) -> None:
     retry_input = _model_events(log)[1].input[-1].text
     assert "Previous output rejected: [semantic]" in retry_input
     assert "node:missing" not in retry_input
+
+
+@pytest.mark.parametrize(
+    ("invalid_plan", "expected_code", "expected_guidance"),
+    [
+        (
+            '{"items": [{"semantic_id": "node:missing", "mode": "exists"}]}',
+            "unresolvable_address",
+            "not present in the supplied stakeholder knowledge",
+        ),
+        (
+            '{"items": [{"semantic_id": "node:skn_001", "mode": "value"}]}',
+            "mode_mismatch",
+            "wrong mode for a semantic item",
+        ),
+    ],
+)
+def test_what_failure_categories_are_typed_and_safe(
+    tmp_path,
+    invalid_plan: str,
+    expected_code: str,
+    expected_guidance: str,
+) -> None:
+    log, captured, errors = _run_mock_response(
+        tmp_path,
+        [ModelOutput.from_content("mockllm", invalid_plan) for _ in range(3)],
+        catch_error=True,
+    )
+
+    assert log.status == "success"
+    assert not captured
+    assert len(errors) == 1
+    error = errors[0]
+    assert error.diagnostics is not None
+    assert error.diagnostics.what_semantic_rejections == 3
+    retry_input = _model_events(log)[1].input[-1].text
+    assert expected_guidance in retry_input
+    assert "node:missing" not in retry_input
+    if expected_code == "unresolvable_address":
+        assert error.diagnostics.what_unresolvable_address_count == 3
+        assert error.diagnostics.what_mode_mismatch_count == 0
+    else:
+        assert error.diagnostics.what_unresolvable_address_count == 0
+        assert error.diagnostics.what_mode_mismatch_count == 3
+    assert error.diagnostics.what_realization_semantic_mismatch_count == 0
 
 
 def test_output_exhaustion_is_retried_and_classified_separately(tmp_path) -> None:

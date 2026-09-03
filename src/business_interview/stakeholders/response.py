@@ -21,6 +21,11 @@ from .knowledge import (
 
 SemanticMode = Literal["value", "absent", "dont_know", "exists", "mention"]
 AlignmentAct = Literal["confirm", "partial", "unknown", "dispute"]
+ResponseValidationCode = Literal[
+    "unresolvable_semantic_address",
+    "canonical_mode_mismatch",
+    "realization_semantic_mismatch",
+]
 
 
 class ResponseParseError(ValueError):
@@ -29,6 +34,17 @@ class ResponseParseError(ValueError):
 
 class ResponseValidationError(ValueError):
     """Raised when a response contract contradicts stakeholder knowledge."""
+
+    code: ResponseValidationCode
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        code: ResponseValidationCode = "realization_semantic_mismatch",
+    ) -> None:
+        super().__init__(message)
+        self.code: ResponseValidationCode = code
 
 
 class PlannedResponseItem(_DeeplyImmutableModel):
@@ -145,7 +161,8 @@ def semantic_mode_for_resolution(
     if resolved.kind in ("node_slot", "edge_slot"):
         return "value"
     raise ResponseValidationError(
-        f"unsupported resolved semantic kind: {resolved.kind!r}"
+        f"unsupported resolved semantic kind: {resolved.kind!r}",
+        code="realization_semantic_mismatch",
     )
 
 
@@ -170,7 +187,8 @@ def _resolve_for_validation(
     except SemanticAddressError as exc:
         raise ResponseValidationError(
             f"{subject} semantic_id {semantic_id!r} is not resolvable in "
-            "stakeholder knowledge"
+            "stakeholder knowledge",
+            code="unresolvable_semantic_address",
         ) from exc
 
 
@@ -189,7 +207,8 @@ def validate_response_plan(
         if item.mode != expected:
             raise ResponseValidationError(
                 f"plan item {index} {item.semantic_id!r} declares mode "
-                f"{item.mode!r}, but stakeholder knowledge requires {expected!r}"
+                f"{item.mode!r}, but stakeholder knowledge requires {expected!r}",
+                code="canonical_mode_mismatch",
             )
     return plan
 
@@ -366,7 +385,8 @@ def _validate_concept_event(
     resolved = _resolve_for_validation(knowledge, semantic_id, subject=subject)
     if resolved.kind != "concept":
         raise ResponseValidationError(
-            f"{subject} semantic_id {semantic_id!r} must resolve to a knowledge concept"
+            f"{subject} semantic_id {semantic_id!r} must resolve to a knowledge concept",
+            code="realization_semantic_mismatch",
         )
     _require_message_span(
         message,
@@ -400,7 +420,8 @@ def validate_stakeholder_response(
         if annotation.mode != expected:
             raise ResponseValidationError(
                 f"annotation {index} {annotation.semantic_id!r} declares mode "
-                f"{annotation.mode!r}, but stakeholder knowledge requires {expected!r}"
+                f"{annotation.mode!r}, but stakeholder knowledge requires {expected!r}",
+                code="canonical_mode_mismatch",
             )
         key = (annotation.semantic_id, annotation.mode)
         if key not in plan_keys:
@@ -470,6 +491,7 @@ __all__ = [
     "ConceptAlignmentAssertion",
     "PlannedResponseItem",
     "ResponseParseError",
+    "ResponseValidationCode",
     "ResponseValidationError",
     "SemanticAnnotation",
     "SemanticMode",

@@ -770,6 +770,8 @@ def _accepted_stakeholder_entries(
 
 def _accepted_response_diagnostics(sample: object) -> dict[str, int]:
     empty_plan = 0
+    nonempty_plan = 0
+    annotated = 0
     no_annotations = 0
     insufficient_annotations = 0
     accepted_entries = _accepted_stakeholder_entries(sample)
@@ -777,14 +779,20 @@ def _accepted_response_diagnostics(sample: object) -> dict[str, int]:
     for entry, observation in accepted_entries:
         annotations = _as_sequence(entry.get("annotations"))
         message = _text(observation.get("text", observation.get("content")))
+        has_persisted_plan = isinstance(entry.get("plan"), Mapping)
         plan_payload = _as_mapping(entry.get("plan"))
-        plan_items = _as_sequence(plan_payload.get("items")) if plan_payload else []
+        plan_items = _as_sequence(plan_payload.get("items"))
 
         # Phase 13 historically persisted the accepted sidecar, not WHAT. A
-        # valid accepted response with no annotations can only have had an
-        # empty plan; keep that inference over the historical state shape.
-        if not plan_items and not annotations:
+        # legacy entry without a plan can only be classified as empty when it
+        # also has no annotations. New runtime entries persist the validated
+        # plan, so non-empty/empty counts never infer from visible prose.
+        if plan_items:
+            nonempty_plan += 1
+        elif has_persisted_plan or not annotations:
             empty_plan += 1
+        if annotations:
+            annotated += 1
         if message.strip() and not annotations:
             no_annotations += 1
 
@@ -805,6 +813,8 @@ def _accepted_response_diagnostics(sample: object) -> dict[str, int]:
     return {
         "accepted_response_count": len(accepted_entries),
         "accepted_empty_plan_response_count": empty_plan,
+        "accepted_nonempty_plan_response_count": nonempty_plan,
+        "accepted_annotated_response_count": annotated,
         "accepted_response_with_text_but_no_annotations_count": no_annotations,
         "accepted_response_with_insufficient_annotations_count": insufficient_annotations,
     }
@@ -1161,11 +1171,29 @@ def _stakeholder_attempt_diagnostics(sample: object) -> dict[str, int]:
     what_semantic = _metadata_count(
         metadata, "interview_stakeholder_what_semantic_rejections"
     )
+    what_unresolvable_address = _metadata_count(
+        metadata, "interview_stakeholder_what_unresolvable_address_count"
+    )
+    what_mode_mismatch = _metadata_count(
+        metadata, "interview_stakeholder_what_mode_mismatch_count"
+    )
+    what_realization_semantic_mismatch = _metadata_count(
+        metadata, "interview_stakeholder_what_realization_semantic_mismatch_count"
+    )
     how_structural = _metadata_count(
         metadata, "interview_stakeholder_how_structural_rejections"
     )
     how_semantic = _metadata_count(
         metadata, "interview_stakeholder_how_semantic_rejections"
+    )
+    how_unresolvable_address = _metadata_count(
+        metadata, "interview_stakeholder_how_unresolvable_address_count"
+    )
+    how_mode_mismatch = _metadata_count(
+        metadata, "interview_stakeholder_how_mode_mismatch_count"
+    )
+    how_realization_semantic_mismatch = _metadata_count(
+        metadata, "interview_stakeholder_how_realization_semantic_mismatch_count"
     )
     has_attempt_metadata = any(
         value is not None
@@ -1182,8 +1210,26 @@ def _stakeholder_attempt_diagnostics(sample: object) -> dict[str, int]:
             what_semantic = inferred_semantic_rejections
     what_structural = what_structural if what_structural is not None else 0
     what_semantic = what_semantic if what_semantic is not None else 0
+    what_unresolvable_address = (
+        what_unresolvable_address if what_unresolvable_address is not None else 0
+    )
+    what_mode_mismatch = what_mode_mismatch if what_mode_mismatch is not None else 0
+    what_realization_semantic_mismatch = (
+        what_realization_semantic_mismatch
+        if what_realization_semantic_mismatch is not None
+        else 0
+    )
     how_structural = how_structural if how_structural is not None else 0
     how_semantic = how_semantic if how_semantic is not None else 0
+    how_unresolvable_address = (
+        how_unresolvable_address if how_unresolvable_address is not None else 0
+    )
+    how_mode_mismatch = how_mode_mismatch if how_mode_mismatch is not None else 0
+    how_realization_semantic_mismatch = (
+        how_realization_semantic_mismatch
+        if how_realization_semantic_mismatch is not None
+        else 0
+    )
     structural_rejections = what_structural + how_structural
     semantic_validation_rejections = what_semantic + how_semantic
     total_rejections = structural_rejections + semantic_validation_rejections
@@ -1215,8 +1261,18 @@ def _stakeholder_attempt_diagnostics(sample: object) -> dict[str, int]:
         "stakeholder_semantic_validation_rejection_count": semantic_validation_rejections,
         "stakeholder_what_structural_rejection_count": what_structural,
         "stakeholder_what_semantic_rejection_count": what_semantic,
+        "stakeholder_what_unresolvable_address_count": what_unresolvable_address,
+        "stakeholder_what_mode_mismatch_count": what_mode_mismatch,
+        "stakeholder_what_realization_semantic_mismatch_count": (
+            what_realization_semantic_mismatch
+        ),
         "stakeholder_how_structural_rejection_count": how_structural,
         "stakeholder_how_semantic_rejection_count": how_semantic,
+        "stakeholder_how_unresolvable_address_count": how_unresolvable_address,
+        "stakeholder_how_mode_mismatch_count": how_mode_mismatch,
+        "stakeholder_how_realization_semantic_mismatch_count": (
+            how_realization_semantic_mismatch
+        ),
         "stakeholder_output_exhaustion_count": output_exhaustion,
         "stakeholder_provider_error_count": provider_errors,
         "stakeholder_retry_count": retry_count,
@@ -1717,8 +1773,14 @@ def _aggregate_stakeholder_contract_diagnostics(
         "stakeholder_semantic_validation_rejection_count",
         "stakeholder_what_structural_rejection_count",
         "stakeholder_what_semantic_rejection_count",
+        "stakeholder_what_unresolvable_address_count",
+        "stakeholder_what_mode_mismatch_count",
+        "stakeholder_what_realization_semantic_mismatch_count",
         "stakeholder_how_structural_rejection_count",
         "stakeholder_how_semantic_rejection_count",
+        "stakeholder_how_unresolvable_address_count",
+        "stakeholder_how_mode_mismatch_count",
+        "stakeholder_how_realization_semantic_mismatch_count",
         "stakeholder_output_exhaustion_count",
         "stakeholder_provider_error_count",
         "stakeholder_retry_count",
@@ -1804,8 +1866,23 @@ def _aggregate_base(runs: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
         "total_accepted_response_count": _diagnostic_total(
             runs, "accepted_response_count"
         ),
+        "total_accepted_empty_plan_response_count": _diagnostic_total(
+            runs, "accepted_empty_plan_response_count"
+        ),
+        "total_accepted_nonempty_plan_response_count": _diagnostic_total(
+            runs, "accepted_nonempty_plan_response_count"
+        ),
+        "total_accepted_annotated_response_count": _diagnostic_total(
+            runs, "accepted_annotated_response_count"
+        ),
         "accepted_empty_plan_rate": _accepted_response_rate(
             runs, "accepted_empty_plan_response_count"
+        ),
+        "accepted_nonempty_plan_rate": _accepted_response_rate(
+            runs, "accepted_nonempty_plan_response_count"
+        ),
+        "accepted_annotated_response_rate": _accepted_response_rate(
+            runs, "accepted_annotated_response_count"
         ),
         "accepted_unannotated_response_rate": _accepted_response_rate(
             runs, "accepted_response_with_text_but_no_annotations_count"
