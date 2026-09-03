@@ -341,7 +341,28 @@ def test_phase14_classifies_stakeholder_semantic_retry_exhaustion(tmp_path) -> N
     assert run["diagnostics"]["stakeholder_plan_attempt_count"] == 3
     assert run["diagnostics"]["stakeholder_realization_attempt_count"] == 0
     assert run["diagnostics"]["stakeholder_semantic_rejection_count"] == 3
-    assert run["diagnostics"]["semantic_retry_count"] == 2
+    assert run["diagnostics"]["stakeholder_rejection_count"] == 3
+    assert run["diagnostics"]["stakeholder_structural_rejection_count"] == 0
+    assert run["diagnostics"]["stakeholder_semantic_validation_rejection_count"] == 3
+    assert run["diagnostics"]["stakeholder_what_semantic_rejection_count"] == 3
+    assert run["diagnostics"]["stakeholder_how_semantic_rejection_count"] == 0
+    assert run["diagnostics"]["stakeholder_retry_count"] == 2
+    assert run["diagnostics"]["stakeholder_output_exhaustion_count"] == 0
+    assert run["diagnostics"]["stakeholder_provider_error_count"] == 0
+    assert run["diagnostics"]["stakeholder_retry_exhausted"] is True
+    assert run["diagnostics"]["stakeholder_terminal_failure_kind"] == "semantic"
+    assert run["diagnostics"]["stakeholder_terminal_failure_phase"] == "plan"
+    assert run["diagnostics"]["stakeholder_terminal_failure_reason"] == (
+        "stakeholder_what_semantic_exhausted"
+    )
+    aggregate = phase14.aggregate_run_summaries([run])
+    assert aggregate["total_stakeholder_rejection_count"] == 3
+    assert aggregate["total_stakeholder_what_semantic_rejection_count"] == 3
+    assert aggregate["stakeholder_retry_exhaustion_count"] == 1
+    assert run["diagnostics"]["stakeholder_structured_output_modes"] == [
+        "inspect_response_schema"
+    ]
+    assert run["run"]["generation_parameters"]["stakeholder"] == {}
 
 
 def test_phase14_cli_summary_has_no_model_call_or_private_dump(tmp_path) -> None:

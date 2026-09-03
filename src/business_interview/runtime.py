@@ -569,8 +569,11 @@ class LiveInterviewStore(BaseModel):
         else:
             if self.protocol_state.terminal_turn != self.candidate_turns:
                 raise ValueError("terminal_turn must equal candidate_turns")
-            if pending_question:
-                raise ValueError("terminal protocol cannot have a pending question")
+            if self.protocol_state.completed and pending_question:
+                raise ValueError("completed protocol cannot have a pending question")
+            # An incomplete protocol may retain the candidate's unanswered
+            # question when stakeholder generation itself failed.  This keeps
+            # the public transcript truthful without fabricating a response.
         return self
 
     @property

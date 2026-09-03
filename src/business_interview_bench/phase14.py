@@ -44,7 +44,13 @@ _GENERATION_FIELDS = frozenset(GenerateConfig.model_fields)
 # These fields can carry credentials or private prompt material and are not
 # allowed in the Phase 14 launch artifact or safe summaries.
 _SENSITIVE_GENERATION_FIELDS = {"extra_headers", "extra_body", "system_message"}
-_SAFE_GENERATION_FIELDS = _GENERATION_FIELDS - _SENSITIVE_GENERATION_FIELDS
+# Native response schemas are safe but can expand into a large JSON Schema in
+# serialized Inspect configs.  Summaries expose the selected mechanism per
+# generation instead of duplicating the schema body.
+_VERBOSE_SAFE_GENERATION_FIELDS = {"response_schema"}
+_SAFE_GENERATION_FIELDS = (
+    _GENERATION_FIELDS - _SENSITIVE_GENERATION_FIELDS - _VERBOSE_SAFE_GENERATION_FIELDS
+)
 _PRIMARY_FIELDS = tuple(item.name for item in fields(PrimaryEvaluation))
 _MODEL_PLACEHOLDER = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*)\}")
 _PLAN_PROMPT_MARKER = "choose only the semantic assertions"
@@ -907,6 +913,18 @@ def _visible_completion_estimated_tokens(event: object) -> int | None:
     return None
 
 
+def _structured_output_mode(event: object) -> str:
+    config = _as_mapping(getattr(event, "config", None))
+    schema = config.get("response_schema")
+    if schema is not None:
+        return "inspect_response_schema"
+    extra_body = _as_mapping(config.get("extra_body"))
+    response_format = _as_mapping(extra_body.get("response_format"))
+    if response_format.get("type") == "json_object":
+        return "inspect_json_object"
+    return "none"
+
+
 def _generation_usage_record(
     event: object,
     *,
@@ -933,6 +951,7 @@ def _generation_usage_record(
     record["visible_completion_estimated_tokens"] = (
         _visible_completion_estimated_tokens(event)
     )
+    record["structured_output_mode"] = _structured_output_mode(event)
     return record
 
 
@@ -1066,21 +1085,45 @@ def _stakeholder_attempt_usage_diagnostics(
     return result
 
 
+def _metadata_count(metadata: Mapping[str, Any], key: str) -> int | None:
+    value = _int_or_none(metadata.get(key))
+    return max(value, 0) if value is not None else None
+
+
+def _retry_failure_kind(event: object) -> str | None:
+    input_text = _event_input_text(event).lower()
+    marker = _RETRY_PROMPT_MARKER
+    for kind in ("structural", "semantic", "output_exhaustion"):
+        if f"{marker} [{kind}]" in input_text:
+            return kind
+    return None
+
+
+def _event_is_output_exhausted(event: object) -> bool:
+    output = getattr(event, "output", None)
+    try:
+        stop_reason = getattr(output, "stop_reason", None)
+    except (AttributeError, IndexError):
+        stop_reason = None
+    return stop_reason in {"max_tokens", "model_length", "length"}
+
+
 def _stakeholder_attempt_diagnostics(sample: object) -> dict[str, int]:
     groups = _stakeholder_attempt_groups(sample)
-    retry_markers = sum(
-        1
+    stakeholder_events = [
+        event
         for event in _events(sample)
-        if _is_model_event(event)
-        and getattr(event, "role", None) == "stakeholder"
-        and _is_retry_attempt(event)
-    )
+        if _is_model_event(event) and getattr(event, "role", None) == "stakeholder"
+    ]
+    retry_markers = sum(1 for event in stakeholder_events if _is_retry_attempt(event))
 
     accepted_count = len(_accepted_stakeholder_entries(sample))
     plan_attempt_count = sum(len(group["plan"]) for group in groups)
     realization_attempt_count = sum(len(group["realization"]) for group in groups)
-    semantic_rejections = 0
+    inferred_semantic_rejections = 0
     inferred_retries = 0
+    marker_structural = {"plan": 0, "realization": 0}
+    marker_semantic = {"plan": 0, "realization": 0}
 
     for group_index, group in enumerate(groups):
         non_error_plan = [event for event in group["plan"] if not _event_error(event)]
@@ -1093,21 +1136,117 @@ def _stakeholder_attempt_diagnostics(sample: object) -> dict[str, int]:
         inferred_retries += max(0, len(non_error_plan) - 1)
         inferred_retries += max(0, len(non_error_realization) - 1)
         if group_index < accepted_count:
-            semantic_rejections += max(0, len(non_error_plan) - 1)
-            semantic_rejections += max(0, len(non_error_realization) - 1)
+            inferred_semantic_rejections += max(0, len(non_error_plan) - 1)
+            inferred_semantic_rejections += max(0, len(non_error_realization) - 1)
         elif group["realization"]:
             # Reaching HOW proves that the final WHAT was accepted. HOW has no
             # accepted ledger entry when the overall response failed.
-            semantic_rejections += max(0, len(non_error_plan) - 1)
-            semantic_rejections += len(non_error_realization)
+            inferred_semantic_rejections += max(0, len(non_error_plan) - 1)
+            inferred_semantic_rejections += len(non_error_realization)
         else:
-            semantic_rejections += len(non_error_plan)
+            inferred_semantic_rejections += len(non_error_plan)
+
+        for phase, events in group.items():
+            for event in events:
+                kind = _retry_failure_kind(event)
+                if kind == "structural":
+                    marker_structural[phase] += 1
+                elif kind == "semantic":
+                    marker_semantic[phase] += 1
+
+    metadata = _sample_metadata(sample)
+    what_structural = _metadata_count(
+        metadata, "interview_stakeholder_what_structural_rejections"
+    )
+    what_semantic = _metadata_count(
+        metadata, "interview_stakeholder_what_semantic_rejections"
+    )
+    how_structural = _metadata_count(
+        metadata, "interview_stakeholder_how_structural_rejections"
+    )
+    how_semantic = _metadata_count(
+        metadata, "interview_stakeholder_how_semantic_rejections"
+    )
+    has_attempt_metadata = any(
+        value is not None
+        for value in (what_structural, what_semantic, how_structural, how_semantic)
+    )
+    if not has_attempt_metadata:
+        what_structural = marker_structural["plan"]
+        what_semantic = marker_semantic["plan"]
+        how_structural = marker_structural["realization"]
+        how_semantic = marker_semantic["realization"]
+        if not any((what_structural, what_semantic, how_structural, how_semantic)):
+            # Old logs predate the kind marker; retain the historical total
+            # under the legacy field rather than guessing a subcategory.
+            what_semantic = inferred_semantic_rejections
+    what_structural = what_structural if what_structural is not None else 0
+    what_semantic = what_semantic if what_semantic is not None else 0
+    how_structural = how_structural if how_structural is not None else 0
+    how_semantic = how_semantic if how_semantic is not None else 0
+    structural_rejections = what_structural + how_structural
+    semantic_validation_rejections = what_semantic + how_semantic
+    total_rejections = structural_rejections + semantic_validation_rejections
+    retry_count = _metadata_count(metadata, "interview_stakeholder_retry_count")
+    if retry_count is None:
+        retry_count = max(retry_markers, inferred_retries)
+    output_exhaustion = _metadata_count(
+        metadata, "interview_stakeholder_output_exhaustion_count"
+    )
+    if output_exhaustion is None:
+        output_exhaustion = sum(
+            1 for event in stakeholder_events if _event_is_output_exhausted(event)
+        )
+    provider_errors = _metadata_count(
+        metadata, "interview_stakeholder_provider_error_count"
+    )
+    if provider_errors is None:
+        provider_errors = sum(1 for event in stakeholder_events if _event_error(event))
 
     return {
         "stakeholder_plan_attempt_count": plan_attempt_count,
         "stakeholder_realization_attempt_count": realization_attempt_count,
-        "stakeholder_semantic_rejection_count": semantic_rejections,
-        "semantic_retry_count": max(retry_markers, inferred_retries),
+        # Kept as the historical semantic-only field; the explicit total and
+        # subcategory fields below prevent structural failures being folded into
+        # semantic diagnostics.
+        "stakeholder_semantic_rejection_count": semantic_validation_rejections,
+        "stakeholder_rejection_count": total_rejections,
+        "stakeholder_structural_rejection_count": structural_rejections,
+        "stakeholder_semantic_validation_rejection_count": semantic_validation_rejections,
+        "stakeholder_what_structural_rejection_count": what_structural,
+        "stakeholder_what_semantic_rejection_count": what_semantic,
+        "stakeholder_how_structural_rejection_count": how_structural,
+        "stakeholder_how_semantic_rejection_count": how_semantic,
+        "stakeholder_output_exhaustion_count": output_exhaustion,
+        "stakeholder_provider_error_count": provider_errors,
+        "stakeholder_retry_count": retry_count,
+        "semantic_retry_count": retry_count,
+    }
+
+
+def _stakeholder_terminal_diagnostics(
+    metadata: Mapping[str, Any], failure_class: str
+) -> dict[str, Any]:
+    kind = metadata.get("interview_stakeholder_failure_kind")
+    phase = metadata.get("interview_stakeholder_failure_phase")
+    reason = metadata.get("interview_stakeholder_failure_reason")
+    exhausted = metadata.get("interview_stakeholder_retry_exhausted")
+    return {
+        "stakeholder_retry_exhausted": (
+            exhausted
+            if isinstance(exhausted, bool)
+            else failure_class
+            in {
+                "stakeholder_structural_validation_failure",
+                "stakeholder_semantic_validation_failure",
+                "stakeholder_output_exhaustion",
+            }
+        ),
+        "stakeholder_terminal_failure_kind": kind if isinstance(kind, str) else None,
+        "stakeholder_terminal_failure_phase": phase if isinstance(phase, str) else None,
+        "stakeholder_terminal_failure_reason": reason
+        if isinstance(reason, str)
+        else None,
     }
 
 
@@ -1217,6 +1356,15 @@ def classify_failure(
         return "completed"
 
     reason = _text(protocol.get("failure_reason"))
+    if reason.startswith("stakeholder_"):
+        if "_structural_exhausted" in reason:
+            return "stakeholder_structural_validation_failure"
+        if "_semantic_exhausted" in reason:
+            return "stakeholder_semantic_validation_failure"
+        if "_output_exhausted" in reason:
+            return "stakeholder_output_exhaustion"
+        if "_provider_generation_failure" in reason:
+            return "stakeholder_generation_failure"
     if reason == "candidate_did_not_ask_question":
         return "candidate_did_not_ask_question"
     if reason == "candidate_step_limit_exhausted":
@@ -1338,6 +1486,14 @@ def _run_summary(log: EvalLog, sample: object, source_name: str) -> dict[str, An
         **_error_diagnostics(sample),
         **_empty_plan_diagnostics(sample),
         **_stakeholder_attempt_usage_diagnostics(generation_usage["stakeholder"]),
+        **_stakeholder_terminal_diagnostics(metadata, failure_class),
+        "stakeholder_structured_output_modes": sorted(
+            {
+                str(record["structured_output_mode"])
+                for record in generation_usage["stakeholder"]
+                if isinstance(record.get("structured_output_mode"), str)
+            }
+        ),
         "usage_warning_count": len(usage_warnings),
         "usage_warnings": usage_warnings,
     }
@@ -1547,6 +1703,36 @@ def _aggregate_attempt_diagnostics(
     return result
 
 
+def _boolean_diagnostic(run: Mapping[str, Any], field: str) -> bool:
+    value = _as_mapping(run.get("diagnostics")).get(field)
+    return value if isinstance(value, bool) else False
+
+
+def _aggregate_stakeholder_contract_diagnostics(
+    runs: Sequence[Mapping[str, Any]],
+) -> dict[str, Any]:
+    fields = (
+        "stakeholder_rejection_count",
+        "stakeholder_structural_rejection_count",
+        "stakeholder_semantic_validation_rejection_count",
+        "stakeholder_what_structural_rejection_count",
+        "stakeholder_what_semantic_rejection_count",
+        "stakeholder_how_structural_rejection_count",
+        "stakeholder_how_semantic_rejection_count",
+        "stakeholder_output_exhaustion_count",
+        "stakeholder_provider_error_count",
+        "stakeholder_retry_count",
+    )
+    result: dict[str, Any] = {}
+    for field in fields:
+        result[f"total_{field}"] = _diagnostic_total(runs, field)
+        result[f"mean_{field}"] = _mean(_diagnostic_values(runs, field))
+    result["stakeholder_retry_exhaustion_count"] = sum(
+        1 for run in runs if _boolean_diagnostic(run, "stakeholder_retry_exhausted")
+    )
+    return result
+
+
 def _aggregate_base(runs: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
     score_runs = [_as_mapping(run.get("primary_evaluation")) for run in runs]
     protocol_runs = [_as_mapping(run.get("protocol")) for run in runs]
@@ -1625,6 +1811,7 @@ def _aggregate_base(runs: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
             runs, "accepted_response_with_text_but_no_annotations_count"
         ),
         **_aggregate_attempt_diagnostics(runs),
+        **_aggregate_stakeholder_contract_diagnostics(runs),
         "usage": _aggregate_usage(runs),
     }
 

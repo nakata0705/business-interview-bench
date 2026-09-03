@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+import json
 from typing import Any
 
 from inspect_ai import Task
@@ -194,6 +195,138 @@ def test_mock_stakeholder_role_uses_exactly_two_successful_calls(tmp_path) -> No
     assert all(event.error is None for event in events)
 
 
+def test_native_response_schema_is_used_for_both_phases(tmp_path) -> None:
+    log, captured, errors = _run_mock_response(
+        tmp_path,
+        [_plan_output(), _response_output()],
+    )
+
+    assert log.status == "success"
+    assert captured and not errors
+    events = _model_events(log)
+    schemas = [event.config.response_schema for event in events]
+    assert [schema.name for schema in schemas] == [
+        "semantic_response_plan",
+        "stakeholder_response",
+    ]
+    assert all(schema.strict is False for schema in schemas)
+    assert all(schema.json_schema.type == "object" for schema in schemas)
+    assert all(schema.json_schema.additionalProperties is False for schema in schemas)
+    assert all(
+        "$ref" not in json.dumps(schema.json_schema.model_dump(mode="json"))
+        for schema in schemas
+    )
+
+
+def test_common_provider_json_wrappers_are_extracted_without_semantic_repair(
+    tmp_path,
+) -> None:
+    plan = _plan_output()
+    plan.completion = (
+        "prefix ```json\n"
+        '{"items": [{"semantic_id": "node:skn_001:activity", "mode": "value"}]}\n'
+        "``` suffix"
+    )
+    response = _response_output()
+    response.completion = (
+        "Here is the response: "
+        '{"message": "I review requests.", "annotations": ['
+        '{"semantic_id": "node:skn_001:activity", "mode": "value", '
+        '"quote": "review requests", "occurrence": 0}], '
+        '"alignments": [], "terminology": []} trailing text'
+    )
+    log, captured, errors = _run_mock_response(tmp_path, [plan, response])
+
+    assert log.status == "success"
+    assert not errors
+    assert captured[0].message == "I review requests."
+    assert len(_model_events(log)) == 2
+
+
+def test_structural_retry_diagnostic_is_distinct_and_safe(tmp_path) -> None:
+    invalid_plan = ModelOutput.from_content("mockllm", "not json")
+    log, captured, errors = _run_mock_response(
+        tmp_path,
+        [invalid_plan, _plan_output(), _response_output()],
+    )
+
+    assert log.status == "success"
+    assert captured and not errors
+    retry_input = _model_events(log)[1].input[-1].text
+    assert "Previous output rejected: [structural]" in retry_input
+    assert "not json" not in retry_input
+
+
+def test_semantic_retry_diagnostic_is_distinct_and_safe(tmp_path) -> None:
+    invalid_plan = ModelOutput.from_content(
+        "mockllm",
+        '{"items": [{"semantic_id": "node:missing", "mode": "exists"}]}',
+    )
+    log, captured, errors = _run_mock_response(
+        tmp_path,
+        [invalid_plan, _plan_output(), _response_output()],
+    )
+
+    assert log.status == "success"
+    assert captured and not errors
+    retry_input = _model_events(log)[1].input[-1].text
+    assert "Previous output rejected: [semantic]" in retry_input
+    assert "node:missing" not in retry_input
+
+
+def test_output_exhaustion_is_retried_and_classified_separately(tmp_path) -> None:
+    exhausted = ModelOutput.from_content("mockllm", "", stop_reason="max_tokens")
+    log, captured, errors = _run_mock_response(
+        tmp_path,
+        [exhausted, _plan_output(), _response_output()],
+    )
+
+    assert log.status == "success"
+    assert captured and not errors
+    retry_input = _model_events(log)[1].input[-1].text
+    assert "Previous output rejected: [output_exhaustion]" in retry_input
+    assert "token limit" in retry_input
+
+
+def test_output_exhaustion_retry_bound_is_not_a_semantic_failure(tmp_path) -> None:
+    exhausted = ModelOutput.from_content("mockllm", "", stop_reason="max_tokens")
+    log, captured, errors = _run_mock_response(
+        tmp_path,
+        [exhausted, exhausted, exhausted],
+        catch_error=True,
+    )
+
+    assert log.status == "success"
+    assert not captured
+    assert len(errors) == 1
+    assert errors[0].failure_kind == "output_exhaustion"
+    assert errors[0].failure_reason == "stakeholder_what_output_exhaustion_exhausted"
+    assert errors[0].diagnostics is not None
+    assert errors[0].diagnostics.output_exhaustion_count == 3
+    assert errors[0].diagnostics.what_structural_rejections == 0
+    assert errors[0].diagnostics.what_semantic_rejections == 0
+    assert errors[0].diagnostics.retry_count == 2
+
+
+def test_provider_generation_error_is_not_retried_as_semantic_output(tmp_path) -> None:
+    provider_error = ModelOutput.from_content("mockllm", "", error="provider failure")
+    log, captured, errors = _run_mock_response(
+        tmp_path,
+        [provider_error],
+        catch_error=True,
+    )
+
+    assert log.status == "success"
+    assert not captured
+    assert len(errors) == 1
+    assert errors[0].failure_kind == "provider"
+    assert errors[0].failure_reason == ("stakeholder_what_provider_generation_failure")
+    assert errors[0].diagnostics is not None
+    assert errors[0].diagnostics.provider_error_count == 1
+    assert errors[0].diagnostics.retry_count == 0
+    assert len(_model_events(log)) == 1
+
+
 def test_invalid_plan_retries_before_realization(tmp_path) -> None:
     invalid_plan = ModelOutput.from_content(
         model="mockllm",
@@ -233,7 +366,7 @@ def test_invalid_realization_retries_with_the_same_plan(tmp_path) -> None:
     assert "Previous output rejected" in events[2].input[-1].text
 
 
-def test_retry_exhaustion_is_an_explicit_error(tmp_path) -> None:
+def test_retry_exhaustion_is_an_explicit_structural_error(tmp_path) -> None:
     invalid_plan = ModelOutput.from_content(model="mockllm", content="not json")
     log, captured, errors = _run_mock_response(
         tmp_path,
@@ -245,4 +378,10 @@ def test_retry_exhaustion_is_an_explicit_error(tmp_path) -> None:
     assert not captured
     assert len(errors) == 1
     assert "plan rejected after 3 attempts" in str(errors[0])
+    assert errors[0].failure_kind == "structural"
+    assert errors[0].failure_reason == "stakeholder_what_structural_exhausted"
+    assert errors[0].retry_exhausted is True
+    assert errors[0].diagnostics is not None
+    assert errors[0].diagnostics.what_structural_rejections == 3
+    assert errors[0].diagnostics.retry_count == 2
     assert len(_model_events(log)) == 3

@@ -21,6 +21,8 @@ from .multiturn import (
 )
 from .scorer import primary_scorer
 from .stakeholder import (
+    StakeholderAttemptDiagnostics,
+    StakeholderGenerationError,
     StakeholderResponseError,
     StakeholderTurn,
     invoke_stakeholder_response,
@@ -38,6 +40,8 @@ __all__ = [
     "LiveInterviewStoreModel",
     "MultiTurnInterviewError",
     "phase13_interview",
+    "StakeholderAttemptDiagnostics",
+    "StakeholderGenerationError",
     "StakeholderResponseError",
     "StakeholderTurn",
     "build_interview_tools",

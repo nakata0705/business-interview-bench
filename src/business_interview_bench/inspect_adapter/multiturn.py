@@ -50,6 +50,7 @@ from .live_store import (
     persist_live_state,
 )
 from .stakeholder import (
+    StakeholderAttemptDiagnostics,
     StakeholderResponseError,
     invoke_stakeholder_response_with_plan,
 )
@@ -400,6 +401,30 @@ def multi_turn_interview_solver(
         def complete_state() -> None:
             state.completed = True
 
+        def record_stakeholder_diagnostics(
+            diagnostics: StakeholderAttemptDiagnostics | None,
+        ) -> None:
+            if diagnostics is None:
+                return
+            for name, value in diagnostics.as_dict().items():
+                key = f"interview_stakeholder_{name}"
+                previous = state.metadata.get(key)
+                previous_count = previous if isinstance(previous, int) else 0
+                state.metadata[key] = previous_count + value
+
+        def record_stakeholder_failure(error: StakeholderResponseError) -> None:
+            state.metadata["interview_stakeholder_failure_kind"] = (
+                error.failure_kind or "provider"
+            )
+            state.metadata["interview_stakeholder_failure_phase"] = error.phase
+            state.metadata["interview_stakeholder_failure_reason"] = (
+                error.failure_reason or "stakeholder_response_failure"
+            )
+            state.metadata["interview_stakeholder_retry_exhausted"] = (
+                error.retry_exhausted
+            )
+            record_stakeholder_diagnostics(error.diagnostics)
+
         if not any(
             isinstance(message, ChatMessageSystem)
             and _CANDIDATE_SYSTEM_MARKER in message.text
@@ -522,11 +547,22 @@ def multi_turn_interview_solver(
                     stakeholder_turn.plan,
                     stakeholder_turn.response,
                 )
-            except Exception:
-                # Do not append a public message when sidecar validation or
-                # stakeholder generation failed.  The exception remains
-                # visible to Inspect as a provider/runtime failure.
+            except Exception as exc:
+                if isinstance(exc, StakeholderResponseError):
+                    # A bounded WHAT/HOW failure is an authoritative terminal
+                    # protocol outcome.  Do not append a fabricated public
+                    # answer; persist an explicit incomplete state and retain
+                    # only safe failure counters in Inspect metadata.
+                    record_stakeholder_failure(exc)
+                    failure_reason = exc.failure_reason
+                    if failure_reason is None:
+                        failure_reason = "stakeholder_response_failure"
+                    runtime = mark_max_turn_exhausted(runtime, failure_reason)
+                    runtime_ref[0] = runtime
+                    persist(runtime)
+                    break
                 raise
+            record_stakeholder_diagnostics(stakeholder_turn.diagnostics)
             runtime_ref[0] = runtime
             persist(runtime)
             state.messages.append(

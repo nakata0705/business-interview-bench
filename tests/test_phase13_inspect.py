@@ -672,6 +672,77 @@ def test_phase13_terminology_keeps_both_public_provenance_spans(tmp_path) -> Non
     assert runtime_store.stakeholder_knowledge
 
 
+def test_stakeholder_retry_exhaustion_is_terminal_without_fabrication(tmp_path) -> None:
+    invalid_plan = ModelOutput.from_content(
+        "mockllm",
+        '{"items": [{"semantic_id": "missing", "mode": "value"}]}',
+    )
+    log = _run(
+        tmp_path,
+        [ModelOutput.from_content("mockllm", "What do you do?")],
+        (),
+        max_turns=2,
+        stakeholder_outputs=[invalid_plan, invalid_plan, invalid_plan],
+    )
+
+    assert log.status == "success"
+    runtime_store = _sample_store(log)
+    runtime = runtime_store.live_state
+    assert runtime["protocol_state"] == {
+        "status": "incomplete",
+        "completion_reason": None,
+        "failure_reason": "stakeholder_what_semantic_exhausted",
+        "terminal_turn": 1,
+    }
+    assert runtime["stakeholder_turns"] == 0
+    assert runtime["question_count"] == 1
+    assert runtime["public_message_ledger"][-1]["role"] == "assistant"
+    assert runtime["public_message_ledger"][-1]["content"] == "What do you do?"
+    assert (
+        log.samples[0].scores["phase13_primary_scorer"].value["protocol_completed"]
+        is False
+    )
+    metadata = log.samples[0].metadata
+    assert metadata["interview_stakeholder_failure_kind"] == "semantic"
+    assert metadata["interview_stakeholder_failure_phase"] == "plan"
+    assert metadata["interview_stakeholder_retry_exhausted"] is True
+    assert metadata["interview_stakeholder_what_semantic_rejections"] == 3
+    assert metadata["interview_stakeholder_retry_count"] == 2
+
+
+def test_stakeholder_how_exhaustion_is_terminal_without_a_public_response(
+    tmp_path,
+) -> None:
+    plan = ModelOutput.from_content("mockllm", '{"items": []}')
+    invalid_response = ModelOutput.from_content("mockllm", "not json")
+    log = _run(
+        tmp_path,
+        [ModelOutput.from_content("mockllm", "What do you do?")],
+        (),
+        max_turns=2,
+        stakeholder_outputs=[
+            plan,
+            invalid_response,
+            invalid_response,
+            invalid_response,
+        ],
+    )
+
+    assert log.status == "success"
+    runtime = _sample_store(log).live_state
+    assert runtime["protocol_state"]["status"] == "incomplete"
+    assert runtime["protocol_state"]["failure_reason"] == (
+        "stakeholder_how_structural_exhausted"
+    )
+    assert runtime["stakeholder_turns"] == 0
+    assert runtime["public_message_ledger"][-1]["role"] == "assistant"
+    metadata = log.samples[0].metadata
+    assert metadata["interview_stakeholder_failure_kind"] == "structural"
+    assert metadata["interview_stakeholder_failure_phase"] == "realization"
+    assert metadata["interview_stakeholder_how_structural_rejections"] == 3
+    assert metadata["interview_stakeholder_retry_count"] == 2
+
+
 def test_max_turn_exhaustion_is_explicit_incomplete_state(tmp_path) -> None:
     candidate_outputs = [
         ModelOutput.from_content("mockllm", "First question?"),
