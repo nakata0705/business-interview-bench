@@ -1,0 +1,348 @@
+{
+  "name": "phase21-provisional-candidate-policy-calibration",
+  "schema_version": 1,
+  "runs": [
+    {
+      "scenario_id": "lab_sample_flow",
+      "candidate_model": "openrouter/deepseek/deepseek-v4-flash-0731",
+      "stakeholder_model": "openrouter/deepseek/deepseek-v4-flash-0731",
+      "stakeholder_profile": {
+        "stakeholder_id": "phase14-lab-technician",
+        "name": "Phase 14 lab technician",
+        "role": "lab technician",
+        "visible_node_ids": [
+          "n1",
+          "n2",
+          "n3",
+          "n4"
+        ],
+        "visible_edge_ids": [
+          "l1",
+          "l2",
+          "l3"
+        ],
+        "visible_node_attributes": {
+          "n1": [
+            "activity",
+            "actor",
+            "rationale",
+            "reads",
+            "system",
+            "writes"
+          ],
+          "n2": [
+            "activity",
+            "actor",
+            "rationale",
+            "reads",
+            "system",
+            "writes"
+          ],
+          "n3": [
+            "activity",
+            "actor",
+            "rationale",
+            "reads",
+            "system",
+            "writes"
+          ],
+          "n4": [
+            "activity",
+            "actor",
+            "rationale",
+            "reads",
+            "system",
+            "writes"
+          ]
+        },
+        "visible_edge_attributes": {
+          "l1": [
+            "condition"
+          ],
+          "l2": [
+            "condition"
+          ],
+          "l3": [
+            "condition"
+          ]
+        },
+        "concept_overrides": {},
+        "forgetting": {
+          "baseline_forget_probability": 0.0,
+          "node_forget_probability": 0.0,
+          "edge_forget_probability": 0.0,
+          "property_forget_probability": 0.0,
+          "max_retries": 32,
+          "allow_shortcut_contraction": true
+        }
+      },
+      "stakeholder_seed": 1401,
+      "max_interview_turns": 8,
+      "max_candidate_steps_per_turn": 8,
+      "candidate_max_tokens": 2048,
+      "candidate_generation": {
+        "temperature": 0.0,
+        "max_tokens": 2048,
+        "reasoning_effort": "low",
+        "max_retries": 0,
+        "timeout": 60
+      },
+      "stakeholder_generation": {
+        "temperature": 0.0,
+        "reasoning_effort": "low",
+        "max_retries": 0,
+        "timeout": 60
+      },
+      "epoch": 1,
+      "run_index": 0
+    },
+    {
+      "scenario_id": "quotation_workflow_1",
+      "candidate_model": "openrouter/deepseek/deepseek-v4-flash-0731",
+      "stakeholder_model": "openrouter/deepseek/deepseek-v4-flash-0731",
+      "stakeholder_profile": {
+        "stakeholder_id": "phase14-sales-owner",
+        "name": "Phase 14 sales employee",
+        "role": "sales employee",
+        "visible_node_ids": [
+          "ap",
+          "cc",
+          "cq",
+          "me",
+          "r",
+          "sq"
+        ],
+        "visible_edge_ids": [
+          "e1",
+          "e2",
+          "e3",
+          "e4",
+          "e5",
+          "e6"
+        ],
+        "visible_node_attributes": {
+          "ap": [
+            "activity",
+            "actor",
+            "rationale",
+            "reads",
+            "system",
+            "writes"
+          ],
+          "cc": [
+            "activity",
+            "actor",
+            "rationale",
+            "reads",
+            "system",
+            "writes"
+          ],
+          "cq": [
+            "activity",
+            "actor",
+            "rationale",
+            "reads",
+            "system",
+            "writes"
+          ],
+          "me": [
+            "activity",
+            "actor",
+            "rationale",
+            "reads",
+            "system",
+            "writes"
+          ],
+          "r": [
+            "activity",
+            "actor",
+            "rationale",
+            "reads",
+            "system",
+            "writes"
+          ],
+          "sq": [
+            "activity",
+            "actor",
+            "rationale",
+            "reads",
+            "system",
+            "writes"
+          ]
+        },
+        "visible_edge_attributes": {
+          "e1": [
+            "condition"
+          ],
+          "e2": [
+            "condition"
+          ],
+          "e3": [
+            "condition"
+          ],
+          "e4": [
+            "condition"
+          ],
+          "e5": [
+            "condition"
+          ],
+          "e6": [
+            "condition"
+          ]
+        },
+        "concept_overrides": {},
+        "forgetting": {
+          "baseline_forget_probability": 0.0,
+          "node_forget_probability": 0.0,
+          "edge_forget_probability": 0.0,
+          "property_forget_probability": 0.0,
+          "max_retries": 32,
+          "allow_shortcut_contraction": true
+        }
+      },
+      "stakeholder_seed": 1402,
+      "max_interview_turns": 8,
+      "max_candidate_steps_per_turn": 8,
+      "candidate_max_tokens": 2048,
+      "candidate_generation": {
+        "temperature": 0.0,
+        "max_tokens": 2048,
+        "reasoning_effort": "low",
+        "max_retries": 0,
+        "timeout": 60
+      },
+      "stakeholder_generation": {
+        "temperature": 0.0,
+        "reasoning_effort": "low",
+        "max_retries": 0,
+        "timeout": 60
+      },
+      "epoch": 1,
+      "run_index": 1
+    },
+    {
+      "scenario_id": "quotation_workflow_1_ja",
+      "candidate_model": "openrouter/deepseek/deepseek-v4-flash-0731",
+      "stakeholder_model": "openrouter/deepseek/deepseek-v4-flash-0731",
+      "stakeholder_profile": {
+        "stakeholder_id": "phase14-sales-owner-ja",
+        "name": "Phase 14 営業担当者",
+        "role": "営業担当者",
+        "visible_node_ids": [
+          "ap",
+          "cc",
+          "cq",
+          "me",
+          "r",
+          "sq"
+        ],
+        "visible_edge_ids": [
+          "e1",
+          "e2",
+          "e3",
+          "e4",
+          "e5",
+          "e6"
+        ],
+        "visible_node_attributes": {
+          "ap": [
+            "activity",
+            "actor",
+            "rationale",
+            "reads",
+            "system",
+            "writes"
+          ],
+          "cc": [
+            "activity",
+            "actor",
+            "rationale",
+            "reads",
+            "system",
+            "writes"
+          ],
+          "cq": [
+            "activity",
+            "actor",
+            "rationale",
+            "reads",
+            "system",
+            "writes"
+          ],
+          "me": [
+            "activity",
+            "actor",
+            "rationale",
+            "reads",
+            "system",
+            "writes"
+          ],
+          "r": [
+            "activity",
+            "actor",
+            "rationale",
+            "reads",
+            "system",
+            "writes"
+          ],
+          "sq": [
+            "activity",
+            "actor",
+            "rationale",
+            "reads",
+            "system",
+            "writes"
+          ]
+        },
+        "visible_edge_attributes": {
+          "e1": [
+            "condition"
+          ],
+          "e2": [
+            "condition"
+          ],
+          "e3": [
+            "condition"
+          ],
+          "e4": [
+            "condition"
+          ],
+          "e5": [
+            "condition"
+          ],
+          "e6": [
+            "condition"
+          ]
+        },
+        "concept_overrides": {},
+        "forgetting": {
+          "baseline_forget_probability": 0.0,
+          "node_forget_probability": 0.0,
+          "edge_forget_probability": 0.0,
+          "property_forget_probability": 0.0,
+          "max_retries": 32,
+          "allow_shortcut_contraction": true
+        }
+      },
+      "stakeholder_seed": 1403,
+      "max_interview_turns": 8,
+      "max_candidate_steps_per_turn": 8,
+      "candidate_max_tokens": 2048,
+      "candidate_generation": {
+        "temperature": 0.0,
+        "max_tokens": 2048,
+        "reasoning_effort": "low",
+        "max_retries": 0,
+        "timeout": 60
+      },
+      "stakeholder_generation": {
+        "temperature": 0.0,
+        "reasoning_effort": "low",
+        "max_retries": 0,
+        "timeout": 60
+      },
+      "epoch": 1,
+      "run_index": 2
+    }
+  ]
+}

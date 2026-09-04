@@ -1,0 +1,216 @@
+{
+  "schema_version": 1,
+  "experiment": "phase21-candidate-generation-policy",
+  "purpose": "Compare Candidate generation budgets and reasoning policy without changing interview strategy.",
+  "candidate_model": "openrouter/deepseek/deepseek-v4-flash-0731",
+  "scenario_id": "quotation_workflow_1",
+  "stakeholder_fixture": {
+    "kind": "inspect_mockllm",
+    "description": "Deterministic empty-plan/short-response pairs held constant across arms.",
+    "target_stakeholder_not_measured": true
+  },
+  "common_controls": {
+    "temperature": 0.0,
+    "provider_retries": 0,
+    "stakeholder_projection_seed": 1402,
+    "candidate_generation_seed": null,
+    "candidate_generation_seed_controlled": false,
+    "model_timeout_seconds": 60,
+    "attempt_timeout_seconds": 60,
+    "max_interview_turns": 8,
+    "max_candidate_steps_per_turn": 8,
+    "stakeholder_policy_unchanged_in_benchmark": true,
+    "primary_evaluation_field_count": 41
+  },
+  "arms": [
+    {
+      "name": "baseline_1024_no_reasoning_override",
+      "run_index": 400,
+      "candidate_generation": {
+        "max_tokens": 1024,
+        "temperature": 0.0,
+        "reasoning_effort": null,
+        "provider_retries": 0,
+        "seed": null
+      },
+      "status": "available",
+      "terminal_result": "interview_turn_limit",
+      "primary_evaluation_field_count": 41,
+      "candidate_generation_count": 9,
+      "candidate_diagnostics": {
+        "candidate_question_generation_count": 8,
+        "candidate_tool_generation_count": 1,
+        "candidate_empty_completion_count": 0,
+        "candidate_output_exhaustion_count": 0,
+        "candidate_provider_error_count": 0,
+        "candidate_invalid_tool_call_count": 0,
+        "candidate_generations_at_max_tokens_count": 0,
+        "candidate_total_tool_call_count": 2,
+        "candidate_tool_error_count": 0,
+        "candidate_tool_call_counts": {
+          "get_agent_graph": 1,
+          "get_observations": 1
+        },
+        "candidate_tool_error_counts": {},
+        "candidate_tool_call_category_counts": {
+          "graph_reads": 2
+        },
+        "candidate_tool_error_category_counts": {},
+        "candidate_tool_call_sequences": [
+          {
+            "interview_turn_index": 1,
+            "steps": [
+              {
+                "candidate_step_index": 1,
+                "tool_call_count": 2,
+                "tool_names": [
+                  "get_agent_graph",
+                  "get_observations"
+                ],
+                "tool_error_count": 0
+              }
+            ]
+          }
+        ]
+      },
+      "candidate_usage": {
+        "input_tokens": 1480,
+        "output_tokens": 1267,
+        "reasoning_tokens": 1148,
+        "total_tokens": 24507,
+        "total_cost": null,
+        "non_reasoning_output_tokens": 119,
+        "reasoning_share": 0.9060773480662984
+      },
+      "comparison_note": "The fixed stakeholder fixture intentionally runs to the interview-turn bound; this arm result is for Candidate mechanics, not benchmark quality."
+    },
+    {
+      "name": "expanded_2048_no_reasoning_override",
+      "run_index": 401,
+      "candidate_generation": {
+        "max_tokens": 2048,
+        "temperature": 0.0,
+        "reasoning_effort": null,
+        "provider_retries": 0,
+        "seed": null
+      },
+      "status": "available",
+      "terminal_result": "interview_turn_limit",
+      "primary_evaluation_field_count": 41,
+      "candidate_generation_count": 9,
+      "candidate_diagnostics": {
+        "candidate_question_generation_count": 8,
+        "candidate_tool_generation_count": 1,
+        "candidate_empty_completion_count": 0,
+        "candidate_output_exhaustion_count": 0,
+        "candidate_provider_error_count": 0,
+        "candidate_invalid_tool_call_count": 0,
+        "candidate_generations_at_max_tokens_count": 0,
+        "candidate_total_tool_call_count": 2,
+        "candidate_tool_error_count": 0,
+        "candidate_tool_call_counts": {
+          "get_agent_graph": 1,
+          "get_observations": 1
+        },
+        "candidate_tool_error_counts": {},
+        "candidate_tool_call_category_counts": {
+          "graph_reads": 2
+        },
+        "candidate_tool_error_category_counts": {},
+        "candidate_tool_call_sequences": [
+          {
+            "interview_turn_index": 1,
+            "steps": [
+              {
+                "candidate_step_index": 1,
+                "tool_call_count": 2,
+                "tool_names": [
+                  "get_agent_graph",
+                  "get_observations"
+                ],
+                "tool_error_count": 0
+              }
+            ]
+          }
+        ]
+      },
+      "candidate_usage": {
+        "input_tokens": 1537,
+        "output_tokens": 1253,
+        "reasoning_tokens": 1195,
+        "total_tokens": 24294,
+        "total_cost": null,
+        "non_reasoning_output_tokens": 58,
+        "reasoning_share": 0.9537110933758979
+      },
+      "comparison_note": "The fixed stakeholder fixture intentionally runs to the interview-turn bound; this arm result is for Candidate mechanics, not benchmark quality."
+    },
+    {
+      "name": "expanded_2048_low_reasoning",
+      "run_index": 402,
+      "candidate_generation": {
+        "max_tokens": 2048,
+        "temperature": 0.0,
+        "reasoning_effort": "low",
+        "provider_retries": 0,
+        "seed": null
+      },
+      "status": "available",
+      "terminal_result": "interview_turn_limit",
+      "primary_evaluation_field_count": 41,
+      "candidate_generation_count": 9,
+      "candidate_diagnostics": {
+        "candidate_question_generation_count": 8,
+        "candidate_tool_generation_count": 1,
+        "candidate_empty_completion_count": 0,
+        "candidate_output_exhaustion_count": 0,
+        "candidate_provider_error_count": 0,
+        "candidate_invalid_tool_call_count": 0,
+        "candidate_generations_at_max_tokens_count": 0,
+        "candidate_total_tool_call_count": 2,
+        "candidate_tool_error_count": 0,
+        "candidate_tool_call_counts": {
+          "get_agent_graph": 1,
+          "get_observations": 1
+        },
+        "candidate_tool_error_counts": {},
+        "candidate_tool_call_category_counts": {
+          "graph_reads": 2
+        },
+        "candidate_tool_error_category_counts": {},
+        "candidate_tool_call_sequences": [
+          {
+            "interview_turn_index": 1,
+            "steps": [
+              {
+                "candidate_step_index": 1,
+                "tool_call_count": 2,
+                "tool_names": [
+                  "get_agent_graph",
+                  "get_observations"
+                ],
+                "tool_error_count": 0
+              }
+            ]
+          }
+        ]
+      },
+      "candidate_usage": {
+        "input_tokens": 4026,
+        "output_tokens": 854,
+        "reasoning_tokens": 496,
+        "total_tokens": 23568,
+        "total_cost": null,
+        "non_reasoning_output_tokens": 358,
+        "reasoning_share": 0.5807962529274004
+      },
+      "comparison_note": "The fixed stakeholder fixture intentionally runs to the interview-turn bound; this arm result is for Candidate mechanics, not benchmark quality."
+    }
+  ],
+  "decision": {
+    "provisional_policy": "expanded_2048_low_reasoning",
+    "selection_rule": "Prefer an arm with no Candidate output/provider failures, then the lowest reasoning-token usage at the same successful question behavior.",
+    "evidence": "All three isolation arms produced 8 questions, no output exhaustion, and no provider errors; the low-reasoning arm used fewer Candidate reasoning tokens than both no-override arms.",
+    "not_a_strategy_change": true
+  }
+}

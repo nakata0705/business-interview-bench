@@ -15,6 +15,7 @@ import argparse
 import json
 import os
 import re
+from collections import Counter
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import fields
 from pathlib import Path
@@ -27,6 +28,10 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from business_interview.evaluation import PrimaryEvaluation
 from business_interview.scenarios import get_scenario
 from business_interview.stakeholders import StakeholderProfile, project_knowledge
+from business_interview_bench.inspect_adapter.candidate import (
+    CandidateGenerationOutcome,
+    classify_candidate_output,
+)
 
 SUMMARY_SCHEMA_VERSION = 3
 _USAGE_FIELDS = (
@@ -534,6 +539,78 @@ def _event_usage(event: object, *, warnings: list[str] | None = None) -> dict[st
     return _usage(raw_usage, warnings=warnings)
 
 
+def _candidate_generation_records(
+    sample: object,
+    *,
+    configured_max_tokens: int | None,
+    requested_reasoning_effort: str | None,
+    warnings: list[str] | None,
+) -> list[dict[str, Any]]:
+    """Classify every Candidate ModelEvent without retaining its completion."""
+    records: list[dict[str, Any]] = []
+    interview_turn_index = 1
+    candidate_step_index = 0
+    next_turn = False
+    current_record: dict[str, Any] | None = None
+
+    for event in _events(sample):
+        if _is_model_event(event):
+            if getattr(event, "role", None) == "stakeholder":
+                # The next Candidate generation starts the next interview
+                # turn. Multiple stakeholder WHAT/HOW calls still advance only
+                # once because ``next_turn`` remains set.
+                next_turn = True
+                current_record = None
+                continue
+            if next_turn:
+                interview_turn_index += 1
+                candidate_step_index = 0
+                next_turn = False
+            candidate_step_index += 1
+            outcome: CandidateGenerationOutcome = classify_candidate_output(
+                getattr(event, "output", None)
+            )
+            usage = _event_usage(event, warnings=warnings)
+            event_config = _as_mapping(getattr(event, "config", None))
+            event_max_tokens = _int_or_none(event_config.get("max_tokens"))
+            record: dict[str, Any] = {
+                "role": "candidate",
+                # Preserve the historical phase field; the explicit outcome
+                # kind below is the Candidate-specific classification.
+                "phase": "unknown",
+                "requested_reasoning_effort": requested_reasoning_effort,
+                "response_index": None,
+                "attempt_index": len(records) + 1,
+                "retry": False,
+                "accepted": None,
+                "interview_turn_index": interview_turn_index,
+                "candidate_step_index": candidate_step_index,
+                "outcome_kind": outcome.outcome_kind,
+                "stop_reason": outcome.stop_reason,
+                "tool_call_count": outcome.tool_call_count,
+                "tool_names": list(outcome.tool_names),
+                "visible_completion_chars": outcome.visible_completion_chars,
+                "configured_max_tokens": (
+                    configured_max_tokens
+                    if configured_max_tokens is not None
+                    else event_max_tokens
+                ),
+                "hit_output_limit": outcome.hit_output_limit,
+                "produced_question": outcome.produced_question,
+                "tool_error_count": 0,
+            }
+            record.update(usage)
+            records.append(record)
+            current_record = record if outcome.tool_call_count else None
+            continue
+
+        if type(event).__name__ == "ToolEvent" and current_record is not None:
+            if _event_error(event):
+                current_record["tool_error_count"] += 1
+
+    return records
+
+
 def _event_usages(
     sample: object,
     *,
@@ -668,6 +745,36 @@ def _limit_parameters(log: EvalLog, sample: object) -> dict[str, int | None]:
             "candidate_max_tokens", "phase13_candidate_max_tokens"
         ),
     }
+
+
+def _candidate_configured_max_tokens(
+    log: EvalLog,
+    sample: object,
+    generation_parameters: Mapping[str, Mapping[str, Any]],
+) -> int | None:
+    """Resolve the effective Candidate token bound for safe diagnostics."""
+    candidate_config = generation_parameters.get("candidate", {})
+    for value in (
+        _runtime_payload(sample).get("candidate_max_tokens"),
+        _task_args(log).get("candidate_max_tokens"),
+        candidate_config.get("max_tokens"),
+    ):
+        numeric = _int_or_none(value)
+        if numeric is not None:
+            return numeric
+    return None
+
+
+def _run_availability(log: EvalLog, protocol: Mapping[str, Any]) -> str:
+    """Mark non-terminal samples unavailable rather than scoring them as zero."""
+    status = protocol.get("status")
+    if status in {"completed", "incomplete"}:
+        return "available"
+    if status == "active":
+        return "unavailable"
+    return (
+        "unavailable" if _text(getattr(log, "status", None)) != "success" else "unknown"
+    )
 
 
 def _protocol_summary(log: EvalLog, sample: object) -> dict[str, Any]:
@@ -969,6 +1076,8 @@ def _per_generation_usage(
     sample: object,
     *,
     requested_reasoning_effort: str | None = None,
+    candidate_configured_max_tokens: int | None = None,
+    candidate_reasoning_effort: str | None = None,
     warnings: list[str] | None = None,
 ) -> dict[str, list[dict[str, Any]]]:
     """Return safe usage metadata for every candidate/stakeholder ModelEvent."""
@@ -1009,36 +1118,21 @@ def _per_generation_usage(
                     warnings=warnings,
                 )
 
-    candidate_records: list[dict[str, Any]] = []
+    candidate_records = _candidate_generation_records(
+        sample,
+        configured_max_tokens=candidate_configured_max_tokens,
+        requested_reasoning_effort=candidate_reasoning_effort,
+        warnings=warnings,
+    )
     stakeholder_records: list[dict[str, Any]] = []
-    candidate_index = 0
     for event in _events(sample):
         if not _is_model_event(event):
             continue
-        if getattr(event, "role", None) == "stakeholder":
-            record = stakeholder_details.get(id(event))
-            if record is not None:
-                stakeholder_records.append(record)
+        if getattr(event, "role", None) != "stakeholder":
             continue
-        candidate_index += 1
-        explicit_retry = False
-        try:
-            explicit_retry = _is_retry_attempt(event)
-        except (AttributeError, TypeError):
-            explicit_retry = False
-        candidate_records.append(
-            _generation_usage_record(
-                event,
-                role="candidate",
-                phase="unknown",
-                requested_reasoning_effort=None,
-                response_index=None,
-                attempt_index=candidate_index,
-                retry=explicit_retry,
-                accepted=None,
-                warnings=warnings,
-            )
-        )
+        record = stakeholder_details.get(id(event))
+        if record is not None:
+            stakeholder_records.append(record)
     return {"candidate": candidate_records, "stakeholder": stakeholder_records}
 
 
@@ -1306,6 +1400,141 @@ def _stakeholder_terminal_diagnostics(
     }
 
 
+_CANDIDATE_GRAPH_READ_TOOLS = frozenset({"get_agent_graph", "get_observations"})
+_CANDIDATE_EVIDENCE_TOOLS = frozenset({"attach_evidence"})
+_CANDIDATE_COMPLETION_TOOLS = frozenset({"complete_interview"})
+
+
+def _candidate_tool_category(name: str) -> str:
+    if name in _CANDIDATE_GRAPH_READ_TOOLS:
+        return "graph_reads"
+    if name in _CANDIDATE_EVIDENCE_TOOLS:
+        return "evidence_operations"
+    if name in _CANDIDATE_COMPLETION_TOOLS:
+        return "completion"
+    if name.startswith(("add_", "remove_", "define_", "set_", "update_")):
+        return "graph_mutations"
+    return "other"
+
+
+def _candidate_tool_error_counts(sample: object) -> Counter[str]:
+    counts: Counter[str] = Counter()
+    for event in _events(sample):
+        if type(event).__name__ != "ToolEvent" or not _event_error(event):
+            continue
+        name = getattr(event, "function", None)
+        if isinstance(name, str) and name:
+            counts[name] += 1
+    return counts
+
+
+def _candidate_diagnostics(
+    sample: object,
+    records: Sequence[Mapping[str, Any]],
+    metadata: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Summarize Candidate mechanics without copying completion content."""
+    outcome_counts = Counter(
+        str(record["outcome_kind"])
+        for record in records
+        if isinstance(record.get("outcome_kind"), str)
+    )
+    tool_call_counts: Counter[str] = Counter()
+    tool_call_category_counts: Counter[str] = Counter()
+    sequences: dict[int, dict[str, Any]] = {}
+    for record in records:
+        raw_names = record.get("tool_names")
+        names = (
+            [name for name in raw_names if isinstance(name, str)]
+            if isinstance(raw_names, Sequence) and not isinstance(raw_names, str)
+            else []
+        )
+        for name in names:
+            tool_call_counts[name] += 1
+            tool_call_category_counts[_candidate_tool_category(name)] += 1
+        raw_call_count = _int_or_none(record.get("tool_call_count")) or 0
+        unnamed_count = max(0, raw_call_count - len(names))
+        if unnamed_count:
+            tool_call_category_counts["other"] += unnamed_count
+        if raw_call_count <= 0:
+            continue
+        turn = _int_or_none(record.get("interview_turn_index"))
+        step = _int_or_none(record.get("candidate_step_index"))
+        if turn is None or step is None:
+            continue
+        sequence = sequences.setdefault(
+            turn,
+            {"interview_turn_index": turn, "steps": []},
+        )
+        sequence["steps"].append(
+            {
+                "candidate_step_index": step,
+                "tool_call_count": raw_call_count,
+                "tool_names": names,
+                "tool_error_count": _int_or_none(record.get("tool_error_count")) or 0,
+            }
+        )
+
+    event_provider_errors = outcome_counts["provider_error"]
+    metadata_provider_errors = _metadata_count(
+        metadata, "interview_candidate_provider_error_count"
+    )
+    provider_error_count = (
+        metadata_provider_errors
+        if metadata_provider_errors is not None
+        else event_provider_errors
+    )
+    runtime_protocol = _as_mapping(_runtime_payload(sample).get("protocol_state"))
+    terminal_reason = runtime_protocol.get("failure_reason")
+    if not isinstance(terminal_reason, str) or not terminal_reason:
+        terminal_reason = None
+    tool_error_counts = _candidate_tool_error_counts(sample)
+    tool_error_category_counts: Counter[str] = Counter()
+    for name, count in tool_error_counts.items():
+        tool_error_category_counts[_candidate_tool_category(name)] += count
+
+    return {
+        "candidate_question_generation_count": sum(
+            1 for record in records if _is_true(record.get("produced_question"))
+        ),
+        "candidate_tool_generation_count": sum(
+            1
+            for record in records
+            if (_int_or_none(record.get("tool_call_count")) or 0) > 0
+        ),
+        "candidate_empty_completion_count": outcome_counts["empty_completion"],
+        "candidate_output_exhaustion_count": outcome_counts["output_exhaustion"],
+        "candidate_provider_error_count": provider_error_count,
+        "candidate_invalid_tool_call_count": outcome_counts["invalid_tool_call"],
+        "candidate_generations_at_max_tokens_count": sum(
+            1 for record in records if _is_true(record.get("hit_output_limit"))
+        ),
+        "candidate_total_tool_call_count": sum(
+            (_int_or_none(record.get("tool_call_count")) or 0) for record in records
+        ),
+        "candidate_tool_call_counts": dict(sorted(tool_call_counts.items())),
+        "candidate_tool_error_count": sum(tool_error_counts.values()),
+        "candidate_tool_error_counts": dict(sorted(tool_error_counts.items())),
+        "candidate_tool_call_category_counts": dict(
+            sorted(tool_call_category_counts.items())
+        ),
+        "candidate_tool_error_category_counts": dict(
+            sorted(tool_error_category_counts.items())
+        ),
+        "candidate_tool_call_sequences": [sequences[key] for key in sorted(sequences)],
+        "candidate_terminal_reason": terminal_reason,
+        "candidate_step_limit_reached": (
+            terminal_reason == "candidate_step_limit_exhausted"
+        ),
+        "candidate_true_no_question_count": (
+            1 if terminal_reason == "candidate_did_not_ask_question" else 0
+        ),
+        "candidate_did_not_ask_question_count": (
+            1 if terminal_reason == "candidate_did_not_ask_question" else 0
+        ),
+    }
+
+
 def _empty_plan_diagnostics(sample: object) -> dict[str, int]:
     """Separate accepted-response counters from raw WHAT/HOW attempts."""
     return {
@@ -1423,7 +1652,11 @@ def classify_failure(
             return "stakeholder_generation_failure"
     if reason == "candidate_did_not_ask_question":
         return "candidate_did_not_ask_question"
-    if reason == "candidate_step_limit_exhausted":
+    if reason == "candidate_output_exhausted":
+        return "candidate_output_exhausted"
+    if reason == "candidate_generation_failure":
+        return "candidate_generation_failure"
+    if reason in {"candidate_step_limit_exhausted", "candidate_step_limit"}:
         return "candidate_step_limit"
     if reason in {"max_turns_exhausted", "max_interview_turns_exhausted"}:
         return "interview_turn_limit"
@@ -1526,9 +1759,19 @@ def _run_summary(log: EvalLog, sample: object, source_name: str) -> dict[str, An
     if not isinstance(requested_reasoning_effort, str):
         requested_reasoning_effort = None
     usage_warnings: list[str] = []
+    candidate_configured_max_tokens = _candidate_configured_max_tokens(
+        log, sample, generation_parameters
+    )
+    candidate_reasoning_effort = generation_parameters["candidate"].get(
+        "reasoning_effort"
+    )
+    if not isinstance(candidate_reasoning_effort, str):
+        candidate_reasoning_effort = None
     generation_usage = _per_generation_usage(
         sample,
         requested_reasoning_effort=requested_reasoning_effort,
+        candidate_configured_max_tokens=candidate_configured_max_tokens,
+        candidate_reasoning_effort=candidate_reasoning_effort,
         warnings=usage_warnings,
     )
     usage = _usage_by_role(
@@ -1540,6 +1783,7 @@ def _run_summary(log: EvalLog, sample: object, source_name: str) -> dict[str, An
     diagnostics = {
         "failure_class": failure_class,
         **_error_diagnostics(sample),
+        **_candidate_diagnostics(sample, generation_usage["candidate"], metadata),
         **_empty_plan_diagnostics(sample),
         **_stakeholder_attempt_usage_diagnostics(generation_usage["stakeholder"]),
         **_stakeholder_terminal_diagnostics(metadata, failure_class),
@@ -1561,6 +1805,7 @@ def _run_summary(log: EvalLog, sample: object, source_name: str) -> dict[str, An
     diagnostics["quality_tags"] = tags
     return {
         "schema_version": SUMMARY_SCHEMA_VERSION,
+        "availability": _run_availability(log, protocol),
         "run": {
             "scenario_id": scenario_id,
             "candidate_model": candidate_model,
@@ -1795,6 +2040,52 @@ def _aggregate_stakeholder_contract_diagnostics(
     return result
 
 
+def _aggregate_candidate_diagnostics(
+    runs: Sequence[Mapping[str, Any]],
+) -> dict[str, Any]:
+    """Aggregate Candidate generation mechanics without completion content."""
+    fields = (
+        "candidate_question_generation_count",
+        "candidate_tool_generation_count",
+        "candidate_empty_completion_count",
+        "candidate_output_exhaustion_count",
+        "candidate_provider_error_count",
+        "candidate_invalid_tool_call_count",
+        "candidate_generations_at_max_tokens_count",
+        "candidate_total_tool_call_count",
+        "candidate_tool_error_count",
+        "candidate_true_no_question_count",
+        "candidate_did_not_ask_question_count",
+    )
+    result: dict[str, Any] = {}
+    for field in fields:
+        result[f"total_{field}"] = _diagnostic_total(runs, field)
+        result[f"mean_{field}"] = _mean(_diagnostic_values(runs, field))
+
+    for field in (
+        "candidate_tool_call_counts",
+        "candidate_tool_error_counts",
+        "candidate_tool_call_category_counts",
+        "candidate_tool_error_category_counts",
+    ):
+        counts: Counter[str] = Counter()
+        for run in runs:
+            value = _as_mapping(run.get("diagnostics")).get(field)
+            for name, count in _as_mapping(value).items():
+                numeric = _int_or_none(count)
+                if numeric is not None and numeric >= 0:
+                    counts[str(name)] += numeric
+        result[field] = dict(sorted(counts.items()))
+
+    terminal_reasons: Counter[str] = Counter()
+    for run in runs:
+        reason = _as_mapping(run.get("diagnostics")).get("candidate_terminal_reason")
+        if isinstance(reason, str) and reason:
+            terminal_reasons[reason] += 1
+    result["candidate_terminal_reason_counts"] = dict(sorted(terminal_reasons.items()))
+    return result
+
+
 def _aggregate_base(runs: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
     score_runs = [_as_mapping(run.get("primary_evaluation")) for run in runs]
     protocol_runs = [_as_mapping(run.get("protocol")) for run in runs]
@@ -1853,6 +2144,7 @@ def _aggregate_base(runs: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
         "mean_recoverable_tool_error_count": _mean(
             _diagnostic_values(runs, "recoverable_tool_error_count")
         ),
+        **_aggregate_candidate_diagnostics(runs),
         "total_stakeholder_semantic_rejection_count": _diagnostic_total(
             runs, "stakeholder_semantic_rejection_count"
         ),
@@ -1903,14 +2195,20 @@ def _grouped(runs: Sequence[Mapping[str, Any]], field: str) -> dict[str, Any]:
 
 
 def aggregate_run_summaries(runs: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
-    """Aggregate safe summaries, with scenario/model grouping."""
+    """Aggregate safe summaries, excluding explicitly unavailable samples."""
     run_list = list(runs)
-    aggregate = _aggregate_base(run_list)
-    aggregate["by_scenario"] = _grouped(run_list, "scenario_id")
-    aggregate["by_candidate_model"] = _grouped(run_list, "candidate_model")
-    aggregate["by_stakeholder_model"] = _grouped(run_list, "stakeholder_model")
+    available_runs = [
+        run for run in run_list if run.get("availability") != "unavailable"
+    ]
+    aggregate = _aggregate_base(available_runs)
+    aggregate["manifest_run_count"] = len(run_list)
+    aggregate["available_run_count"] = len(available_runs)
+    aggregate["unavailable_run_count"] = len(run_list) - len(available_runs)
+    aggregate["by_scenario"] = _grouped(available_runs, "scenario_id")
+    aggregate["by_candidate_model"] = _grouped(available_runs, "candidate_model")
+    aggregate["by_stakeholder_model"] = _grouped(available_runs, "stakeholder_model")
     aggregate["by_requested_reasoning_effort"] = _grouped(
-        run_list, "requested_reasoning_effort"
+        available_runs, "requested_reasoning_effort"
     )
     return aggregate
 

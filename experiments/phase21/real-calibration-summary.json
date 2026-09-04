@@ -1,0 +1,668 @@
+{
+  "schema_version": 1,
+  "experiment": "phase21-provisional-candidate-policy-calibration",
+  "candidate_model": "openrouter/deepseek/deepseek-v4-flash-0731",
+  "stakeholder_model": "openrouter/deepseek/deepseek-v4-flash-0731",
+  "policy": {
+    "candidate": {
+      "max_tokens": 2048,
+      "temperature": 0.0,
+      "reasoning_effort": "low",
+      "provider_retries": 0
+    },
+    "stakeholder": {
+      "temperature": 0.0,
+      "reasoning_effort": "low",
+      "provider_retries": 0
+    },
+    "limits": {
+      "max_interview_turns": 8,
+      "max_candidate_steps_per_turn": 8
+    },
+    "launch_timeouts_seconds": {
+      "model_timeout": 60,
+      "attempt_timeout": 60,
+      "sample_time_limit": 300
+    }
+  },
+  "runs": [
+    {
+      "run_index": 0,
+      "scenario_id": "lab_sample_flow",
+      "availability": "available",
+      "terminal_result": "completed",
+      "primary_evaluation_field_count": 41,
+      "candidate_generation_count": 11,
+      "candidate_diagnostics": {
+        "candidate_question_generation_count": 2,
+        "candidate_tool_generation_count": 9,
+        "candidate_empty_completion_count": 0,
+        "candidate_output_exhaustion_count": 0,
+        "candidate_provider_error_count": 0,
+        "candidate_invalid_tool_call_count": 0,
+        "candidate_generations_at_max_tokens_count": 0,
+        "candidate_total_tool_call_count": 54,
+        "candidate_tool_error_count": 6,
+        "candidate_tool_call_counts": {
+          "add_edge": 3,
+          "add_node": 4,
+          "attach_evidence": 11,
+          "complete_interview": 1,
+          "define_concept": 11,
+          "get_agent_graph": 1,
+          "get_observations": 1,
+          "set_end_nodes": 1,
+          "set_node_property": 14,
+          "set_node_property_list": 6,
+          "set_start_nodes": 1
+        },
+        "candidate_tool_error_counts": {
+          "set_node_property": 6
+        },
+        "candidate_tool_call_category_counts": {
+          "completion": 1,
+          "evidence_operations": 11,
+          "graph_mutations": 40,
+          "graph_reads": 2
+        },
+        "candidate_tool_error_category_counts": {
+          "graph_mutations": 6
+        },
+        "candidate_tool_call_sequences": [
+          {
+            "interview_turn_index": 2,
+            "steps": [
+              {
+                "candidate_step_index": 1,
+                "tool_call_count": 11,
+                "tool_names": [
+                  "define_concept",
+                  "define_concept",
+                  "define_concept",
+                  "define_concept",
+                  "define_concept",
+                  "define_concept",
+                  "define_concept",
+                  "define_concept",
+                  "define_concept",
+                  "define_concept",
+                  "define_concept"
+                ],
+                "tool_error_count": 0
+              },
+              {
+                "candidate_step_index": 2,
+                "tool_call_count": 4,
+                "tool_names": [
+                  "add_node",
+                  "add_node",
+                  "add_node",
+                  "add_node"
+                ],
+                "tool_error_count": 0
+              },
+              {
+                "candidate_step_index": 3,
+                "tool_call_count": 14,
+                "tool_names": [
+                  "set_node_property",
+                  "set_node_property",
+                  "set_node_property",
+                  "set_node_property",
+                  "set_node_property",
+                  "set_node_property",
+                  "set_node_property",
+                  "set_node_property",
+                  "set_node_property",
+                  "set_node_property",
+                  "set_node_property",
+                  "set_node_property",
+                  "set_node_property",
+                  "set_node_property"
+                ],
+                "tool_error_count": 6
+              },
+              {
+                "candidate_step_index": 4,
+                "tool_call_count": 6,
+                "tool_names": [
+                  "set_node_property_list",
+                  "set_node_property_list",
+                  "set_node_property_list",
+                  "set_node_property_list",
+                  "set_node_property_list",
+                  "set_node_property_list"
+                ],
+                "tool_error_count": 0
+              },
+              {
+                "candidate_step_index": 5,
+                "tool_call_count": 5,
+                "tool_names": [
+                  "add_edge",
+                  "add_edge",
+                  "add_edge",
+                  "set_start_nodes",
+                  "set_end_nodes"
+                ],
+                "tool_error_count": 0
+              },
+              {
+                "candidate_step_index": 6,
+                "tool_call_count": 1,
+                "tool_names": [
+                  "get_observations"
+                ],
+                "tool_error_count": 0
+              },
+              {
+                "candidate_step_index": 7,
+                "tool_call_count": 11,
+                "tool_names": [
+                  "attach_evidence",
+                  "attach_evidence",
+                  "attach_evidence",
+                  "attach_evidence",
+                  "attach_evidence",
+                  "attach_evidence",
+                  "attach_evidence",
+                  "attach_evidence",
+                  "attach_evidence",
+                  "attach_evidence",
+                  "attach_evidence"
+                ],
+                "tool_error_count": 0
+              }
+            ]
+          },
+          {
+            "interview_turn_index": 3,
+            "steps": [
+              {
+                "candidate_step_index": 1,
+                "tool_call_count": 1,
+                "tool_names": [
+                  "get_agent_graph"
+                ],
+                "tool_error_count": 0
+              },
+              {
+                "candidate_step_index": 2,
+                "tool_call_count": 1,
+                "tool_names": [
+                  "complete_interview"
+                ],
+                "tool_error_count": 0
+              }
+            ]
+          }
+        ]
+      },
+      "candidate_usage": {
+        "input_tokens": 27623,
+        "output_tokens": 4521,
+        "reasoning_tokens": 540,
+        "total_tokens": 70288,
+        "total_cost": null,
+        "non_reasoning_output_tokens": 3981,
+        "reasoning_share": 0.11944260119442601
+      },
+      "stakeholder_diagnostics": {
+        "accepted_response_count": 2,
+        "accepted_nonempty_plan_response_count": 1,
+        "accepted_annotated_response_count": 1,
+        "stakeholder_rejection_count": 0,
+        "stakeholder_output_exhaustion_count": 0,
+        "stakeholder_provider_error_count": 0,
+        "stakeholder_retry_count": 0
+      },
+      "protocol_completed": true,
+      "safe_score_flags": {
+        "reconstruction_pass": false,
+        "evidence_pass": false,
+        "protocol_pass": true,
+        "quality_pass": false
+      },
+      "candidate_generation_records": [
+        {
+          "interview_turn_index": 1,
+          "candidate_step_index": 1,
+          "outcome_kind": "question",
+          "stop_reason": "stop",
+          "configured_max_tokens": 2048,
+          "hit_output_limit": false,
+          "produced_question": true,
+          "tool_call_count": 0,
+          "tool_names": [],
+          "tool_error_count": 0,
+          "input_tokens": 2232,
+          "output_tokens": 80,
+          "reasoning_tokens": 45,
+          "non_reasoning_output_tokens": 35,
+          "total_tokens": 2312
+        },
+        {
+          "interview_turn_index": 2,
+          "candidate_step_index": 1,
+          "outcome_kind": "tool_call",
+          "stop_reason": "tool_calls",
+          "configured_max_tokens": 2048,
+          "hit_output_limit": false,
+          "produced_question": false,
+          "tool_call_count": 11,
+          "tool_names": [
+            "define_concept",
+            "define_concept",
+            "define_concept",
+            "define_concept",
+            "define_concept",
+            "define_concept",
+            "define_concept",
+            "define_concept",
+            "define_concept",
+            "define_concept",
+            "define_concept"
+          ],
+          "tool_error_count": 0,
+          "input_tokens": 315,
+          "output_tokens": 1010,
+          "reasoning_tokens": 244,
+          "non_reasoning_output_tokens": 766,
+          "total_tokens": 3373
+        },
+        {
+          "interview_turn_index": 2,
+          "candidate_step_index": 2,
+          "outcome_kind": "tool_call",
+          "stop_reason": "tool_calls",
+          "configured_max_tokens": 2048,
+          "hit_output_limit": false,
+          "produced_question": false,
+          "tool_call_count": 4,
+          "tool_names": [
+            "add_node",
+            "add_node",
+            "add_node",
+            "add_node"
+          ],
+          "tool_error_count": 0,
+          "input_tokens": 1439,
+          "output_tokens": 173,
+          "reasoning_tokens": 17,
+          "non_reasoning_output_tokens": 156,
+          "total_tokens": 3916
+        },
+        {
+          "interview_turn_index": 2,
+          "candidate_step_index": 3,
+          "outcome_kind": "tool_call",
+          "stop_reason": "tool_calls",
+          "configured_max_tokens": 2048,
+          "hit_output_limit": false,
+          "produced_question": false,
+          "tool_call_count": 14,
+          "tool_names": [
+            "set_node_property",
+            "set_node_property",
+            "set_node_property",
+            "set_node_property",
+            "set_node_property",
+            "set_node_property",
+            "set_node_property",
+            "set_node_property",
+            "set_node_property",
+            "set_node_property",
+            "set_node_property",
+            "set_node_property",
+            "set_node_property",
+            "set_node_property"
+          ],
+          "tool_error_count": 6,
+          "input_tokens": 455,
+          "output_tokens": 1072,
+          "reasoning_tokens": 0,
+          "non_reasoning_output_tokens": 1072,
+          "total_tokens": 5111
+        },
+        {
+          "interview_turn_index": 2,
+          "candidate_step_index": 4,
+          "outcome_kind": "tool_call",
+          "stop_reason": "tool_calls",
+          "configured_max_tokens": 2048,
+          "hit_output_limit": false,
+          "produced_question": false,
+          "tool_call_count": 6,
+          "tool_names": [
+            "set_node_property_list",
+            "set_node_property_list",
+            "set_node_property_list",
+            "set_node_property_list",
+            "set_node_property_list",
+            "set_node_property_list"
+          ],
+          "tool_error_count": 0,
+          "input_tokens": 1926,
+          "output_tokens": 531,
+          "reasoning_tokens": 29,
+          "non_reasoning_output_tokens": 502,
+          "total_tokens": 6297
+        },
+        {
+          "interview_turn_index": 2,
+          "candidate_step_index": 5,
+          "outcome_kind": "tool_call",
+          "stop_reason": "tool_calls",
+          "configured_max_tokens": 2048,
+          "hit_output_limit": false,
+          "produced_question": false,
+          "tool_call_count": 5,
+          "tool_names": [
+            "add_edge",
+            "add_edge",
+            "add_edge",
+            "set_start_nodes",
+            "set_end_nodes"
+          ],
+          "tool_error_count": 0,
+          "input_tokens": 878,
+          "output_tokens": 329,
+          "reasoning_tokens": 0,
+          "non_reasoning_output_tokens": 329,
+          "total_tokens": 6839
+        },
+        {
+          "interview_turn_index": 2,
+          "candidate_step_index": 6,
+          "outcome_kind": "tool_call",
+          "stop_reason": "tool_calls",
+          "configured_max_tokens": 2048,
+          "hit_output_limit": false,
+          "produced_question": false,
+          "tool_call_count": 1,
+          "tool_names": [
+            "get_observations"
+          ],
+          "tool_error_count": 0,
+          "input_tokens": 348,
+          "output_tokens": 105,
+          "reasoning_tokens": 83,
+          "non_reasoning_output_tokens": 22,
+          "total_tokens": 7109
+        },
+        {
+          "interview_turn_index": 2,
+          "candidate_step_index": 7,
+          "outcome_kind": "tool_call",
+          "stop_reason": "tool_calls",
+          "configured_max_tokens": 2048,
+          "hit_output_limit": false,
+          "produced_question": false,
+          "tool_call_count": 11,
+          "tool_names": [
+            "attach_evidence",
+            "attach_evidence",
+            "attach_evidence",
+            "attach_evidence",
+            "attach_evidence",
+            "attach_evidence",
+            "attach_evidence",
+            "attach_evidence",
+            "attach_evidence",
+            "attach_evidence",
+            "attach_evidence"
+          ],
+          "tool_error_count": 0,
+          "input_tokens": 340,
+          "output_tokens": 914,
+          "reasoning_tokens": 34,
+          "non_reasoning_output_tokens": 880,
+          "total_tokens": 8166
+        },
+        {
+          "interview_turn_index": 2,
+          "candidate_step_index": 8,
+          "outcome_kind": "question",
+          "stop_reason": "stop",
+          "configured_max_tokens": 2048,
+          "hit_output_limit": false,
+          "produced_question": true,
+          "tool_call_count": 0,
+          "tool_names": [],
+          "tool_error_count": 0,
+          "input_tokens": 1365,
+          "output_tokens": 62,
+          "reasoning_tokens": 0,
+          "non_reasoning_output_tokens": 62,
+          "total_tokens": 8595
+        },
+        {
+          "interview_turn_index": 3,
+          "candidate_step_index": 1,
+          "outcome_kind": "tool_call",
+          "stop_reason": "tool_calls",
+          "configured_max_tokens": 2048,
+          "hit_output_limit": false,
+          "produced_question": false,
+          "tool_call_count": 1,
+          "tool_names": [
+            "get_agent_graph"
+          ],
+          "tool_error_count": 0,
+          "input_tokens": 8279,
+          "output_tokens": 83,
+          "reasoning_tokens": 51,
+          "non_reasoning_output_tokens": 32,
+          "total_tokens": 8362
+        },
+        {
+          "interview_turn_index": 3,
+          "candidate_step_index": 2,
+          "outcome_kind": "tool_call",
+          "stop_reason": "tool_calls",
+          "configured_max_tokens": 2048,
+          "hit_output_limit": false,
+          "produced_question": false,
+          "tool_call_count": 1,
+          "tool_names": [
+            "complete_interview"
+          ],
+          "tool_error_count": 0,
+          "input_tokens": 10046,
+          "output_tokens": 162,
+          "reasoning_tokens": 37,
+          "non_reasoning_output_tokens": 125,
+          "total_tokens": 10208
+        }
+      ]
+    }
+  ],
+  "aggregate": {
+    "total_manifest_runs": 3,
+    "available_run_count": 1,
+    "unavailable_run_count": 2,
+    "scored_run_count": 1,
+    "available_completion_rate": 1.0,
+    "available_accepted_nonempty_plan_response_count": 1,
+    "available_accepted_annotated_response_count": 1,
+    "unavailable_runs_excluded_from_aggregates": true
+  },
+  "unavailable_runs": [
+    {
+      "run_index": 1,
+      "scenario_id": "quotation_workflow_1",
+      "availability": "unavailable",
+      "reason": "sample time limit reached before a terminal protocol state",
+      "partial_observation": {
+        "sample_persisted": true,
+        "terminal_state_observed": false,
+        "candidate_generation_count_observed": 2,
+        "candidate_diagnostics_observed": {
+          "candidate_question_generation_count": 1,
+          "candidate_tool_generation_count": 1,
+          "candidate_empty_completion_count": 0,
+          "candidate_output_exhaustion_count": 0,
+          "candidate_provider_error_count": 0,
+          "candidate_invalid_tool_call_count": 0,
+          "candidate_generations_at_max_tokens_count": 0,
+          "candidate_total_tool_call_count": 2,
+          "candidate_tool_error_count": 0,
+          "candidate_tool_call_counts": {
+            "get_agent_graph": 1,
+            "get_observations": 1
+          },
+          "candidate_tool_error_counts": {},
+          "candidate_tool_call_category_counts": {
+            "graph_reads": 2
+          },
+          "candidate_tool_error_category_counts": {},
+          "candidate_tool_call_sequences": [
+            {
+              "interview_turn_index": 1,
+              "steps": [
+                {
+                  "candidate_step_index": 1,
+                  "tool_call_count": 2,
+                  "tool_names": [
+                    "get_agent_graph",
+                    "get_observations"
+                  ],
+                  "tool_error_count": 0
+                }
+              ]
+            }
+          ]
+        },
+        "not_scored": true,
+        "candidate_generation_records_observed": [
+          {
+            "interview_turn_index": 1,
+            "candidate_step_index": 1,
+            "outcome_kind": "tool_call",
+            "stop_reason": "tool_calls",
+            "configured_max_tokens": 2048,
+            "hit_output_limit": false,
+            "produced_question": false,
+            "tool_call_count": 2,
+            "tool_names": [
+              "get_agent_graph",
+              "get_observations"
+            ],
+            "tool_error_count": 0,
+            "input_tokens": 186,
+            "output_tokens": 62,
+            "reasoning_tokens": 21,
+            "non_reasoning_output_tokens": 41,
+            "total_tokens": 2296
+          },
+          {
+            "interview_turn_index": 1,
+            "candidate_step_index": 2,
+            "outcome_kind": "question",
+            "stop_reason": "stop",
+            "configured_max_tokens": 2048,
+            "hit_output_limit": false,
+            "produced_question": true,
+            "tool_call_count": 0,
+            "tool_names": [],
+            "tool_error_count": 0,
+            "input_tokens": 78,
+            "output_tokens": 64,
+            "reasoning_tokens": 39,
+            "non_reasoning_output_tokens": 25,
+            "total_tokens": 2446
+          }
+        ]
+      }
+    },
+    {
+      "run_index": 2,
+      "scenario_id": "quotation_workflow_1_ja",
+      "availability": "unavailable",
+      "reason": "sample time limit reached before a terminal protocol state",
+      "partial_observation": {
+        "sample_persisted": true,
+        "terminal_state_observed": false,
+        "candidate_generation_count_observed": 2,
+        "candidate_diagnostics_observed": {
+          "candidate_question_generation_count": 1,
+          "candidate_tool_generation_count": 1,
+          "candidate_empty_completion_count": 0,
+          "candidate_output_exhaustion_count": 0,
+          "candidate_provider_error_count": 0,
+          "candidate_invalid_tool_call_count": 0,
+          "candidate_generations_at_max_tokens_count": 0,
+          "candidate_total_tool_call_count": 2,
+          "candidate_tool_error_count": 0,
+          "candidate_tool_call_counts": {
+            "get_agent_graph": 1,
+            "get_observations": 1
+          },
+          "candidate_tool_error_counts": {},
+          "candidate_tool_call_category_counts": {
+            "graph_reads": 2
+          },
+          "candidate_tool_error_category_counts": {},
+          "candidate_tool_call_sequences": [
+            {
+              "interview_turn_index": 1,
+              "steps": [
+                {
+                  "candidate_step_index": 1,
+                  "tool_call_count": 2,
+                  "tool_names": [
+                    "get_agent_graph",
+                    "get_observations"
+                  ],
+                  "tool_error_count": 0
+                }
+              ]
+            }
+          ]
+        },
+        "not_scored": true,
+        "candidate_generation_records_observed": [
+          {
+            "interview_turn_index": 1,
+            "candidate_step_index": 1,
+            "outcome_kind": "tool_call",
+            "stop_reason": "tool_calls",
+            "configured_max_tokens": 2048,
+            "hit_output_limit": false,
+            "produced_question": false,
+            "tool_call_count": 2,
+            "tool_names": [
+              "get_agent_graph",
+              "get_observations"
+            ],
+            "tool_error_count": 0,
+            "input_tokens": 207,
+            "output_tokens": 77,
+            "reasoning_tokens": 20,
+            "non_reasoning_output_tokens": 57,
+            "total_tokens": 2332
+          },
+          {
+            "interview_turn_index": 1,
+            "candidate_step_index": 2,
+            "outcome_kind": "question",
+            "stop_reason": "stop",
+            "configured_max_tokens": 2048,
+            "hit_output_limit": false,
+            "produced_question": true,
+            "tool_call_count": 0,
+            "tool_names": [],
+            "tool_error_count": 0,
+            "input_tokens": 371,
+            "output_tokens": 107,
+            "reasoning_tokens": 59,
+            "non_reasoning_output_tokens": 48,
+            "total_tokens": 2526
+          }
+        ]
+      }
+    }
+  ],
+  "accounting_note": "Unavailable runs have no score or accepted-response metric and are not converted to zero.",
+  "primary_evaluation_field_count_contract": 41
+}

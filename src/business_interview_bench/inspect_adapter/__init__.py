@@ -3,6 +3,11 @@
 # Inspect is intentionally imported only inside this adapter package.
 # pyright: reportMissingImports=false
 
+from .candidate import (
+    CandidateGenerationOutcome,
+    CandidateOutcomeKind,
+    classify_candidate_output,
+)
 from .live_scorer import live_primary_scorer, phase13_primary_scorer
 from .live_store import (
     BusinessInterviewLiveStore,
@@ -34,6 +39,9 @@ from .tools import build_interview_tools, graph_mutation_tools, make_interview_t
 
 __all__ = [
     "BusinessInterviewLiveStore",
+    "CandidateGenerationOutcome",
+    "CandidateOutcomeKind",
+    "classify_candidate_output",
     "BusinessInterviewReplayStore",
     "InspectLiveInterviewStore",
     "LiveInterviewInspectStore",

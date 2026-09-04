@@ -17,6 +17,7 @@ from inspect_ai.model import (
     ChatMessageSystem,
     ChatMessageUser,
     GenerateConfig,
+    execute_tools,
 )
 from inspect_ai.solver import Generate, Solver, TaskState, solver
 
@@ -43,6 +44,7 @@ from business_interview.stakeholders import (
     validate_stakeholder_knowledge,
 )
 
+from .candidate import classify_candidate_output
 from .live_scorer import phase13_primary_scorer
 from .live_store import (
     BusinessInterviewLiveStore,
@@ -412,6 +414,12 @@ def multi_turn_interview_solver(
                 previous_count = previous if isinstance(previous, int) else 0
                 state.metadata[key] = previous_count + value
 
+        def record_candidate_provider_error() -> None:
+            previous = state.metadata.get("interview_candidate_provider_error_count")
+            state.metadata["interview_candidate_provider_error_count"] = (
+                previous + 1 if isinstance(previous, int) else 1
+            )
+
         def record_stakeholder_failure(error: StakeholderResponseError) -> None:
             state.metadata["interview_stakeholder_failure_kind"] = (
                 error.failure_kind or "provider"
@@ -490,20 +498,79 @@ def multi_turn_interview_solver(
                     # bounded candidate model generation.
                     state = await generate(
                         state,
-                        tool_calls="single",
+                        # Inspect's ``single`` mode executes tool calls before
+                        # returning.  ``none`` lets us classify stop reasons
+                        # first, so a truncated tool-bearing response cannot
+                        # mutate the graph or complete the interview.
+                        tool_calls="none",
                         max_tokens=candidate_max_tokens,
                         parallel_tool_calls=False,
                     )
-                except StakeholderResponseError:
-                    raise
-                except Exception as exc:
-                    raise MultiTurnInterviewError(
-                        "candidate model turn failed"
-                    ) from exc
+                except Exception:
+                    # A provider/generation exception is an explicit terminal
+                    # runtime outcome, not an active interview or a no-question
+                    # decision. Inspect may or may not persist a ModelEvent for
+                    # this path, so retain one safe metadata counter as well.
+                    runtime = mark_max_turn_exhausted(
+                        runtime_ref[0], "candidate_generation_failure"
+                    )
+                    runtime_ref[0] = runtime
+                    record_candidate_provider_error()
+                    persist(runtime)
+                    break
 
                 runtime = runtime_ref[0]
+                outcome = classify_candidate_output(state.output)
+                if outcome.outcome_kind == "provider_error":
+                    record_candidate_provider_error()
+                    runtime = mark_max_turn_exhausted(
+                        runtime, "candidate_generation_failure"
+                    )
+                    runtime_ref[0] = runtime
+                    persist(runtime)
+                    break
+                if outcome.outcome_kind == "output_exhaustion":
+                    # A max_tokens/model_length stop is not a genuine
+                    # no-question decision, even if a truncated fragment is
+                    # present in the provider output.
+                    runtime = mark_max_turn_exhausted(
+                        runtime, "candidate_output_exhausted"
+                    )
+                    runtime_ref[0] = runtime
+                    persist(runtime)
+                    break
+
+                if outcome.outcome_kind == "empty_completion":
+                    # A normal stop with no visible text is the true
+                    # no-question case; an output-limit stop was handled above.
+                    runtime = mark_max_turn_exhausted(
+                        runtime, "candidate_did_not_ask_question"
+                    )
+                    runtime_ref[0] = runtime
+                    persist(runtime)
+                    break
+
                 tool_calls = state.output.message.tool_calls or []
                 if tool_calls:
+                    # Execute only after the output has passed the terminal
+                    # provider/limit/empty checks above.
+                    try:
+                        tool_messages, tool_output = await execute_tools(
+                            state.messages,
+                            state.tools,
+                            None,
+                        )
+                    except Exception:
+                        runtime = mark_max_turn_exhausted(
+                            runtime, "candidate_generation_failure"
+                        )
+                        runtime_ref[0] = runtime
+                        record_candidate_provider_error()
+                        persist(runtime)
+                        break
+                    state.messages.extend(tool_messages)
+                    if tool_output is not None:
+                        state.output = tool_output
                     # Tool-only output is not a public question. Generate the
                     # next candidate generation within this same interview
                     # turn, unless a terminal tool already completed it.
@@ -515,6 +582,8 @@ def multi_turn_interview_solver(
                     break
                 question = state.output.message.text.strip()
                 if not question:
+                    # A normal completion with no usable visible question is
+                    # the narrower, genuine no-question terminal outcome.
                     runtime = mark_max_turn_exhausted(
                         runtime, "candidate_did_not_ask_question"
                     )
