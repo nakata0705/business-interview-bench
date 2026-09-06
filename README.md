@@ -485,10 +485,14 @@ uv run python -m business_interview_bench.interview_agent \
 Tool calls are bounded and serial, automatic claims stay provisional, and
 unknown candidates or stakeholder confirmation cannot mutate state. Empty,
 truncated, filtered, communication, and limit failures are classified rather
-than treated as completion. Checkpoints contain validated state, the next
-utterance counter, and safe model/status metadata only; provider conversation
-history, tool receipts, hidden reasoning, credentials, private state, and
-unpublished utterances are excluded. `--resume` continues without
-replaying prior calls. Offline MockLLM coverage is in
-`tests/test_interview_agent.py`; the user-facing command uses Inspect's normal
-provider configuration for a real model.
+than treated as completion. Checkpoints contain validated state, the ordered
+provider-independent public conversation (`id`, role, body, sequence, and
+utterance/reply links), the next utterance counter, and safe model/status
+metadata. They exclude provider message objects, tool receipts, hidden
+reasoning, credentials, private state, and unpublished utterances. A restored
+agent rebuilds model input from that public conversation, so a short answer
+such as `はい` remains next to the question it answers; prior tool calls are
+not replayed. `reply_to` is conversational context only, not evidence that the
+answer supports every point in a multi-part question. Offline MockLLM coverage
+is in `tests/test_interview_agent.py`; the user-facing command uses Inspect's
+normal provider configuration for a real model.

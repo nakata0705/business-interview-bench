@@ -39,8 +39,36 @@ def _agent(outputs: list[ModelOutput], **kwargs: Any) -> InterviewStateAgent:
     return InterviewStateAgent(model, max_tool_rounds=4, **kwargs)
 
 
+class _RecordingModel:
+    name = "recording-model"
+
+    def __init__(self, outputs: list[ModelOutput]) -> None:
+        self.outputs = list(outputs)
+        self.inputs: list[Any] = []
+
+    async def generate(self, input: Any, tools: Any, config: Any) -> ModelOutput:
+        del tools, config
+        self.inputs.append(list(input) if isinstance(input, list) else input)
+        return self.outputs.pop(0)
+
+
 def test_provider_tool_definitions_use_candidate_evidence_and_inline_refs() -> None:
     agent = _agent([ModelOutput.from_content("mockllm", "ack")])
+
+    def assert_strict_objects(value: Any) -> None:
+        if isinstance(value, list):
+            for item in value:
+                assert_strict_objects(item)
+            return
+        if not isinstance(value, dict):
+            return
+        properties = value.get("properties")
+        if isinstance(properties, dict):
+            assert set(value["required"]) == set(properties)
+            assert value["additionalProperties"] is False
+        for key, child in value.items():
+            if key != "properties":
+                assert_strict_objects(child)
 
     for definition in agent.tools:
         rendered = json.dumps(
@@ -50,6 +78,7 @@ def test_provider_tool_definitions_use_candidate_evidence_and_inline_refs() -> N
         assert "$defs" not in rendered
         assert "$ref" not in rendered
         assert definition.parameters.additionalProperties is False
+        assert_strict_objects(definition.parameters.model_dump(mode="json"))
 
     record = next(item for item in agent.tools if item.name == "record_process_step")
     record_schema = record.parameters.model_dump(mode="json")
@@ -300,10 +329,48 @@ def test_truncated_output_does_not_execute_or_complete() -> None:
     assert caught.value.kind == "output_truncated"
     assert agent.state.completion.status == "active"
     assert not agent.state.claims
+    assert [message.role for message in agent.public_messages] == ["user"]
+    assert agent.public_messages[0].content == "申請を確認します"
+    assert "途中まで" not in agent.checkpoint().model_dump_json()
     assert agent.metadata.execution_status == "technical_failure"
 
 
-def test_checkpoint_round_trip_excludes_conversation_and_resumes_without_replaying(
+def test_checkpoint_round_trip_preserves_public_question_for_short_answer(
+    tmp_path: Path,
+) -> None:
+    question = "確認を担当するのは経理ですか？"
+    first_model = _RecordingModel([ModelOutput.from_content("mockllm", question)])
+    first_agent = InterviewStateAgent(first_model, max_tool_rounds=4)
+    asyncio.run(first_agent.process_utterance("申請内容を確認する業務です。"))
+    checkpoint_path = tmp_path / "interview.json"
+    first_agent.save_checkpoint(checkpoint_path)
+
+    resumed_model = _RecordingModel(
+        [ModelOutput.from_content("mockllm", "了解しました")]
+    )
+    resumed = InterviewStateAgent.from_checkpoint_file(
+        resumed_model,
+        checkpoint_path,
+        max_tool_rounds=4,
+    )
+    asyncio.run(resumed.process_utterance("はい"))
+
+    input_messages = resumed_model.inputs[-1]
+    question_index = next(
+        index
+        for index, message in enumerate(input_messages)
+        if message.text == question
+    )
+    answer_index = next(
+        index
+        for index, message in enumerate(input_messages)
+        if "utterance_id: u2" in message.text
+    )
+    assert question_index < answer_index
+    assert "\nはい\n" in input_messages[answer_index].text
+
+
+def test_checkpoint_round_trip_stores_public_conversation_without_provider_history(
     tmp_path: Path,
 ) -> None:
     first = "まず申請内容を確認します"
@@ -326,10 +393,19 @@ def test_checkpoint_round_trip_excludes_conversation_and_resumes_without_replayi
     first_agent.save_checkpoint(checkpoint_path)
 
     checkpoint = load_checkpoint(checkpoint_path)
+    assert checkpoint.schema_version == "business_interview.interview_agent.v3"
     assert checkpoint.next_utterance_number == 2
     assert checkpoint.metadata.prompt_version
+    assert [message.role for message in checkpoint.public_messages] == [
+        "user",
+        "assistant",
+    ]
+    assert checkpoint.public_messages[0].utterance_id == "u1"
+    assert checkpoint.public_messages[0].content == first
+    assert checkpoint.public_messages[1].content == "記録しました"
     assert "messages" not in checkpoint.model_dump(mode="json")
     assert "turns" not in checkpoint.model_dump(mode="json")
+    assert '"tool_calls":' not in checkpoint.model_dump_json()
     assert "assistant_text" not in checkpoint.model_dump_json()
     assert "api_key" not in checkpoint.model_dump_json().lower()
     restored_state = checkpoint.state
@@ -370,6 +446,225 @@ def test_checkpoint_round_trip_excludes_conversation_and_resumes_without_replayi
     )
 
 
+def test_checkpoint_rejects_public_user_body_that_differs_from_utterance(
+    tmp_path: Path,
+) -> None:
+    agent = _agent([ModelOutput.from_content("mockllm", "確認しました")])
+    asyncio.run(agent.process_utterance("申請内容を確認します"))
+    checkpoint_path = tmp_path / "mismatch.json"
+    agent.save_checkpoint(checkpoint_path)
+
+    payload = load_checkpoint(checkpoint_path).model_dump(mode="json")
+    payload["public_messages"][0]["content"] = "別の発言"
+    checkpoint_path.write_text(
+        json.dumps(payload, ensure_ascii=False),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(InterviewAgentError, match="invalid interview checkpoint"):
+        load_checkpoint(checkpoint_path)
+
+
+def test_checkpoint_resume_reaches_executor_for_correction_with_short_answer(
+    tmp_path: Path,
+) -> None:
+    first = "申請内容を確認し、担当は経理です。"
+    question = "確認を担当するのは経理ですか？"
+    first_agent = _agent(
+        [
+            ModelOutput.for_tool_call(
+                "mockllm",
+                "record_process_step",
+                {
+                    "step_id": "step:review",
+                    "activity": {"state": "value", "value": "申請を確認"},
+                    "actor": {"id": "actor:accounting", "label": "経理"},
+                    "evidence": [_candidate("u1")],
+                },
+            ),
+            ModelOutput.from_content("mockllm", question),
+        ]
+    )
+    asyncio.run(first_agent.process_utterance(first))
+    checkpoint_path = tmp_path / "correction.json"
+    first_agent.save_checkpoint(checkpoint_path)
+
+    resumed_model = _agent(
+        [
+            ModelOutput.for_tool_call(
+                "mockllm",
+                "revise_record",
+                {
+                    "record_id": "step:review",
+                    "field": "actor",
+                    "replacement_id": "claim:step:review:actor:sales",
+                    "statement": "担当は営業です。",
+                    "value": {"id": "actor:sales", "label": "営業"},
+                    "correction_note": "短い回答で担当者を訂正した。",
+                    "evidence": [_candidate("u2")],
+                },
+            ),
+            ModelOutput.from_content("mockllm", "担当者を訂正しました。"),
+        ]
+    )
+    resumed = InterviewStateAgent.from_checkpoint_file(
+        resumed_model.model,
+        checkpoint_path,
+        max_tool_rounds=4,
+    )
+    answer = "いいえ、営業です"
+    turn = asyncio.run(resumed.process_utterance(answer))
+
+    assert turn.invocations[0].receipt is not None
+    assert [item.id for item in resumed.state.business_model.process_steps] == [
+        "step:review"
+    ]
+    old_claim = next(
+        item
+        for item in resumed.state.claims
+        if item.predicate == "actor" and item.status == "rejected"
+    )
+    current_claim = next(
+        item
+        for item in resumed.state.claims
+        if item.predicate == "actor" and item.status != "rejected"
+    )
+    assert current_claim.supersedes == old_claim.id
+    assert current_claim.evidence[0].quote == answer
+    assert (
+        resumed.state.business_model.process_steps[0].actor.entity_id == "actor:sales"
+    )
+
+
+def test_assistant_question_is_not_an_evidence_candidate_for_short_answer(
+    tmp_path: Path,
+) -> None:
+    question = "確認を担当するのは経理ですか？"
+    first_agent = _agent([ModelOutput.from_content("mockllm", question)])
+    asyncio.run(first_agent.process_utterance("申請内容を確認する業務です。"))
+    checkpoint_path = tmp_path / "boundary.json"
+    first_agent.save_checkpoint(checkpoint_path)
+    question_message = first_agent.public_messages[1]
+
+    resumed_model = _agent(
+        [
+            ModelOutput.for_tool_call(
+                "mockllm",
+                "record_process_step",
+                {
+                    "step_id": "step:bad",
+                    "activity": {"state": "value", "value": "確認"},
+                    "evidence": [
+                        {
+                            "candidate_id": candidate_id_for_utterance(
+                                question_message.id
+                            )
+                        }
+                    ],
+                },
+            ),
+            ModelOutput.for_tool_call(
+                "mockllm",
+                "record_process_step",
+                {
+                    "step_id": "step:review",
+                    "activity": {"state": "value", "value": "確認"},
+                    "evidence": [_candidate("u2")],
+                },
+            ),
+            ModelOutput.from_content("mockllm", "回答を記録しました。"),
+        ]
+    )
+    resumed = InterviewStateAgent.from_checkpoint_file(
+        resumed_model.model,
+        checkpoint_path,
+        max_tool_rounds=4,
+    )
+    answer = "はい"
+    turn = asyncio.run(resumed.process_utterance(answer))
+
+    assert turn.invocations[0].receipt is None
+    assert turn.invocations[0].error is not None
+    assert "unpublished evidence candidate" in turn.invocations[0].error
+    assert turn.invocations[1].receipt is not None
+    assert resumed.state.claims[0].evidence[0].quote == answer
+    assert question not in [item.text for item in resumed.state.utterances]
+    assert resumed.public_messages[2].reply_to == question_message.id
+
+
+def test_repeated_checkpoint_resume_does_not_duplicate_public_history_or_tools(
+    tmp_path: Path,
+) -> None:
+    first_agent = _agent(
+        [
+            ModelOutput.for_tool_call(
+                "mockllm",
+                "record_process_step",
+                {
+                    "step_id": "step:review",
+                    "activity": {"state": "value", "value": "申請を確認"},
+                    "evidence": [_candidate("u1")],
+                },
+            ),
+            ModelOutput.from_content("mockllm", "確認を担当するのは経理ですか？"),
+        ]
+    )
+    asyncio.run(first_agent.process_utterance("申請内容を確認する業務です。"))
+    first_path = tmp_path / "first.json"
+    first_agent.save_checkpoint(first_path)
+
+    resumed_model = _RecordingModel(
+        [ModelOutput.from_content("mockllm", "回答を受け取りました。")]
+    )
+    resumed = InterviewStateAgent.from_checkpoint_file(
+        resumed_model,
+        first_path,
+        max_tool_rounds=4,
+    )
+    assert resumed.history == ()
+    assert resumed_model.inputs == []
+    asyncio.run(resumed.process_utterance("はい"))
+    second_path = tmp_path / "second.json"
+    resumed.save_checkpoint(second_path)
+
+    restored_model = _RecordingModel([])
+    restored = InterviewStateAgent.from_checkpoint_file(
+        restored_model,
+        second_path,
+        max_tool_rounds=4,
+    )
+    third_path = tmp_path / "third.json"
+    restored.save_checkpoint(third_path)
+    second = load_checkpoint(second_path)
+    third = load_checkpoint(third_path)
+
+    assert restored.history == ()
+    assert restored_model.inputs == []
+    assert second.public_messages == third.public_messages
+    assert [message.role for message in third.public_messages] == [
+        "user",
+        "assistant",
+        "user",
+        "assistant",
+    ]
+    assert [message.content for message in third.public_messages] == [
+        "申請内容を確認する業務です。",
+        "確認を担当するのは経理ですか？",
+        "はい",
+        "回答を受け取りました。",
+    ]
+    assert [message.sequence for message in third.public_messages] == list(
+        range(len(third.public_messages))
+    )
+    assert len({message.id for message in third.public_messages}) == len(
+        third.public_messages
+    )
+    assert len(third.state.claims) == 1
+    checkpoint_json = second_path.read_text(encoding="utf-8")
+    for private_name in ("tool_calls", "tool_call_id", "assistant_text", "reasoning"):
+        assert f'"{private_name}":' not in checkpoint_json
+
+
 def test_failure_metadata_classifies_provider_errors_without_echoing_credentials() -> (
     None
 ):
@@ -395,3 +690,25 @@ def test_report_preserves_readable_flow_and_completion_sections() -> None:
     assert "## Evidence and claims" in report
     assert "## Completion" in report
     assert "prompt version" in report
+
+
+def test_report_shows_question_linked_to_short_answer() -> None:
+    question = "確認を担当するのは経理ですか？"
+    agent = _agent(
+        [
+            ModelOutput.from_content("mockllm", question),
+            ModelOutput.from_content("mockllm", "はいを確認しました"),
+        ]
+    )
+    asyncio.run(agent.process_utterance("申請内容を確認する業務です。"))
+    asyncio.run(agent.process_utterance("はい"))
+
+    report = render_interview_report(
+        agent.state,
+        metadata=agent.metadata,
+        public_messages=agent.public_messages,
+    )
+
+    assert "## Public conversation" in report
+    assert question in report
+    assert "reply_to=`public:assistant:0001`" in report

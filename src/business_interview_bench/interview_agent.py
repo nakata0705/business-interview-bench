@@ -30,6 +30,7 @@ from urllib.parse import urlsplit
 
 from inspect_ai.model import (
     ChatMessage,
+    ChatMessageAssistant,
     ChatMessageSystem,
     ChatMessageTool,
     ChatMessageUser,
@@ -40,7 +41,7 @@ from inspect_ai.model import (
     get_model,
 )
 from inspect_ai.tool import ToolCall, ToolDef, ToolError, ToolParams
-from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 
 from business_interview.interview_state import (
     EvidenceCitation,
@@ -58,8 +59,8 @@ from business_interview.interview_tools import (
     parse_tool_input,
 )
 
-AGENT_SCHEMA_VERSION = "business_interview.interview_agent.v2"
-PROMPT_VERSION = "interview-state-agent.ja.v2"
+AGENT_SCHEMA_VERSION = "business_interview.interview_agent.v3"
+PROMPT_VERSION = "interview-state-agent.ja.v3"
 
 FailureKind = Literal[
     "empty_response",
@@ -91,8 +92,10 @@ _AGENT_SYSTEM_PROMPT = """business-interview-bench InterviewState agent
   record_idと一つのfield/valueを指定したrevise_recordを使う。
 - 事実を記録する操作には、公開発言の候補IDを使ったevidenceを少なくとも一つ付ける。
   引用候補のcandidate_idだけを選び、座標・quote・Evidence IDを手計算しない。
-- candidate_idは現在までに公開された発言に限る。ツール結果や自分の発言、未来の回答を
+- candidate_idは現在までに公開された利用者発言に限る。ツール結果や自分の発言、公開質問、未来の回答を
   引用しない。候補のsemantic_supportは意味的な利用者承認ではない。
+- 保存されたassistantの質問は回答を理解するための対話文脈であり、業務事実の根拠ではない。
+  「はい」だけで質問に含まれる複数論点をすべて確定せず、必要なら明確化を続ける。
 - 自動記録のclaim_statusは必ずprovisionalにする。stakeholder_confirmedをtrueにしない。
 - 明示されない値はabsentまたはdont_knowにし、CRUDを入出力や「書く」という語だけから
   推測しない。不明なCRUDはunknownにする。
@@ -194,24 +197,147 @@ class InterviewAgentRun:
         )
 
 
-class InterviewAgentCheckpoint(BaseModel):
-    """JSON checkpoint for safe pause/resume of one text interview.
+def _validate_public_messages(
+    messages: Sequence[PublicConversationMessage],
+    utterances: Sequence[Utterance],
+) -> None:
+    if [message.sequence for message in messages] != list(range(len(messages))):
+        raise ValueError("public messages must have contiguous ordered sequences")
+    message_ids = [message.id for message in messages]
+    if len(message_ids) != len(set(message_ids)):
+        raise ValueError("public message IDs must be unique")
 
-    The checkpoint stores public utterances through ``InterviewState`` and safe
-    execution metadata. It never stores provider message objects, model
-    conversation history, hidden reasoning, credentials, or private stakeholder
-    data.
+    utterances_by_id = {utterance.id: utterance for utterance in utterances}
+    referenced_utterances: list[str] = []
+    for index, message in enumerate(messages):
+        if message.role != "user":
+            continue
+        if message.utterance_id not in utterances_by_id:
+            raise ValueError(
+                f"public user message references unknown utterance "
+                f"{message.utterance_id!r}"
+            )
+        utterance = utterances_by_id[message.utterance_id]
+        if message.content != utterance.text:
+            raise ValueError(
+                f"public user message does not match utterance {utterance.id!r}"
+            )
+        referenced_utterances.append(utterance.id)
+        previous = messages[index - 1] if index else None
+        expected_reply_to = (
+            previous.id
+            if previous is not None and previous.role == "assistant"
+            else None
+        )
+        if message.reply_to != expected_reply_to:
+            raise ValueError(
+                f"public user message {message.id!r} has an invalid reply_to link"
+            )
+
+    if tuple(referenced_utterances) != tuple(utterance.id for utterance in utterances):
+        raise ValueError(
+            "public user messages must reference each InterviewState utterance once "
+            "in order"
+        )
+
+
+class PublicConversationMessage(BaseModel):
+    """The small provider-independent record of one public chat message.
+
+    ``utterance_id`` is present only for a user message and points to the
+    exact immutable :class:`Utterance` in ``InterviewState``.  ``reply_to`` is
+    a conversational link for a short answer; it is never a semantic claim
+    that the answer supports every point in the referenced assistant message.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    schema_version: Literal[
-        "business_interview.interview_agent.v1",
-        "business_interview.interview_agent.v2",
-    ] = AGENT_SCHEMA_VERSION
+    id: str = Field(min_length=1)
+    role: Literal["user", "assistant"]
+    content: str = Field(min_length=1)
+    sequence: int = Field(ge=0)
+    utterance_id: str | None = Field(default=None, min_length=1)
+    reply_to: str | None = Field(default=None, min_length=1)
+
+    @model_validator(mode="after")
+    def _role_fields_are_consistent(self) -> PublicConversationMessage:
+        if self.role == "user" and self.utterance_id is None:
+            raise ValueError("public user messages require utterance_id")
+        if self.role == "assistant" and self.utterance_id is not None:
+            raise ValueError("public assistant messages cannot reference an utterance")
+        if self.role == "assistant" and self.reply_to is not None:
+            raise ValueError("reply_to is only valid on public user messages")
+        return self
+
+    @property
+    def message_id(self) -> str:
+        """Compatibility name for callers that distinguish message from utterance IDs."""
+        return self.id
+
+    @property
+    def order(self) -> int:
+        """Human-readable alias for the persisted conversation sequence."""
+        return self.sequence
+
+    @property
+    def text(self) -> str:
+        """Alias matching Inspect's message terminology."""
+        return self.content
+
+
+def _public_user_message_id(utterance_id: str) -> str:
+    return f"public:user:{utterance_id}"
+
+
+def _public_assistant_message_id(sequence: int) -> str:
+    return f"public:assistant:{sequence:04d}"
+
+
+def _public_messages_from_utterances(
+    utterances: Sequence[Utterance],
+) -> tuple[PublicConversationMessage, ...]:
+    return tuple(
+        PublicConversationMessage(
+            id=_public_user_message_id(utterance.id),
+            role="user",
+            content=utterance.text,
+            sequence=index,
+            utterance_id=utterance.id,
+        )
+        for index, utterance in enumerate(utterances)
+    )
+
+
+class InterviewAgentCheckpoint(BaseModel):
+    """JSON checkpoint for safe pause/resume of one text interview.
+
+    The checkpoint stores the public utterance ledger, the public assistant
+    responses, and safe execution metadata.  Provider message objects, tool
+    call/receipt history, hidden reasoning, credentials, and private
+    stakeholder data are never persisted.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    schema_version: Literal["business_interview.interview_agent.v3"] = (
+        AGENT_SCHEMA_VERSION
+    )
     state: InterviewState = Field(default_factory=InterviewState)
+    public_messages: tuple[PublicConversationMessage, ...] = Field(
+        default_factory=tuple
+    )
     next_utterance_number: int = Field(default=1, ge=1)
     metadata: InterviewAgentMetadata = Field(default_factory=InterviewAgentMetadata)
+
+    @model_validator(mode="after")
+    def _public_messages_match_state(self) -> InterviewAgentCheckpoint:
+        _validate_public_messages(self.public_messages, self.state.utterances)
+        return self
+
+    @property
+    def public_conversation(self) -> tuple[PublicConversationMessage, ...]:
+        """Alias for the ordered public conversation ledger."""
+        return self.public_messages
 
 
 class _ModelLike(Protocol):
@@ -244,6 +370,7 @@ class InterviewStateAgent:
         model: Model | _ModelLike,
         *,
         state: InterviewState | None = None,
+        public_messages: Sequence[PublicConversationMessage] | None = None,
         next_utterance_number: int | None = None,
         max_tool_rounds: int = 8,
         max_tool_calls: int = 16,
@@ -265,6 +392,13 @@ class InterviewStateAgent:
 
         initial_state = state if state is not None else InterviewState()
         self.harness = InterviewHarness(initial_state)
+        resolved_public_messages = (
+            tuple(public_messages)
+            if public_messages is not None
+            else _public_messages_from_utterances(initial_state.utterances)
+        )
+        _validate_public_messages(resolved_public_messages, initial_state.utterances)
+        self._public_messages = list(resolved_public_messages)
         self.model = model
         # Keep the old attribute as a compatibility alias for callers of the
         # first adapter revision; the bound is a model-call bound, not a retry
@@ -287,9 +421,19 @@ class InterviewStateAgent:
             if next_utterance_number is not None
             else _next_utterance_number(initial_state.utterances)
         )
+        executor = InterviewToolExecutor(self.harness)
+        # Providers receive strict schemas (some OpenAI-compatible endpoints
+        # require every object property to be listed as required), while the
+        # local executor keeps the original Pydantic defaults for deterministic
+        # MockLLM and programmatic callers.
         self._tools = build_interview_state_tools(
-            InterviewToolExecutor(self.harness),
+            executor,
             completion_allowed=self._completion_is_allowed,
+        )
+        self._execution_tools = build_interview_state_tools(
+            executor,
+            completion_allowed=self._completion_is_allowed,
+            strict_provider_schema=False,
         )
         self._history: list[InterviewAgentTurn] = []
         self._metadata = _metadata_for_model(
@@ -301,11 +445,27 @@ class InterviewStateAgent:
         )
 
         # Rebuild only public context after a checkpoint restore. The model can
-        # recover all durable structured context through inspect_interview_state.
-        for index, item in enumerate(initial_state.utterances):
-            self._messages.append(
-                _utterance_message(item, initial_state.utterances[: index + 1])
-            )
+        # recover all durable structured context through inspect_interview_state,
+        # while the ordered assistant messages keep short answers intelligible.
+        utterance_indexes = {
+            item.id: index for index, item in enumerate(initial_state.utterances)
+        }
+        for public_message in self._public_messages:
+            if public_message.role == "user":
+                # The checkpoint validator guarantees this lookup succeeds.
+                utterance = next(
+                    item
+                    for item in initial_state.utterances
+                    if item.id == public_message.utterance_id
+                )
+                index = utterance_indexes[utterance.id]
+                self._messages.append(
+                    _utterance_message(utterance, initial_state.utterances[: index + 1])
+                )
+            else:
+                self._messages.append(
+                    ChatMessageAssistant(content=public_message.content)
+                )
 
     @property
     def state(self) -> InterviewState:
@@ -332,6 +492,16 @@ class InterviewStateAgent:
         """Return completed visible turns from this provider session."""
         return tuple(self._history)
 
+    @property
+    def public_messages(self) -> tuple[PublicConversationMessage, ...]:
+        """Return the ordered, provider-independent public conversation."""
+        return tuple(self._public_messages)
+
+    @property
+    def public_conversation(self) -> tuple[PublicConversationMessage, ...]:
+        """Alias for callers that describe the ledger as a conversation."""
+        return self.public_messages
+
     async def process_utterance(
         self,
         utterance: str | Utterance,
@@ -345,12 +515,15 @@ class InterviewStateAgent:
             speaker=speaker,
             utterance_id=utterance_id,
         )
+        public_message = self._new_public_user_message(item)
         try:
             self.harness.register_utterance(item)
         except (InterviewStateError, ValueError) as exc:
             raise InterviewAgentError(str(exc), kind="input_error") from exc
+        self._public_messages.append(public_message)
         self._messages.append(_utterance_message(item, self.state.utterances))
         turn = await self._run_model_turn(item.id)
+        self._append_public_assistant_message(turn.assistant_text)
         self._history.append(turn)
         return turn
 
@@ -364,6 +537,7 @@ class InterviewStateAgent:
             turn = await self._run_model_turn(None)
         finally:
             self._completion_allowed = False
+        self._append_public_assistant_message(turn.assistant_text)
         self._history.append(turn)
         return turn
 
@@ -407,6 +581,7 @@ class InterviewStateAgent:
         """Build a JSON-safe pause/resume checkpoint."""
         return InterviewAgentCheckpoint(
             state=self.state,
+            public_messages=tuple(self._public_messages),
             next_utterance_number=self._next_utterance_number,
             metadata=self._metadata,
         )
@@ -430,10 +605,11 @@ class InterviewStateAgent:
         checkpoint: InterviewAgentCheckpoint,
         **kwargs: Any,
     ) -> InterviewStateAgent:
-        """Restore an agent without replaying any prior tool call."""
+        """Restore public context without replaying any prior tool call."""
         agent = cls(
             model,
             state=checkpoint.state,
+            public_messages=checkpoint.public_messages,
             next_utterance_number=checkpoint.next_utterance_number,
             **kwargs,
         )
@@ -496,6 +672,48 @@ class InterviewStateAgent:
                 self._next_utterance_number,
                 number + 1,
             )
+
+    def _new_public_user_message(
+        self, utterance: Utterance
+    ) -> PublicConversationMessage:
+        sequence = len(self._public_messages)
+        message = PublicConversationMessage(
+            id=_public_user_message_id(utterance.id),
+            role="user",
+            content=utterance.text,
+            sequence=sequence,
+            utterance_id=utterance.id,
+            reply_to=(
+                self._public_messages[-1].id
+                if self._public_messages
+                and self._public_messages[-1].role == "assistant"
+                else None
+            ),
+        )
+        if any(item.id == message.id for item in self._public_messages):
+            raise InterviewAgentError(
+                f"public message ID already exists: {message.id!r}",
+                kind="input_error",
+            )
+        return message
+
+    def _append_public_assistant_message(self, text: str) -> None:
+        content = text.strip()
+        if not content:
+            return
+        sequence = len(self._public_messages)
+        message = PublicConversationMessage(
+            id=_public_assistant_message_id(sequence),
+            role="assistant",
+            content=content,
+            sequence=sequence,
+        )
+        if any(item.id == message.id for item in self._public_messages):
+            raise InterviewAgentError(
+                f"public message ID already exists: {message.id!r}",
+                kind="agent_error",
+            )
+        self._public_messages.append(message)
 
     def _completion_is_allowed(self) -> bool:
         return self._completion_allowed
@@ -582,7 +800,10 @@ class InterviewStateAgent:
             tool_call_count += len(tool_calls)
 
             try:
-                tool_result = await execute_tools(self._messages, self._tools)
+                tool_result = await execute_tools(
+                    self._messages,
+                    self._execution_tools,
+                )
             except Exception as exc:
                 raise self._failure(
                     "tool_execution_failure",
@@ -593,9 +814,12 @@ class InterviewStateAgent:
             invocations.extend(_invocations_for(tool_calls, tool_result.messages))
 
             if self.state.completion.status != "active":
+                # A tool-call message is an internal execution step, even if
+                # the provider attached text to it. Only a later no-tool
+                # message is a response that was normally returned publicly.
                 turn = InterviewAgentTurn(
                     utterance_id=utterance_id,
-                    assistant_text=assistant_text,
+                    assistant_text="",
                     invocations=tuple(invocations),
                 )
                 self._mark_turn_success()
@@ -645,6 +869,7 @@ def build_interview_state_tools(
     executor: InterviewToolExecutor,
     *,
     completion_allowed: Callable[[], bool] | None = None,
+    strict_provider_schema: bool = True,
 ) -> list[ToolDef]:
     """Adapt the core Pydantic tool catalog to Inspect's model interface.
 
@@ -653,13 +878,15 @@ def build_interview_state_tools(
     function-call endpoints, so this boundary inlines references. Evidence
     fields are then changed only at the model boundary to candidate selections;
     the adapter resolves them back to the core ``EvidenceCitation`` model before
-    calling the existing executor.
+    calling the existing executor. Provider-facing schemas use strict required
+    object properties by default; local execution can retain Pydantic defaults.
     """
     return [
         _build_tool(
             executor,
             definition,
             completion_allowed=completion_allowed,
+            strict_provider_schema=strict_provider_schema,
         )
         for definition in get_tool_definitions()
     ]
@@ -688,6 +915,7 @@ def _build_tool(
     definition: ToolDefinition,
     *,
     completion_allowed: Callable[[], bool] | None = None,
+    strict_provider_schema: bool = True,
 ) -> ToolDef:
     tool_name = definition.name
 
@@ -715,7 +943,11 @@ def _build_tool(
         name=tool_name,
         description=definition.description,
         parameters=ToolParams.model_validate(
-            _agent_tool_schema(tool_name, definition.input_schema)
+            _agent_tool_schema(
+                tool_name,
+                definition.input_schema,
+                strict_provider_schema=strict_provider_schema,
+            )
         ),
         parallel=False,
     )
@@ -771,9 +1003,16 @@ def _resolve_agent_arguments(
     return resolved
 
 
-def _agent_tool_schema(tool_name: str, schema: dict[str, Any]) -> dict[str, Any]:
+def _agent_tool_schema(
+    tool_name: str,
+    schema: dict[str, Any],
+    *,
+    strict_provider_schema: bool = True,
+) -> dict[str, Any]:
     transformed = _inline_json_schema(schema)
     _replace_evidence_properties(transformed)
+    if strict_provider_schema:
+        _require_all_object_properties(transformed)
     properties = transformed.get("properties")
     if isinstance(properties, dict):
         claim_status = properties.get("claim_status")
@@ -846,6 +1085,35 @@ def _replace_evidence_properties(schema: dict[str, Any]) -> None:
                     and property_schema.get("type") == "array"
                 ):
                     property_schema["items"] = dict(selection_schema)
+            for property_schema in properties.values():
+                visit(property_schema)
+        for key, child in value.items():
+            if key != "properties":
+                visit(child)
+
+    visit(schema)
+
+
+def _require_all_object_properties(schema: dict[str, Any]) -> None:
+    """Make object schemas acceptable to strict OpenAI-compatible endpoints.
+
+    Strict function schemas require every declared property to appear in
+    ``required``. Nullable properties retain their optional domain semantics by
+    accepting ``null``; the adapter's Pydantic parser still owns defaults and
+    validation after the provider call.
+    """
+
+    def visit(value: Any) -> None:
+        if isinstance(value, list):
+            for item in value:
+                visit(item)
+            return
+        if not isinstance(value, dict):
+            return
+        properties = value.get("properties")
+        if isinstance(properties, dict):
+            value["required"] = list(properties)
+            value["additionalProperties"] = False
             for property_schema in properties.values():
                 visit(property_schema)
         for key, child in value.items():
@@ -1152,8 +1420,25 @@ def render_interview_report(
     state: InterviewState,
     *,
     metadata: InterviewAgentMetadata | None = None,
+    public_messages: Sequence[PublicConversationMessage] | None = None,
 ) -> str:
-    """Render a human-readable report with the prototype's familiar sections."""
+    """Render the business state and the public dialogue that supports it."""
+    conversation = (
+        tuple(public_messages)
+        if public_messages is not None
+        else _public_messages_from_utterances(state.utterances)
+    )
+    _validate_public_messages(conversation, state.utterances)
+    messages_by_id = {message.id: message for message in conversation}
+    question_by_utterance_id = {
+        message.utterance_id: messages_by_id[message.reply_to]
+        for message in conversation
+        if message.role == "user"
+        and message.utterance_id is not None
+        and message.reply_to is not None
+        and message.reply_to in messages_by_id
+        and messages_by_id[message.reply_to].role == "assistant"
+    }
     model = state.business_model
     steps = {item.id: item for item in model.process_steps}
     actors = {item.id: item.label for item in model.actors}
@@ -1172,6 +1457,17 @@ def render_interview_report(
     for utterance in state.utterances:
         lines.append(f"- `{utterance.id}` ({utterance.speaker}): {utterance.text}")
     if not state.utterances:
+        lines.append("- (none)")
+
+    lines.extend(["", "## Public conversation", ""])
+    for message in conversation:
+        details = f"`{message.sequence}` `{message.id}` ({message.role})"
+        if message.role == "user":
+            details += f"; utterance=`{message.utterance_id}`"
+            if message.reply_to is not None:
+                details += f"; reply_to=`{message.reply_to}`"
+        lines.append(f"- {details}: {message.content}")
+    if not conversation:
         lines.append("- (none)")
 
     lines.extend(["", "## Current business flow", ""])
@@ -1258,13 +1554,16 @@ def render_interview_report(
 
     lines.extend(["", "## Evidence and claims", ""])
     for claim in state.claims:
-        evidence = (
-            ", ".join(
+        evidence_parts = []
+        for item in claim.evidence:
+            evidence_text = (
                 f"{item.evidence_id}={item.utterance_id}[{item.start}:{item.end}]"
-                for item in claim.evidence
             )
-            or "(none)"
-        )
+            question = question_by_utterance_id.get(item.utterance_id)
+            if question is not None:
+                evidence_text += f"; response_to={question.id}: {question.content}"
+            evidence_parts.append(evidence_text)
+        evidence = ", ".join(evidence_parts) or "(none)"
         correction = f"; supersedes `{claim.supersedes}`" if claim.supersedes else ""
         lines.append(
             f"- `{claim.id}` [{claim.status}] {claim.record_type}/{claim.target_id}/"
@@ -1362,7 +1661,11 @@ def _write_state_outputs(
     if report is not None:
         report.parent.mkdir(parents=True, exist_ok=True)
         report.write_text(
-            render_interview_report(agent.state, metadata=agent.metadata),
+            render_interview_report(
+                agent.state,
+                metadata=agent.metadata,
+                public_messages=agent.public_messages,
+            ),
             encoding="utf-8",
         )
 
@@ -1582,6 +1885,7 @@ __all__ = [
     "InterviewAgentTurn",
     "InterviewStateAgent",
     "InterviewToolInvocation",
+    "PublicConversationMessage",
     "PROMPT_VERSION",
     "build_interview_state_tools",
     "candidate_id_for_utterance",

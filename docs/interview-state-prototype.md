@@ -9,8 +9,9 @@
 - 処理、担当者、入出力、フロー、分岐、システム、データ種別、CRUD を現在の業務モデルとして読める。
 - `unknown` CRUD、システム `dont_know`、手作業システムを、推測した `create`/`update` と混同しない。
 - 終了、関係者の確認、内容の完全性を別々に保持できる。
+- assistantの公開質問・確認・要約と利用者回答を、再開後も順序付きで読める形に保てる。
 
-既存3ケースと追記・訂正の適合caseはすべて `InterviewHarness` → `InterviewToolExecutor` → Pydantic検証の同じ経路を通る。これはモデルの自動抽出精度やベンチマーク合格率を測るものではなく、手動で構成したツール呼び出し列による契約適合確認である。
+既存3ケースと追記・訂正の適合caseはすべて `InterviewHarness` → `InterviewToolExecutor` → Pydantic検証の同じ経路を通る。これはモデルの自動抽出精度やベンチマーク合格率を測るものではなく、手動で構成したツール呼び出し列による契約適合確認である。公開対話の再開回帰は `tests/test_interview_agent.py` の MockLLM/入力捕捉テストで別に確認する。
 
 ## 既存実験から採用した知見
 
@@ -33,6 +34,12 @@
 - `claims` は根拠付きの履歴の正本、`business_model` は同じ操作が同時に更新する現在の読み取り用projectionとした。訂正は旧claimを削除せず `rejected` にし、新claimの `supersedes` で結ぶ。現在の成果物は `business_model` の一意な値だけを読むため、失効した内容を現行フロー/CRUDに残さない。active claimは対象フィールドごとに高々1件で、保存/読込時にもprojectionとの一致を検証する。
 - `SOURCE` と `SINK` は `source_boundary` / `sink_boundary` の Flow としてだけ使う。normal/branch/exception flow の endpoint に混ぜない。
 - `Completion` の `status=ended`、`stakeholder_confirmed`、`content_completeness` は別フィールドである。`complete_interview` しただけでは承認済みにならない。
+
+### 公開対話と業務根拠の境界
+
+`InterviewAgentCheckpoint.public_messages` は、プロバイダ固有の `ChatMessage` ではなく、`PublicConversationMessage` の小さなタプルである。各要素は安定した `id`、`role`（`user`/`assistant`）、公開本文 `content`、連続した `sequence` を持つ。`user` 要素だけが `InterviewState.utterances` の `utterance_id` を参照し、本文の一致を読込時にも検証する。assistantメッセージは利用者に提示した質問・確認・要約だけを保持する。
+
+assistantの直後の利用者発言には `reply_to` でassistantメッセージIDを残す。これは「この回答を理解する際の直前の問い」を辿るための対話リンクであり、質問に含まれる全論点への同意や意味的支持を表さない。EvidenceCitationの候補は従来どおり `InterviewState.utterances` からだけ作り、assistant質問を業務事実や引用候補へ変換しない。したがって「はい」の引用は原文のまま `はい` と保存され、レポートの公開対話表示から対応する質問を確認できる。
 
 ## 7操作の最終形
 
@@ -145,18 +152,23 @@ uv run python -m business_interview_bench.interview_agent \
   --checkpoint /tmp/interview-state.checkpoint.json
 ```
 
-checkpointは検証済み`InterviewState`、次の発言番号、safeなmodel/config/status metadata
-だけをJSON保存する。Inspectのconversation message、tool call/receipt履歴、hidden
-reasoning、認証情報、private stakeholder state、未公開の発言は保存しない。`--resume`
-は公開状態から新しいprovider conversationを構築し、過去のtool callを再実行しない。
-通常終了、controllerによる`user_stopped`、技術的失敗はmetadataで区別される。
-`--report`はCurrent business flow、Evidence and claims、Corrections、Completionなどを
-含む読みやすい成果物を出力する。
+checkpointは検証済み`InterviewState`、順序付き`PublicConversationMessage`、次の発言番号、
+safeなmodel/config/status metadataをJSON保存する。`PublicConversationMessage`には公開本文、
+role、安定ID、sequence、利用者発言なら既存utteranceへの参照、直前assistantへの`reply_to`
+だけを持たせる。Inspectのprovider message object、tool call/receipt履歴、hidden reasoning、
+認証情報、private stakeholder state、未公開の発言は保存しない。schemaは
+`business_interview.interview_agent.v3`へ更新し、旧checkpointに存在しない質問を推測して
+補わない。`--resume`は保存済み公開対話から新しいprovider conversationを構築し、過去のtool
+callや利用者発言を再実行しない。正常な応答完了後のcheckpointを保証対象とし、途中失敗時は
+利用者発言だけが保存され、打切り出力は公開質問として保存しない。通常終了、controllerによる
+`user_stopped`、技術的失敗はmetadataで区別される。`--report`にはPublic conversationを
+含め、短い回答の根拠から関連質問を辿れるようにする。
 
-`tests/test_interview_agent.py`はMockLLMで、手動のtool列ではなくmodel outputのtool
-callを実行すること、candidate ID解決、unknown candidate/confirmed claimの拒否、追記・
-訂正、truncation、conversationを含めないcheckpoint再開、provider向けschemaを確認する。実provider
-の短いsmokeは環境変数のcredentialがある場合だけ実行する。
+`tests/test_interview_agent.py`はMockLLMで、手動のtool列ではなくmodel outputのtool callを
+実行すること、candidate ID解決、unknown candidate/confirmed claimの拒否、追記・訂正、
+truncation、質問後のcheckpoint再開と入力順序、質問と根拠の境界、複数回保存での重複なし、
+provider向けschemaを確認する。実providerの短いsmokeは環境変数のcredentialがある場合だけ
+実行し、結果は `experiments/phase22/README.md` に残す。
 
 本格的な質問戦略、音声/Zoom/Teams、改善提案、スコア、Phase 21診断、旧19グラフ
 ツールの大規模置換は、この最小縦断の結果だけで自動開始しない。
