@@ -37,25 +37,42 @@ uv run python -m business_interview.prototype \
 
 ## Model-selected short interview
 
-`business_interview_bench.interview_agent` is the next vertical slice: it
-registers each public utterance with `InterviewHarness`, supplies an exact
-citation candidate, and lets an Inspect model choose the typed operations. No
-manual operation list is read by this path. Provider credentials stay in the
-provider's normal environment configuration.
+`business_interview_bench.interview_agent` registers each public utterance with
+`InterviewHarness`, exposes only harness-issued candidate IDs such as
+`candidate:u1:full`, and lets an Inspect model choose the seven typed
+operations. The adapter resolves a selected ID to the exact public quote and
+range before invoking `InterviewToolExecutor`; no manual operation list is
+read by this path. Provider credentials stay in the provider's normal
+configuration.
 
 ```bash
+# Fixed input
 uv run python -m business_interview_bench.interview_agent \
   --model openrouter/provider/model \
   --text '担当は営業で、申請書を確認します。' \
   --text '確認結果を記録します。' \
   --complete \
   --checkpoint /tmp/interview-state.checkpoint.json \
-  --output /tmp/interview-state.json
+  --output /tmp/interview-state.json \
+  --report /tmp/interview-state.report.md
+
+# Or interactive Japanese text until /done
+uv run python -m business_interview_bench.interview_agent \
+  --model openrouter/provider/model --interactive \
+  --checkpoint /tmp/interview-state.checkpoint.json
 ```
 
-The checkpoint contains only the validated `InterviewState` and the next
-utterance counter. Resume it with another public utterance without exposing
-provider conversation state:
+The bounded loop executes stateful tool calls serially and limits model/tool
+calls, output tokens, timeout, and retries. Automatic claims remain
+`provisional`; the adapter rejects unknown evidence candidates and
+`stakeholder_confirmed=true`. Empty, truncated, filtered, communication, and
+limit failures do not silently complete the interview.
+
+A checkpoint stores the validated `InterviewState`, next utterance counter,
+and safe model/config/status metadata. It does not store Inspect conversation
+messages, tool-call/receipt history, hidden reasoning, credentials, private
+stakeholder state, or unpublished text. Resume it with another public utterance
+without replaying prior calls:
 
 ```bash
 uv run python -m business_interview_bench.interview_agent \
@@ -65,9 +82,8 @@ uv run python -m business_interview_bench.interview_agent \
   --complete
 ```
 
-The model loop is bounded by `--max-tool-rounds`; failed typed operations are
-returned to the model as tool receipts, while the core executor remains the
-only state mutation boundary. `tests/test_interview_agent.py` exercises the
-same path with Inspect MockLLM and verifies incremental correction plus
-checkpoint resume. A real provider run is credential-gated and is not replaced
-by MockLLM in the user-facing command.
+`tests/test_interview_agent.py` exercises the same path with Inspect MockLLM,
+including candidate resolution, invalid-candidate/confirmed-claim rejection,
+incremental correction, truncation handling, and checkpoint resume. A real
+provider run is credential-gated and is not replaced by MockLLM in the
+user-facing command.

@@ -1531,7 +1531,7 @@ _DESCRIPTIONS: dict[ToolName, str] = {
     "connect_process_steps": "Record an ordered, conditional, or exception flow between existing steps with evidence.",
     "record_resource_usage": "Link an existing process step to a system and data type with explicit CRUD, including unknown or manual use.",
     "record_issue": "Record an open question, contradiction, exception, or business rule with its target and evidence.",
-    "revise_record": "Add or replace one typed field on an existing record while preserving any superseded claim and its evidence.",
+    "revise_record": "Add or replace one typed field on an existing record while preserving superseded claims. Match field/value types: activity or condition=ValueInput, actor or data_type=EntityInput, inputs or outputs=DataListInput, crud=CrudInput, system=SystemInput.",
     "complete_interview": "Record termination separately from stakeholder confirmation and content completeness.",
 }
 

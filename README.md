@@ -459,21 +459,36 @@ quality and next hardening priority.
 
 ## InterviewState model agent
 
-The typed `InterviewState` prototype now has a separate, minimal real-model
-adapter. `InterviewStateAgent` registers each public utterance, supplies an
-exact evidence candidate, and lets an Inspect model choose the seven typed
-operations; the manual replay operation list is not used.
+The typed `InterviewState` prototype has a separate, minimal real-model
+adapter. `InterviewStateAgent` registers every public utterance before the
+model call, exposes harness-issued candidate IDs such as
+`candidate:u1:full`, resolves the selected exact citation at the adapter
+boundary, and lets an Inspect model choose the seven typed operations. The
+manual replay operation list is not used.
 
 ```bash
+# Fixed-input run
 uv run python -m business_interview_bench.interview_agent \
   --model openrouter/provider/model \
   --text '担当は営業で、申請書を確認します。' \
   --complete \
   --checkpoint /tmp/interview-state.checkpoint.json \
-  --output /tmp/interview-state.json
+  --output /tmp/interview-state.json \
+  --report /tmp/interview-state.report.md
+
+# Interactive run: Japanese text until /done; EOF is a normal stop
+uv run python -m business_interview_bench.interview_agent \
+  --model openrouter/provider/model --interactive \
+  --checkpoint /tmp/interview-state.checkpoint.json
 ```
 
-Use `--resume` to continue from a JSON checkpoint. The adapter is credential-
-gated and retains only validated `InterviewState` data in checkpoints. Offline
-MockLLM coverage is in `tests/test_interview_agent.py`; the user-facing command
-uses Inspect's normal provider configuration for a real model.
+Tool calls are bounded and serial, automatic claims stay provisional, and
+unknown candidates or stakeholder confirmation cannot mutate state. Empty,
+truncated, filtered, communication, and limit failures are classified rather
+than treated as completion. Checkpoints contain validated state, the next
+utterance counter, and safe model/status metadata only; provider conversation
+history, tool receipts, hidden reasoning, credentials, private state, and
+unpublished utterances are excluded. `--resume` continues without
+replaying prior calls. Offline MockLLM coverage is in
+`tests/test_interview_agent.py`; the user-facing command uses Inspect's normal
+provider configuration for a real model.

@@ -116,25 +116,47 @@ uv run python -m business_interview.prototype \
 
 `business_interview_bench.interview_agent.InterviewStateAgent` は上記の7操作を
 Pydantic入力SchemaからInspect `ToolDef`へ薄く変換し、公開発言ごとに実モデルを
-呼び出す。発言はモデル呼び出し前に`InterviewHarness`へ登録され、最新発言の
-`utterance_id + [0, len(text)) + quote`を引用候補としてモデルへ渡す。モデルが
-選んだtool callだけが`InterviewToolExecutor`を通り、失敗した型付きreceiptは次の
-モデル呼び出しへ返される。Pydanticの`$defs`/`$ref`はOpenAI互換providerで扱える
-ようadapter境界でinlineするが、実行時の入力検証は元のPydanticモデルを使う。
+呼び出す。発言はモデル呼び出し前に`InterviewHarness`へ登録され、登録済みの全公開
+発言に `candidate:<utterance-id>:full` という安定した引用候補IDが発行される。
+モデルは `candidate_id` だけを選び、adapterが正確なquote/rangeを`EvidenceCitation`
+へ戻してから、`InterviewToolExecutor`と既存Pydantic validationを通す。モデルには
+tool結果とreceiptが返るが、発言登録/evidence発行はtoolとして公開されない。
+
+すべての7操作は状態変更の順序を保つためserialで実行し、model call数、tool call数、
+生成token数、provider timeout/retryをboundedにする。自動抽出は
+`claim_status=provisional`だけを許し、`stakeholder_confirmed=true`を拒否する。
+`complete_interview`はcontrollerが「これ以上公開発言を渡さない」と通知した
+`finish()`でだけ選べる。空応答、truncation、content filter、通信失敗、tool/model
+limitは完了扱いにせず、`InterviewAgentError.kind`とsafe metadataに分類する。
 
 ```bash
+# 固定入力（返信はstderr、state JSONはstdoutまたは--outputへ）
 uv run python -m business_interview_bench.interview_agent \
   --model openrouter/provider/model \
   --text '担当は営業で、申請書を確認します。' \
   --complete \
+  --checkpoint /tmp/interview-state.checkpoint.json \
+  --output /tmp/interview-state.json \
+  --report /tmp/interview-state.report.md
+
+# 対話入力（/doneでfinish、EOF/中断はuser_stoppedとして保存）
+uv run python -m business_interview_bench.interview_agent \
+  --model openrouter/provider/model --interactive \
   --checkpoint /tmp/interview-state.checkpoint.json
 ```
 
-checkpointは`InterviewState`と次の発言番号だけをJSON保存し、
-`--resume`で再構築できる。providerの会話履歴、認証情報、stakeholder private stateは
-保存しない。`tests/test_interview_agent.py`はMockLLMで、手動のtool列ではなくmodel
-outputのtool callを実行すること、追記・訂正、checkpoint再開、provider向けschemaを
-確認する。実providerの短いsmokeは環境変数のcredentialがある場合だけ実行する。
+checkpointは検証済み`InterviewState`、次の発言番号、safeなmodel/config/status metadata
+だけをJSON保存する。Inspectのconversation message、tool call/receipt履歴、hidden
+reasoning、認証情報、private stakeholder state、未公開の発言は保存しない。`--resume`
+は公開状態から新しいprovider conversationを構築し、過去のtool callを再実行しない。
+通常終了、controllerによる`user_stopped`、技術的失敗はmetadataで区別される。
+`--report`はCurrent business flow、Evidence and claims、Corrections、Completionなどを
+含む読みやすい成果物を出力する。
+
+`tests/test_interview_agent.py`はMockLLMで、手動のtool列ではなくmodel outputのtool
+callを実行すること、candidate ID解決、unknown candidate/confirmed claimの拒否、追記・
+訂正、truncation、conversationを含めないcheckpoint再開、provider向けschemaを確認する。実provider
+の短いsmokeは環境変数のcredentialがある場合だけ実行する。
 
 本格的な質問戦略、音声/Zoom/Teams、改善提案、スコア、Phase 21診断、旧19グラフ
 ツールの大規模置換は、この最小縦断の結果だけで自動開始しない。
