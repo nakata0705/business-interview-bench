@@ -1526,12 +1526,12 @@ _INPUT_MODELS: dict[ToolName, type[BaseModel]] = {
 }
 
 _DESCRIPTIONS: dict[ToolName, str] = {
-    "inspect_interview_state": "Read the current business understanding, evidence, open questions, and contradictions.",
-    "record_process_step": "Record a new process step with any currently known actor, inputs, outputs, and public evidence; add later fields with revise_record.",
-    "connect_process_steps": "Record an ordered, conditional, or exception flow between existing steps with evidence.",
-    "record_resource_usage": "Link an existing process step to a system and data type with explicit CRUD, including unknown or manual use.",
-    "record_issue": "Record an open question, contradiction, exception, or business rule with its target and evidence.",
-    "revise_record": "Add or replace one typed field on an existing record while preserving superseded claims. Match field/value types: activity or condition=ValueInput, actor or data_type=EntityInput, inputs or outputs=DataListInput, crud=CrudInput, system=SystemInput.",
+    "inspect_interview_state": "Read the current business understanding, active claims, evidence, open questions, and contradictions; the result is context, not new evidence.",
+    "record_process_step": "Record only a newly explicit process action with public evidence. For an existing action's later actor, activity, input, output, or condition, use revise_record instead; leave an unmentioned actor null and data lists unset, and do not turn an activity noun into an input or output.",
+    "connect_process_steps": "Record an explicitly stated ordered, conditional, or exception flow between existing steps with public evidence; after recording a newly explicit step that follows an existing step, use this to record that order, but do not infer an unstated order.",
+    "record_resource_usage": "Link an existing process step to a publicly named system and data type with explicit CRUD; use unknown CRUD when the operation cannot be distinguished and do not infer a system.",
+    "record_issue": "Record an open question, contradiction, exception, or business rule with its target and public evidence.",
+    "revise_record": "Add or replace one typed field on an existing business record for a later detail or correction, preserving superseded claims. Use the same record_id and expected_claim_id for the current claim when available; change only a field supported by the current public utterance. Match field/value types: activity or condition=ValueInput, actor or data_type=EntityInput, inputs or outputs=DataListInput, crud=CrudInput, system=SystemInput.",
     "complete_interview": "Record termination separately from stakeholder confirmation and content completeness.",
 }
 

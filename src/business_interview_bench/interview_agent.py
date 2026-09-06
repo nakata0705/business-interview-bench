@@ -51,6 +51,7 @@ from business_interview.interview_state import (
     Utterance,
 )
 from business_interview.interview_tools import (
+    InspectInterviewStateInput,
     InterviewToolExecutor,
     ToolDefinition,
     ToolName,
@@ -60,7 +61,7 @@ from business_interview.interview_tools import (
 )
 
 AGENT_SCHEMA_VERSION = "business_interview.interview_agent.v3"
-PROMPT_VERSION = "interview-state-agent.ja.v3"
+PROMPT_VERSION = "interview-state-agent.ja.v5"
 
 FailureKind = Literal[
     "empty_response",
@@ -87,23 +88,44 @@ _AGENT_SYSTEM_PROMPT = """business-interview-bench InterviewState agent
 事実、担当者、ID、引用、関係を推測して作らないでください。
 
 ルール:
-- 既存のレコードIDやclaim IDが必要なら、まずinspect_interview_stateを使う。
-- 新しい処理にはrecord_process_stepを使う。同じ処理の後続情報はstepを再登録せず、
-  record_idと一つのfield/valueを指定したrevise_recordを使う。
-- 事実を記録する操作には、公開発言の候補IDを使ったevidenceを少なくとも一つ付ける。
-  引用候補のcandidate_idだけを選び、座標・quote・Evidence IDを手計算しない。
-- candidate_idは現在までに公開された利用者発言に限る。ツール結果や自分の発言、公開質問、未来の回答を
-  引用しない。候補のsemantic_supportは意味的な利用者承認ではない。
-- 保存されたassistantの質問は回答を理解するための対話文脈であり、業務事実の根拠ではない。
-  「はい」だけで質問に含まれる複数論点をすべて確定せず、必要なら明確化を続ける。
-- 自動記録のclaim_statusは必ずprovisionalにする。stakeholder_confirmedをtrueにしない。
-- 明示されない値はabsentまたはdont_knowにし、CRUDを入出力や「書く」という語だけから
-  推測しない。不明なCRUDはunknownにする。
+- 各生成の直前に、controllerが現在のInterviewStateから作ったsnapshotが渡されます。
+  これは暫定的な現在理解であり、新しい発言でも正解でも証拠でもありません。
+  snapshotの値やclaim/evidence IDを引用候補として使わず、公開発言のcandidate_idだけを選びます。
+  ツール成功後の次の生成には更新済みsnapshotが渡されるので、常にそれを最新の状態として扱います。
+- 新しい業務行為が利用者発言で明示された場合だけrecord_process_stepを使います。
+  既存処理の担当者、活動、入出力、条件などが後から判明した場合は、stepを再登録せず、
+  既存のrecord_idと一つのfield/valueを指定したrevise_recordを使います。後続発言で変更するのは、
+  その発言が明示または明確に参照しているフィールドだけです。過去発言やsnapshotだけから別の
+  フィールドを追加しません。
+- 既存情報が訂正された場合も同じrecord_idへrevise_recordを使い、snapshotの現在claimを
+  expected_claim_idに指定できるなら指定します。古いclaimを消したり上書きしたりせず、訂正履歴を残します。
+- 活動の文中に現れる対象名だけではinputs/outputsを確定しません。「対象を確認する」のような
+  活動表現から入力を、「結果を保管する」のような活動表現から出力・データ型・CRUDを推測せず、
+  入力・出力として明示された場合だけ対応するfieldを記録します。
+- 同じ処理への補足か新しい処理か判断できない場合は、推測で処理を増やさず利用者へ質問します。
+  反対に、新しい処理が明示された場合は既存処理へ無理に押し込めません。既存処理の後に行うことが
+  利用者発言で明示されている場合は、新しいstepをrecord_process_stepで記録した後、
+  connect_process_stepsでその既存stepからの順序も記録します。
+- 話者、speaker、stakeholderなどの会話上の役割名を、業務担当者であると自動変換しません。
+  担当者は利用者発言が業務上の担当者だと明示した場合だけ記録します。
+- 事実を記録する操作には、公開発言の候補IDを使ったevidenceを少なくとも一つ付けます。
+  引用候補のcandidate_idだけを選び、座標・quote・Evidence IDを手計算しません。
+- candidate_idは現在までに公開された利用者発言に限ります。ツール結果や自分の発言、公開質問、未来の回答を
+  引用しません。候補のsemantic_supportは意味的な利用者承認ではありません。
+- 保存されたassistantの質問は回答を理解するための対話文脈であり、業務事実の根拠ではありません。
+  「はい」だけで質問に含まれる複数論点をすべて確定せず、必要なら明確化を続けます。
+- 自動記録のclaim_statusは必ずprovisionalにします。stakeholder_confirmedをtrueにしません。
+- 情報状態は次の意味を厳守します。UNSETはまだ聞いていない／発言で説明されていない状態、
+  ABSENTは利用者が明示的に存在しないと説明した状態、DONT_KNOWは利用者自身が分からないと答えた状態、
+  valueは公開発言に基づく具体的な値です。未言及をABSENTやDONT_KNOWに変換しません。
+  新しいstepで担当者が未言及ならactor=null、入力・出力が未言及ならDataListInputのstate=unsetを使います。
+- CRUDは操作種別が公開発言から区別できる場合だけcreate/read/update/deleteを使い、区別できなければunknownにします。
+  入出力や「書く」「保管する」という語だけからCRUDやシステムを推測しません。
 - 安定した短いASCII ID（例: step:review、actor:sales、data:application）を使い、
-  既存entityはinspect後に再利用する。
-- ツール結果が失敗ならエラーを読み、同じ不正呼び出しを繰り返さず修正する。
-- controllerがこれ以上公開発言を渡さないと明示するまでcomplete_interviewを呼ばない。
-  「完了しました」と書くだけでは終了にならない。
+  既存entityはsnapshotまたはinspect_interview_stateで確認して再利用します。
+- ツール結果が失敗ならエラーを読み、同じ不正呼び出しを繰り返さず修正します。
+- controllerがこれ以上公開発言を渡さないと明示するまでcomplete_interviewを呼びません。
+  「完了しました」と書くだけでは終了になりません。
 
 各発言への更新後は、日本語で理解した内容を短く示し、さらに聞く必要があれば原則一問
 だけの次の質問を返してください。利用者承認を推測せず、終了時も確認済みとは扱いません。
@@ -421,7 +443,8 @@ class InterviewStateAgent:
             if next_utterance_number is not None
             else _next_utterance_number(initial_state.utterances)
         )
-        executor = InterviewToolExecutor(self.harness)
+        self._executor = InterviewToolExecutor(self.harness)
+        executor = self._executor
         # Providers receive strict schemas (some OpenAI-compatible endpoints
         # require every object property to be listed as required), while the
         # local executor keeps the original Pydantic defaults for deterministic
@@ -718,6 +741,16 @@ class InterviewStateAgent:
     def _completion_is_allowed(self) -> bool:
         return self._completion_allowed
 
+    def _generation_messages(self) -> list[ChatMessage]:
+        """Build the latest model input without persisting state snapshots."""
+        current_state = _render_current_state(self._executor)
+        if self._messages and isinstance(self._messages[0], ChatMessageSystem):
+            system = ChatMessageSystem(
+                content=f"{self._messages[0].text}\n\n{current_state}"
+            )
+            return [system, *self._messages[1:]]
+        return [ChatMessageSystem(content=current_state), *self._messages]
+
     async def _run_model_turn(self, utterance_id: str | None) -> InterviewAgentTurn:
         invocations: list[InterviewToolInvocation] = []
         assistant_text = ""
@@ -726,7 +759,7 @@ class InterviewStateAgent:
         for round_index in range(self.max_model_calls):
             try:
                 output = await self.model.generate(
-                    self._messages,
+                    self._generation_messages(),
                     tools=self._tools,
                     config=self.generation_config,
                 )
@@ -1264,6 +1297,56 @@ def _finish_message(public_utterances: Sequence[Utterance]) -> ChatMessageUser:
             "the interview active. Available evidence candidates are:\n"
             f"{json.dumps(candidates, ensure_ascii=False, sort_keys=True)}"
         )
+    )
+
+
+def _render_current_state(executor: InterviewToolExecutor) -> str:
+    """Render the latest typed inspection as non-evidence model context."""
+    inspection = executor.inspect_interview_state(
+        InspectInterviewStateInput(include_evidence=False)
+    )
+    if not inspection.ok or inspection.snapshot is None:
+        raise InterviewAgentError(
+            "could not build the current InterviewState snapshot",
+            kind="tool_execution_failure",
+        )
+    snapshot = inspection.snapshot
+    payload = {
+        "business_model": snapshot.business_model.model_dump(mode="json"),
+        "active_claims": [
+            {
+                "id": claim.id,
+                "record_type": claim.record_type,
+                "target_id": claim.target_id,
+                "predicate": claim.predicate,
+                "statement": claim.statement,
+                "value": claim.value.model_dump(mode="json"),
+                "status": claim.status,
+                "supersedes": claim.supersedes,
+                "change_reason": claim.change_reason,
+            }
+            for claim in snapshot.current_claims
+        ],
+        "open_questions": [
+            question.model_dump(mode="json") for question in snapshot.open_questions
+        ],
+        "contradictions": [
+            {
+                "id": contradiction.id,
+                "claim_ids": contradiction.claim_ids,
+                "status": contradiction.status,
+                "resolution_claim_id": contradiction.resolution_claim_id,
+            }
+            for contradiction in snapshot.contradictions
+        ],
+    }
+    return (
+        "Current InterviewState snapshot (controller-provided, provisional only):\n"
+        "This is the latest typed understanding, not a user utterance, not a source "
+        "of truth, and not evidence. Do not cite it; select evidence only from "
+        "candidate IDs in public user messages. It is refreshed after every "
+        "successful tool update.\n"
+        + json.dumps(payload, ensure_ascii=False, sort_keys=True)
     )
 
 

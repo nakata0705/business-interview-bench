@@ -1,0 +1,249 @@
+{
+  "schema_version": "business_interview.interview_state.v2",
+  "utterances": [
+    {
+      "id": "u1",
+      "speaker": "stakeholder",
+      "text": "申請内容を確認する業務です。"
+    },
+    {
+      "id": "u2",
+      "speaker": "stakeholder",
+      "text": "その確認を担当するのは経理です。"
+    },
+    {
+      "id": "u3",
+      "speaker": "stakeholder",
+      "text": "訂正です。その確認の担当は経理ではなく営業です。"
+    },
+    {
+      "id": "u4",
+      "speaker": "stakeholder",
+      "text": "確認の次に、別の処理として総務が結果を保管します。"
+    }
+  ],
+  "claims": [
+    {
+      "id": "claim:step:check_application:activity",
+      "record_type": "process_step",
+      "target_id": "step:check_application",
+      "predicate": "activity",
+      "statement": "Process step step:check_application has the recorded activity.",
+      "value": {
+        "state": "value",
+        "value": "申請内容を確認する業務です。"
+      },
+      "evidence": [
+        {
+          "utterance_id": "u1",
+          "start": 0,
+          "end": 14,
+          "quote": "申請内容を確認する業務です。",
+          "semantic_support": "unassessed",
+          "evidence_id": "ev_0001"
+        }
+      ],
+      "status": "provisional",
+      "supersedes": null,
+      "change_reason": null
+    },
+    {
+      "id": "actor:accounting",
+      "record_type": "process_step",
+      "target_id": "step:check_application",
+      "predicate": "actor",
+      "statement": "確認業務の担当者は経理です。",
+      "value": {
+        "state": "value",
+        "value": "actor:accounting"
+      },
+      "evidence": [
+        {
+          "utterance_id": "u2",
+          "start": 0,
+          "end": 16,
+          "quote": "その確認を担当するのは経理です。",
+          "semantic_support": "unassessed",
+          "evidence_id": "ev_0002"
+        }
+      ],
+      "status": "rejected",
+      "supersedes": null,
+      "change_reason": "担当者を経理に修正"
+    },
+    {
+      "id": "data:application",
+      "record_type": "process_step",
+      "target_id": "step:check_application",
+      "predicate": "inputs",
+      "statement": "業務の入力は申請内容です。",
+      "value": {
+        "state": "value",
+        "value": "[\"data:application\"]"
+      },
+      "evidence": [
+        {
+          "utterance_id": "u1",
+          "start": 0,
+          "end": 14,
+          "quote": "申請内容を確認する業務です。",
+          "semantic_support": "unassessed",
+          "evidence_id": "ev_0003"
+        }
+      ],
+      "status": "provisional",
+      "supersedes": null,
+      "change_reason": "業務の入力を申請内容に修正"
+    },
+    {
+      "id": "actor:sales",
+      "record_type": "process_step",
+      "target_id": "step:check_application",
+      "predicate": "actor",
+      "statement": "確認業務の担当者は営業です。",
+      "value": {
+        "state": "value",
+        "value": "actor:sales"
+      },
+      "evidence": [
+        {
+          "utterance_id": "u3",
+          "start": 0,
+          "end": 24,
+          "quote": "訂正です。その確認の担当は経理ではなく営業です。",
+          "semantic_support": "unassessed",
+          "evidence_id": "ev_0004"
+        }
+      ],
+      "status": "provisional",
+      "supersedes": "actor:accounting",
+      "change_reason": "訂正です。その確認の担当は経理ではなく営業です。"
+    },
+    {
+      "id": "claim:step:store_results:activity",
+      "record_type": "process_step",
+      "target_id": "step:store_results",
+      "predicate": "activity",
+      "statement": "Process step step:store_results has the recorded activity.",
+      "value": {
+        "state": "value",
+        "value": "結果を保管する業務です。"
+      },
+      "evidence": [
+        {
+          "utterance_id": "u4",
+          "start": 0,
+          "end": 25,
+          "quote": "確認の次に、別の処理として総務が結果を保管します。",
+          "semantic_support": "unassessed",
+          "evidence_id": "ev_0005"
+        }
+      ],
+      "status": "provisional",
+      "supersedes": null,
+      "change_reason": null
+    },
+    {
+      "id": "claim:step:store_results:actor",
+      "record_type": "process_step",
+      "target_id": "step:store_results",
+      "predicate": "actor",
+      "statement": "Process step step:store_results has the recorded actor.",
+      "value": {
+        "state": "value",
+        "value": "actor:general_affairs"
+      },
+      "evidence": [
+        {
+          "utterance_id": "u4",
+          "start": 0,
+          "end": 25,
+          "quote": "確認の次に、別の処理として総務が結果を保管します。",
+          "semantic_support": "unassessed",
+          "evidence_id": "ev_0005"
+        }
+      ],
+      "status": "provisional",
+      "supersedes": null,
+      "change_reason": null
+    }
+  ],
+  "business_model": {
+    "actors": [
+      {
+        "id": "actor:accounting",
+        "label": "経理"
+      },
+      {
+        "id": "actor:sales",
+        "label": "営業"
+      },
+      {
+        "id": "actor:general_affairs",
+        "label": "総務"
+      }
+    ],
+    "process_steps": [
+      {
+        "id": "step:check_application",
+        "activity": {
+          "state": "value",
+          "value": "申請内容を確認する業務です。"
+        },
+        "actor": {
+          "state": "value",
+          "entity_id": "actor:sales"
+        },
+        "inputs": {
+          "state": "value",
+          "entity_ids": [
+            "data:application"
+          ]
+        },
+        "outputs": {
+          "state": "unset",
+          "entity_ids": []
+        }
+      },
+      {
+        "id": "step:store_results",
+        "activity": {
+          "state": "value",
+          "value": "結果を保管する業務です。"
+        },
+        "actor": {
+          "state": "value",
+          "entity_id": "actor:general_affairs"
+        },
+        "inputs": {
+          "state": "unset",
+          "entity_ids": []
+        },
+        "outputs": {
+          "state": "unset",
+          "entity_ids": []
+        }
+      }
+    ],
+    "flows": [],
+    "systems": [],
+    "data_types": [
+      {
+        "id": "data:application",
+        "label": "申請内容"
+      }
+    ],
+    "data_operations": []
+  },
+  "open_questions": [],
+  "contradictions": [],
+  "issues": [],
+  "completion": {
+    "status": "active",
+    "termination_reason": null,
+    "unresolved_question_ids": [],
+    "stakeholder_confirmed": false,
+    "confirmation_evidence": [],
+    "content_completeness": "unknown"
+  }
+}

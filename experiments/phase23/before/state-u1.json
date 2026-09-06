@@ -1,0 +1,99 @@
+{
+  "schema_version": "business_interview.interview_state.v2",
+  "utterances": [
+    {
+      "id": "u1",
+      "speaker": "stakeholder",
+      "text": "申請内容を確認する業務です。"
+    }
+  ],
+  "claims": [
+    {
+      "id": "claim:step:application_review:activity",
+      "record_type": "process_step",
+      "target_id": "step:application_review",
+      "predicate": "activity",
+      "statement": "Process step step:application_review has the recorded activity.",
+      "value": {
+        "state": "value",
+        "value": "申請内容を確認する業務です。"
+      },
+      "evidence": [
+        {
+          "utterance_id": "u1",
+          "start": 0,
+          "end": 14,
+          "quote": "申請内容を確認する業務です。",
+          "semantic_support": "unassessed",
+          "evidence_id": "ev_0001"
+        }
+      ],
+      "status": "provisional",
+      "supersedes": null,
+      "change_reason": null
+    },
+    {
+      "id": "claim:step:application_review:actor",
+      "record_type": "process_step",
+      "target_id": "step:application_review",
+      "predicate": "actor",
+      "statement": "Process step step:application_review has the recorded actor.",
+      "value": {
+        "state": "absent",
+        "value": null
+      },
+      "evidence": [
+        {
+          "utterance_id": "u1",
+          "start": 0,
+          "end": 14,
+          "quote": "申請内容を確認する業務です。",
+          "semantic_support": "unassessed",
+          "evidence_id": "ev_0001"
+        }
+      ],
+      "status": "provisional",
+      "supersedes": null,
+      "change_reason": null
+    }
+  ],
+  "business_model": {
+    "actors": [],
+    "process_steps": [
+      {
+        "id": "step:application_review",
+        "activity": {
+          "state": "value",
+          "value": "申請内容を確認する業務です。"
+        },
+        "actor": {
+          "state": "absent",
+          "entity_id": null
+        },
+        "inputs": {
+          "state": "unset",
+          "entity_ids": []
+        },
+        "outputs": {
+          "state": "unset",
+          "entity_ids": []
+        }
+      }
+    ],
+    "flows": [],
+    "systems": [],
+    "data_types": [],
+    "data_operations": []
+  },
+  "open_questions": [],
+  "contradictions": [],
+  "issues": [],
+  "completion": {
+    "status": "active",
+    "termination_reason": null,
+    "unresolved_question_ids": [],
+    "stakeholder_confirmed": false,
+    "confirmation_evidence": [],
+    "content_completeness": "unknown"
+  }
+}

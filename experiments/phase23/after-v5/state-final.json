@@ -1,0 +1,197 @@
+{
+  "schema_version": "business_interview.interview_state.v2",
+  "utterances": [
+    {
+      "id": "u1",
+      "speaker": "stakeholder",
+      "text": "申請内容を確認する業務です。"
+    },
+    {
+      "id": "u2",
+      "speaker": "stakeholder",
+      "text": "その確認を担当するのは経理です。"
+    },
+    {
+      "id": "u3",
+      "speaker": "stakeholder",
+      "text": "訂正です。その確認の担当は経理ではなく営業です。"
+    },
+    {
+      "id": "u4",
+      "speaker": "stakeholder",
+      "text": "確認の次に、別の処理として総務が結果を保管します。"
+    }
+  ],
+  "claims": [
+    {
+      "id": "claim:step:check_application:activity",
+      "record_type": "process_step",
+      "target_id": "step:check_application",
+      "predicate": "activity",
+      "statement": "Process step step:check_application has the recorded activity.",
+      "value": {
+        "state": "value",
+        "value": "申請内容を確認する業務"
+      },
+      "evidence": [
+        {
+          "utterance_id": "u1",
+          "start": 0,
+          "end": 14,
+          "quote": "申請内容を確認する業務です。",
+          "semantic_support": "unassessed",
+          "evidence_id": "ev_0001"
+        }
+      ],
+      "status": "provisional",
+      "supersedes": null,
+      "change_reason": null
+    },
+    {
+      "id": "claim:step:store_results:activity",
+      "record_type": "process_step",
+      "target_id": "step:store_results",
+      "predicate": "activity",
+      "statement": "Process step step:store_results has the recorded activity.",
+      "value": {
+        "state": "value",
+        "value": "結果を保管する業務"
+      },
+      "evidence": [
+        {
+          "utterance_id": "u4",
+          "start": 0,
+          "end": 25,
+          "quote": "確認の次に、別の処理として総務が結果を保管します。",
+          "semantic_support": "unassessed",
+          "evidence_id": "ev_0002"
+        }
+      ],
+      "status": "provisional",
+      "supersedes": null,
+      "change_reason": null
+    },
+    {
+      "id": "claim:step:store_results:actor",
+      "record_type": "process_step",
+      "target_id": "step:store_results",
+      "predicate": "actor",
+      "statement": "Process step step:store_results has the recorded actor.",
+      "value": {
+        "state": "value",
+        "value": "actor:general_affairs"
+      },
+      "evidence": [
+        {
+          "utterance_id": "u4",
+          "start": 0,
+          "end": 25,
+          "quote": "確認の次に、別の処理として総務が結果を保管します。",
+          "semantic_support": "unassessed",
+          "evidence_id": "ev_0002"
+        }
+      ],
+      "status": "provisional",
+      "supersedes": null,
+      "change_reason": null
+    },
+    {
+      "id": "claim:flow:check_and_store:relation",
+      "record_type": "flow",
+      "target_id": "flow:check_and_store",
+      "predicate": "relation",
+      "statement": "Flow flow:check_and_store connects step:check_application to step:store_results.",
+      "value": {
+        "state": "value",
+        "value": "step:check_application->step:store_results"
+      },
+      "evidence": [
+        {
+          "utterance_id": "u4",
+          "start": 0,
+          "end": 25,
+          "quote": "確認の次に、別の処理として総務が結果を保管します。",
+          "semantic_support": "unassessed",
+          "evidence_id": "ev_0003"
+        }
+      ],
+      "status": "provisional",
+      "supersedes": null,
+      "change_reason": null
+    }
+  ],
+  "business_model": {
+    "actors": [
+      {
+        "id": "actor:general_affairs",
+        "label": "総務"
+      }
+    ],
+    "process_steps": [
+      {
+        "id": "step:check_application",
+        "activity": {
+          "state": "value",
+          "value": "申請内容を確認する業務"
+        },
+        "actor": {
+          "state": "unset",
+          "entity_id": null
+        },
+        "inputs": {
+          "state": "unset",
+          "entity_ids": []
+        },
+        "outputs": {
+          "state": "unset",
+          "entity_ids": []
+        }
+      },
+      {
+        "id": "step:store_results",
+        "activity": {
+          "state": "value",
+          "value": "結果を保管する業務"
+        },
+        "actor": {
+          "state": "value",
+          "entity_id": "actor:general_affairs"
+        },
+        "inputs": {
+          "state": "unset",
+          "entity_ids": []
+        },
+        "outputs": {
+          "state": "unset",
+          "entity_ids": []
+        }
+      }
+    ],
+    "flows": [
+      {
+        "id": "flow:check_and_store",
+        "from_id": "step:check_application",
+        "to_id": "step:store_results",
+        "kind": "normal",
+        "condition": {
+          "state": "unset",
+          "value": null
+        }
+      }
+    ],
+    "systems": [],
+    "data_types": [],
+    "data_operations": []
+  },
+  "open_questions": [],
+  "contradictions": [],
+  "issues": [],
+  "completion": {
+    "status": "active",
+    "termination_reason": null,
+    "unresolved_question_ids": [],
+    "stakeholder_confirmed": false,
+    "confirmation_evidence": [],
+    "content_completeness": "unknown"
+  }
+}

@@ -52,6 +52,15 @@ class _RecordingModel:
         return self.outputs.pop(0)
 
 
+def _state_context(input_messages: list[Any]) -> tuple[str, dict[str, Any]]:
+    text = next(
+        message.text
+        for message in input_messages
+        if "Current InterviewState snapshot" in message.text
+    )
+    return text, json.loads(text.rsplit("\n", 1)[-1])
+
+
 def test_provider_tool_definitions_use_candidate_evidence_and_inline_refs() -> None:
     agent = _agent([ModelOutput.from_content("mockllm", "ack")])
 
@@ -91,6 +100,84 @@ def test_provider_tool_definitions_use_candidate_evidence_and_inline_refs() -> N
     assert "activity/condition" in revise_schema["properties"]["field"]["description"]
     assert revise_schema["properties"]["claim_status"]["enum"] == ["provisional"]
     assert revise_schema["properties"]["value"]["examples"][1]["id"] == "actor:sales"
+    assert "same record_id" in revise.description
+    assert "newly explicit" in record.description
+
+
+def test_prompt_distinguishes_unset_from_absent_and_binds_updates_to_records() -> None:
+    agent = _agent([ModelOutput.from_content("mockllm", "ack")])
+
+    prompt = agent.messages[0].text
+    assert "UNSETはまだ聞いていない" in prompt
+    assert "ABSENTは利用者が明示的に存在しない" in prompt
+    assert "DONT_KNOWは利用者自身が分からない" in prompt
+    assert "同じrecord_idへrevise_record" in prompt
+    assert "推測で処理を増やさず" in prompt
+    assert "actor=null" in prompt
+    assert "DataListInputのstate=unset" in prompt
+
+
+def test_each_generation_receives_a_fresh_typed_state_snapshot() -> None:
+    model = _RecordingModel(
+        [
+            ModelOutput.for_tool_call(
+                "mockllm",
+                "record_process_step",
+                {
+                    "step_id": "step:review",
+                    "activity": {"state": "value", "value": "申請を確認"},
+                    "actor": None,
+                    "inputs": {"state": "unset", "items": []},
+                    "outputs": {"state": "unset", "items": []},
+                    "evidence": [_candidate("u1")],
+                },
+            ),
+            ModelOutput.from_content("mockllm", "活動を記録しました。"),
+            ModelOutput.for_tool_call(
+                "mockllm",
+                "revise_record",
+                {
+                    "record_id": "step:review",
+                    "field": "actor",
+                    "replacement_id": "claim:step:review:actor",
+                    "statement": "担当は経理です。",
+                    "value": {"id": "actor:accounting", "label": "経理"},
+                    "correction_note": "後続発言で担当者が判明した。",
+                    "evidence": [_candidate("u2")],
+                },
+            ),
+            ModelOutput.from_content("mockllm", "担当者を追記しました。"),
+        ]
+    )
+    agent = InterviewStateAgent(model, max_tool_rounds=4)
+
+    asyncio.run(agent.process_utterance("申請内容を確認する業務です。"))
+    asyncio.run(agent.process_utterance("その確認を担当するのは経理です。"))
+
+    first_text, first = _state_context(model.inputs[0])
+    after_record_text, after_record = _state_context(model.inputs[1])
+    before_revision_text, before_revision = _state_context(model.inputs[2])
+    after_revision_text, after_revision = _state_context(model.inputs[3])
+
+    assert first["business_model"]["process_steps"] == []
+    assert after_record["business_model"]["process_steps"][0]["id"] == "step:review"
+    step_before_revision = before_revision["business_model"]["process_steps"][0]
+    assert step_before_revision["actor"]["state"] == "unset"
+    assert step_before_revision["inputs"]["state"] == "unset"
+    assert step_before_revision["outputs"]["state"] == "unset"
+    assert "claim:step:review:activity" in after_record_text
+    assert "claim:step:review:actor" not in before_revision_text
+    step_after_revision = after_revision["business_model"]["process_steps"][0]
+    assert step_after_revision["actor"] == {
+        "entity_id": "actor:accounting",
+        "state": "value",
+    }
+    assert "claim:step:review:actor" in after_revision_text
+    assert "candidate:u1:full" not in after_record_text
+    assert "evidence" not in after_revision["active_claims"][0]
+
+    checkpoint_json = agent.checkpoint().model_dump_json()
+    assert "Current InterviewState snapshot" not in checkpoint_json
 
 
 def test_model_selected_tools_update_interview_state_from_public_text() -> None:
@@ -446,6 +533,53 @@ def test_checkpoint_round_trip_stores_public_conversation_without_provider_histo
     )
 
 
+def test_checkpoint_resume_passes_saved_business_state_to_generation(
+    tmp_path: Path,
+) -> None:
+    first_model = _RecordingModel(
+        [
+            ModelOutput.for_tool_call(
+                "mockllm",
+                "record_process_step",
+                {
+                    "step_id": "step:review",
+                    "activity": {"state": "value", "value": "申請を確認"},
+                    "actor": None,
+                    "inputs": {"state": "unset", "items": []},
+                    "outputs": {"state": "unset", "items": []},
+                    "evidence": [_candidate("u1")],
+                },
+            ),
+            ModelOutput.from_content("mockllm", "担当者を教えてください。"),
+        ]
+    )
+    first_agent = InterviewStateAgent(first_model, max_tool_rounds=4)
+    asyncio.run(first_agent.process_utterance("申請内容を確認する業務です。"))
+    checkpoint_path = tmp_path / "state-context.json"
+    first_agent.save_checkpoint(checkpoint_path)
+
+    resumed_model = _RecordingModel(
+        [ModelOutput.from_content("mockllm", "承知しました。")]
+    )
+    resumed = InterviewStateAgent.from_checkpoint_file(
+        resumed_model,
+        checkpoint_path,
+        max_tool_rounds=4,
+    )
+    asyncio.run(resumed.process_utterance("その確認を担当するのは経理です。"))
+
+    _context_text, context = _state_context(resumed_model.inputs[-1])
+    assert context["business_model"]["process_steps"][0]["id"] == "step:review"
+    assert context["active_claims"][0]["id"] == "claim:step:review:activity"
+    assert any(
+        "担当者を教えてください。" in message.text
+        for message in resumed_model.inputs[-1]
+    )
+    assert any(
+        "utterance_id: u2" in message.text for message in resumed_model.inputs[-1]
+    )
+
+
 def test_checkpoint_rejects_public_user_body_that_differs_from_utterance(
     tmp_path: Path,
 ) -> None:
@@ -663,6 +797,129 @@ def test_repeated_checkpoint_resume_does_not_duplicate_public_history_or_tools(
     checkpoint_json = second_path.read_text(encoding="utf-8")
     for private_name in ("tool_calls", "tool_call_id", "assistant_text", "reasoning"):
         assert f'"{private_name}":' not in checkpoint_json
+
+
+def test_fixed_followup_conversation_revises_one_step_and_records_explicit_order(
+    tmp_path: Path,
+) -> None:
+    first_agent = _agent(
+        [
+            ModelOutput.for_tool_call(
+                "mockllm",
+                "record_process_step",
+                {
+                    "step_id": "step:review",
+                    "activity": {"state": "value", "value": "申請内容を確認する"},
+                    "actor": None,
+                    "inputs": {"state": "unset", "items": []},
+                    "outputs": {"state": "unset", "items": []},
+                    "evidence": [_candidate("u1")],
+                },
+            ),
+            ModelOutput.from_content("mockllm", "確認処理を記録しました。"),
+        ]
+    )
+    asyncio.run(first_agent.process_utterance("申請内容を確認する業務です。"))
+    checkpoint_path = tmp_path / "acceptance.json"
+    first_agent.save_checkpoint(checkpoint_path)
+
+    resumed_model = _agent(
+        [
+            ModelOutput.for_tool_call(
+                "mockllm",
+                "revise_record",
+                {
+                    "record_id": "step:review",
+                    "field": "actor",
+                    "replacement_id": "claim:step:review:actor:accounting",
+                    "statement": "確認の担当は経理です。",
+                    "value": {"id": "actor:accounting", "label": "経理"},
+                    "correction_note": "補足発言で担当者が判明した。",
+                    "evidence": [_candidate("u2")],
+                },
+            ),
+            ModelOutput.from_content("mockllm", "担当者を追記しました。"),
+            ModelOutput.for_tool_call(
+                "mockllm",
+                "revise_record",
+                {
+                    "record_id": "step:review",
+                    "field": "actor",
+                    "replacement_id": "claim:step:review:actor:sales",
+                    "statement": "確認の担当は営業です。",
+                    "value": {"id": "actor:sales", "label": "営業"},
+                    "correction_note": "訂正発言で担当者を更新した。",
+                    "expected_claim_id": "claim:step:review:actor:accounting",
+                    "evidence": [_candidate("u3")],
+                },
+            ),
+            ModelOutput.from_content("mockllm", "訂正を反映しました。"),
+            ModelOutput.for_tool_call(
+                "mockllm",
+                "record_process_step",
+                {
+                    "step_id": "step:store",
+                    "activity": {"state": "value", "value": "結果を保管する"},
+                    "actor": {"id": "actor:general-affairs", "label": "総務"},
+                    "inputs": {"state": "unset", "items": []},
+                    "outputs": {"state": "unset", "items": []},
+                    "evidence": [_candidate("u4")],
+                },
+            ),
+            ModelOutput.for_tool_call(
+                "mockllm",
+                "connect_process_steps",
+                {
+                    "flow_id": "flow:review-to-store",
+                    "from_step_id": "step:review",
+                    "to_step_id": "step:store",
+                    "kind": "normal",
+                    "condition": {"state": "unset", "value": None},
+                    "evidence": [_candidate("u4")],
+                },
+            ),
+            ModelOutput.from_content("mockllm", "保管処理と順序を記録しました。"),
+        ]
+    )
+    resumed = InterviewStateAgent.from_checkpoint_file(
+        resumed_model.model,
+        checkpoint_path,
+        max_tool_rounds=4,
+    )
+
+    asyncio.run(resumed.process_utterance("その確認を担当するのは経理です。"))
+    asyncio.run(
+        resumed.process_utterance("訂正です。その確認の担当は経理ではなく営業です。")
+    )
+    asyncio.run(
+        resumed.process_utterance("確認の次に、別の処理として総務が結果を保管します。")
+    )
+
+    model = resumed.state.business_model
+    assert [step.id for step in model.process_steps] == ["step:review", "step:store"]
+    review, store = model.process_steps
+    assert review.actor.entity_id == "actor:sales"
+    assert review.inputs.state == "unset"
+    assert review.outputs.state == "unset"
+    assert store.actor.entity_id == "actor:general-affairs"
+    assert [(flow.from_id, flow.to_id) for flow in model.flows] == [
+        ("step:review", "step:store")
+    ]
+
+    actor_claims = [item for item in resumed.state.claims if item.predicate == "actor"]
+    old_claim = next(item for item in actor_claims if item.status == "rejected")
+    current_claim = next(item for item in actor_claims if item.status != "rejected")
+    assert old_claim.value.value == "actor:accounting"
+    assert old_claim.evidence[0].utterance_id == "u2"
+    assert current_claim.value.value == "actor:sales"
+    assert current_claim.supersedes == old_claim.id
+    assert current_claim.evidence[0].utterance_id == "u3"
+    assert [item.text for item in resumed.state.utterances] == [
+        "申請内容を確認する業務です。",
+        "その確認を担当するのは経理です。",
+        "訂正です。その確認の担当は経理ではなく営業です。",
+        "確認の次に、別の処理として総務が結果を保管します。",
+    ]
 
 
 def test_failure_metadata_classifies_provider_errors_without_echoing_credentials() -> (
