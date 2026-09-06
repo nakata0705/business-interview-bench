@@ -9,6 +9,14 @@
       "state_file": "human_synthetic.state.json"
     },
     {
+      "case_id": "incremental_synthetic",
+      "completion_status": "active",
+      "operation_count": 5,
+      "report_file": "incremental_synthetic.report.md",
+      "source_kind": "synthetic_human",
+      "state_file": "incremental_synthetic.state.json"
+    },
+    {
       "case_id": "normal_existing",
       "completion_status": "ended",
       "operation_count": 23,
@@ -25,6 +33,6 @@
       "state_file": "partial_synthetic.state.json"
     }
   ],
-  "schema_version": "business_interview.prototype_replay.v1",
+  "schema_version": "business_interview.prototype_replay.v2",
   "tool_schema_file": "tool-schemas.json"
 }

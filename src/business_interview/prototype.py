@@ -19,7 +19,7 @@ from collections.abc import Sequence
 from pathlib import Path
 from typing import Any, Literal, Protocol
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from .interview_state import (
     InterviewHarness,
@@ -58,6 +58,15 @@ class ReplayOperation(BaseModel):
     arguments: dict[str, Any] = Field(default_factory=dict)
 
 
+class ReplayTurn(BaseModel):
+    """One public utterance followed by its manual typed tool calls."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    utterance: ReplayUtterance
+    operations: tuple[ReplayOperation, ...] = Field(min_length=1)
+
+
 class ReplayCase(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
@@ -70,8 +79,22 @@ class ReplayCase(BaseModel):
     source_reference: str = Field(min_length=1)
     human_evaluation: Literal["not_applicable", "not_performed", "performed"]
     notes: str = Field(min_length=1)
-    utterances: tuple[ReplayUtterance, ...]
-    operations: tuple[ReplayOperation, ...]
+    utterances: tuple[ReplayUtterance, ...] = Field(default_factory=tuple)
+    operations: tuple[ReplayOperation, ...] = Field(default_factory=tuple)
+    turns: tuple[ReplayTurn, ...] | None = None
+
+    @model_validator(mode="after")
+    def _execution_shape(self) -> ReplayCase:
+        if self.turns is None:
+            if not self.utterances or not self.operations:
+                raise ValueError(
+                    "legacy replay cases require utterances and operations"
+                )
+        elif self.utterances or self.operations or not self.turns:
+            raise ValueError(
+                "turn-based replay cases must contain only non-empty turns"
+            )
+        return self
 
 
 class ReplayResult(BaseModel):
@@ -98,15 +121,12 @@ def load_case(path: Path) -> ReplayCase:
 
 
 def replay_case(case: ReplayCase) -> ReplayResult:
-    """Run every case through the same harness and seven-operation executor."""
+    """Run a case while preserving its public-utterance/tool-call order."""
     harness = InterviewHarness()
-    for item in case.utterances:
-        harness.register_utterance(
-            Utterance(id=item.id, speaker=item.speaker, text=item.text)
-        )
     executor = InterviewToolExecutor(harness)
     receipts: list[ToolOutput] = []
-    for index, operation in enumerate(case.operations, start=1):
+
+    def run_operation(index: int, operation: ReplayOperation) -> None:
         parsed = parse_tool_input(operation.tool, operation.arguments)
         handler = getattr(executor, operation.tool)
         receipt = handler(parsed)
@@ -117,6 +137,24 @@ def replay_case(case: ReplayCase) -> ReplayResult:
                 f"case {case.case_id!r} operation {index} "
                 f"{operation.tool!r} failed: {message}"
             )
+
+    if case.turns is None:
+        for item in case.utterances:
+            harness.register_utterance(
+                Utterance(id=item.id, speaker=item.speaker, text=item.text)
+            )
+        for index, operation in enumerate(case.operations, start=1):
+            run_operation(index, operation)
+    else:
+        operation_index = 0
+        for turn in case.turns:
+            item = turn.utterance
+            harness.register_utterance(
+                Utterance(id=item.id, speaker=item.speaker, text=item.text)
+            )
+            for operation in turn.operations:
+                operation_index += 1
+                run_operation(operation_index, operation)
     return ReplayResult(case=case, state=executor.state, receipts=tuple(receipts))
 
 
@@ -319,7 +357,7 @@ def write_replay_outputs(
         encoding="utf-8",
     )
     manifest = {
-        "schema_version": "business_interview.prototype_replay.v1",
+        "schema_version": "business_interview.prototype_replay.v2",
         "tool_schema_file": "tool-schemas.json",
         "cases": [
             {
@@ -379,6 +417,7 @@ __all__ = [
     "ReplayError",
     "ReplayOperation",
     "ReplayResult",
+    "ReplayTurn",
     "ReplayUtterance",
     "load_case",
     "main",

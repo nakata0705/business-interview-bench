@@ -111,6 +111,7 @@
   },
   "claims": [
     {
+      "change_reason": null,
       "evidence": [
         {
           "end": 34,
@@ -134,6 +135,7 @@
       }
     },
     {
+      "change_reason": null,
       "evidence": [
         {
           "end": 34,
@@ -157,6 +159,7 @@
       }
     },
     {
+      "change_reason": null,
       "evidence": [
         {
           "end": 34,
@@ -180,6 +183,7 @@
       }
     },
     {
+      "change_reason": null,
       "evidence": [
         {
           "end": 20,
@@ -203,6 +207,7 @@
       }
     },
     {
+      "change_reason": null,
       "evidence": [
         {
           "end": 20,
@@ -226,6 +231,7 @@
       }
     },
     {
+      "change_reason": null,
       "evidence": [
         {
           "end": 20,
@@ -249,6 +255,7 @@
       }
     },
     {
+      "change_reason": null,
       "evidence": [
         {
           "end": 54,
@@ -272,6 +279,7 @@
       }
     },
     {
+      "change_reason": null,
       "evidence": [
         {
           "end": 34,
@@ -295,6 +303,7 @@
       }
     },
     {
+      "change_reason": null,
       "evidence": [
         {
           "end": 34,
@@ -318,6 +327,7 @@
       }
     },
     {
+      "change_reason": null,
       "evidence": [
         {
           "end": 34,
@@ -341,6 +351,7 @@
       }
     },
     {
+      "change_reason": null,
       "evidence": [
         {
           "end": 85,
@@ -364,6 +375,7 @@
       }
     },
     {
+      "change_reason": null,
       "evidence": [
         {
           "end": 85,
@@ -387,6 +399,7 @@
       }
     },
     {
+      "change_reason": null,
       "evidence": [
         {
           "end": 85,
@@ -459,7 +472,7 @@
       "text": "Does reviewing create a new record or update the intake sheet?"
     }
   ],
-  "schema_version": "business_interview.interview_state.v1",
+  "schema_version": "business_interview.interview_state.v2",
   "utterances": [
     {
       "id": "p1",

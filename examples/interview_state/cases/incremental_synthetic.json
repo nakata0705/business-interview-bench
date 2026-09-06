@@ -1,0 +1,171 @@
+{
+  "case_id": "incremental_synthetic",
+  "title": "段階的な処理情報の追記と訂正",
+  "source_kind": "synthetic_human",
+  "source_reference": "手動で構成した日本語4発言の適合例",
+  "human_evaluation": "not_performed",
+  "notes": "合成・手動ツール呼び出しによる適合例。発言登録とツール実行を会話順に交互に行い、モデルによる自動抽出や人間評価の成功を示すものではない。",
+  "turns": [
+    {
+      "utterance": {
+        "id": "i1",
+        "speaker": "stakeholder",
+        "text": "まず申請内容を確認します"
+      },
+      "operations": [
+        {
+          "tool": "record_process_step",
+          "arguments": {
+            "step_id": "review",
+            "activity": {
+              "state": "value",
+              "value": "申請内容を確認"
+            },
+            "evidence": [
+              {
+                "utterance_id": "i1",
+                "start": 0,
+                "end": 12,
+                "quote": "まず申請内容を確認します",
+                "semantic_support": "supports"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "utterance": {
+        "id": "i2",
+        "speaker": "stakeholder",
+        "text": "担当は経理で、申請書を確認します"
+      },
+      "operations": [
+        {
+          "tool": "revise_record",
+          "arguments": {
+            "record_id": "review",
+            "field": "actor",
+            "replacement_id": "claim:review:actor",
+            "statement": "reviewの担当は経理です。",
+            "value": {
+              "id": "accounting",
+              "label": "経理"
+            },
+            "correction_note": "追加回答で担当者が判明した。",
+            "evidence": [
+              {
+                "utterance_id": "i2",
+                "start": 0,
+                "end": 16,
+                "quote": "担当は経理で、申請書を確認します",
+                "semantic_support": "supports"
+              }
+            ],
+            "claim_status": "confirmed"
+          }
+        },
+        {
+          "tool": "revise_record",
+          "arguments": {
+            "record_id": "review",
+            "field": "inputs",
+            "replacement_id": "claim:review:inputs",
+            "statement": "reviewの入力は申請書です。",
+            "value": {
+              "state": "value",
+              "items": [
+                {
+                  "id": "application",
+                  "label": "申請書"
+                }
+              ]
+            },
+            "correction_note": "追加回答で入力データが判明した。",
+            "evidence": [
+              {
+                "utterance_id": "i2",
+                "start": 0,
+                "end": 16,
+                "quote": "担当は経理で、申請書を確認します",
+                "semantic_support": "supports"
+              }
+            ],
+            "claim_status": "confirmed"
+          }
+        }
+      ]
+    },
+    {
+      "utterance": {
+        "id": "i3",
+        "speaker": "stakeholder",
+        "text": "確認後は確認結果を残します"
+      },
+      "operations": [
+        {
+          "tool": "revise_record",
+          "arguments": {
+            "record_id": "review",
+            "field": "outputs",
+            "replacement_id": "claim:review:outputs",
+            "statement": "reviewの出力は確認結果です。",
+            "value": {
+              "state": "value",
+              "items": [
+                {
+                  "id": "review_result",
+                  "label": "確認結果"
+                }
+              ]
+            },
+            "correction_note": "追加回答で出力データが判明した。",
+            "evidence": [
+              {
+                "utterance_id": "i3",
+                "start": 0,
+                "end": 13,
+                "quote": "確認後は確認結果を残します",
+                "semantic_support": "supports"
+              }
+            ],
+            "claim_status": "confirmed"
+          }
+        }
+      ]
+    },
+    {
+      "utterance": {
+        "id": "i4",
+        "speaker": "stakeholder",
+        "text": "すみません、担当は経理ではなく営業です"
+      },
+      "operations": [
+        {
+          "tool": "revise_record",
+          "arguments": {
+            "record_id": "review",
+            "field": "actor",
+            "replacement_id": "claim:review:actor:revision1",
+            "statement": "reviewの担当は営業です。",
+            "value": {
+              "id": "sales",
+              "label": "営業"
+            },
+            "correction_note": "訂正回答で担当者が営業だと判明した。",
+            "evidence": [
+              {
+                "utterance_id": "i4",
+                "start": 0,
+                "end": 19,
+                "quote": "すみません、担当は経理ではなく営業です",
+                "semantic_support": "supports"
+              }
+            ],
+            "claim_status": "confirmed"
+          }
+        }
+      ]
+    }
+  ]
+}

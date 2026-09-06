@@ -791,6 +791,96 @@
   },
   "revise_record": {
     "$defs": {
+      "CrudInput": {
+        "additionalProperties": false,
+        "description": "Typed CRUD value used when revising a resource-usage record.",
+        "properties": {
+          "operation": {
+            "enum": [
+              "create",
+              "read",
+              "update",
+              "delete",
+              "unknown"
+            ],
+            "title": "Operation",
+            "type": "string"
+          }
+        },
+        "required": [
+          "operation"
+        ],
+        "title": "CrudInput",
+        "type": "object"
+      },
+      "DataListInput": {
+        "additionalProperties": false,
+        "description": "Inputs/outputs of a step with an explicit empty/unknown distinction.",
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/$defs/EntityInput"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "state": {
+            "default": "unset",
+            "enum": [
+              "unset",
+              "value",
+              "absent",
+              "dont_know"
+            ],
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "title": "DataListInput",
+        "type": "object"
+      },
+      "EntityInput": {
+        "additionalProperties": false,
+        "description": "Create or reuse a local actor/data entity, or state why it is unknown.",
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Id"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Label"
+          },
+          "state": {
+            "default": "value",
+            "enum": [
+              "value",
+              "absent",
+              "dont_know"
+            ],
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "title": "EntityInput",
+        "type": "object"
+      },
       "EvidenceCitation": {
         "additionalProperties": false,
         "description": "Agent-supplied citation coordinates before the harness assigns an ID.\n\n``start`` is inclusive and ``end`` is exclusive.  Both indexes are Python\nUnicode code-point indexes.  The harness checks the quote against the\nimmutable utterance; it does not decide whether the quote semantically\nsupports a claim.",
@@ -835,6 +925,56 @@
         "title": "EvidenceCitation",
         "type": "object"
       },
+      "SystemInput": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Id"
+          },
+          "kind": {
+            "default": "named",
+            "enum": [
+              "named",
+              "manual"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Label"
+          },
+          "state": {
+            "default": "value",
+            "enum": [
+              "value",
+              "absent",
+              "dont_know"
+            ],
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "title": "SystemInput",
+        "type": "object"
+      },
       "ValueInput": {
         "additionalProperties": false,
         "description": "Typed tool input for a scalar that may be unset, absent, or unknown.",
@@ -868,7 +1008,7 @@
       }
     },
     "additionalProperties": false,
-    "description": "A typed claim revision; it is not an arbitrary record patch.",
+    "description": "Add or replace one typed field claim on an existing business record.",
     "properties": {
       "claim_status": {
         "default": "provisional",
@@ -892,6 +1032,33 @@
         "title": "Evidence",
         "type": "array"
       },
+      "expected_claim_id": {
+        "anyOf": [
+          {
+            "minLength": 1,
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Expected Claim Id"
+      },
+      "field": {
+        "enum": [
+          "activity",
+          "actor",
+          "inputs",
+          "outputs",
+          "condition",
+          "crud",
+          "system",
+          "data_type"
+        ],
+        "title": "Field",
+        "type": "string"
+      },
       "record_id": {
         "minLength": 1,
         "title": "Record Id",
@@ -908,11 +1075,29 @@
         "type": "string"
       },
       "value": {
-        "$ref": "#/$defs/ValueInput"
+        "anyOf": [
+          {
+            "$ref": "#/$defs/ValueInput"
+          },
+          {
+            "$ref": "#/$defs/DataListInput"
+          },
+          {
+            "$ref": "#/$defs/SystemInput"
+          },
+          {
+            "$ref": "#/$defs/EntityInput"
+          },
+          {
+            "$ref": "#/$defs/CrudInput"
+          }
+        ],
+        "title": "Value"
       }
     },
     "required": [
       "record_id",
+      "field",
       "replacement_id",
       "statement",
       "value",

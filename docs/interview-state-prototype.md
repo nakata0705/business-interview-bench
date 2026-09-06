@@ -10,7 +10,7 @@
 - `unknown` CRUD、システム `dont_know`、手作業システムを、推測した `create`/`update` と混同しない。
 - 終了、関係者の確認、内容の完全性を別々に保持できる。
 
-3ケースはすべて `InterviewHarness` → `InterviewToolExecutor` → Pydantic検証の同じ経路を通る。これはモデルの自動抽出精度やベンチマーク合格率を測るものではなく、手動で構成したツール呼び出し列による契約適合確認である。
+既存3ケースと追記・訂正の適合caseはすべて `InterviewHarness` → `InterviewToolExecutor` → Pydantic検証の同じ経路を通る。これはモデルの自動抽出精度やベンチマーク合格率を測るものではなく、手動で構成したツール呼び出し列による契約適合確認である。
 
 ## 既存実験から採用した知見
 
@@ -20,7 +20,7 @@
 | 事実 | Phase 21 は Candidate の生成を question/tool/empty/output exhaustion/provider error 等に分け、利用可能な校正は1件、他2件は終端前タイムアウトとしている。 | `experiments/phase21/README.md`、`real-calibration-summary.json` | 生成失敗を新しい品質スコアや質問戦略で解決しない。途中状態を保存できるかだけを見る。 |
 | 事実 | 現行の Candidate 側は `get_agent_graph`、`get_observations` とグラフ編集ツール19個を `build_interview_tools()` で公開し、回答取り込みは `LiveInterviewStore.ingest_stakeholder_response()` が private sidecar と公開本文を別に保存する。 | `src/business_interview_bench/inspect_adapter/tools.py`、`src/business_interview/runtime.py` | 既存 Phase 13 の契約を大規模改修せず、新しい7操作を独立した最小境界として試作する。 |
 | 事実 | `src/business_interview/replay_data/seed9004/evaluation_context.json` には公開 stakeholder observation 14件と `protocol_completed: true` があるが、`provenance.json` は full conversation/evidence ledger を意図的に省略したと記録している。 | `src/business_interview/replay_data/seed9004/evaluation_context.json`、`provenance.json` | Aは保存済み公開 observation の再生と呼ぶ。assistant の欠落発言を復元・捏造しない。 |
-| 仮説 | Phase 20/21 の少数ログから、ツール粒度や回答取り込みが品質の主因だと断定することはできない。 | 上記実験資料 | 今回は原因帰属をしない。操作の不自然さは3ケースの手動再生で定性的に記録する。 |
+| 仮説 | Phase 20/21 の少数ログから、ツール粒度や回答取り込みが品質の主因だと断定することはできない。 | 上記実験資料 | 今回は原因帰属をしない。操作の不自然さは既存3ケースの手動再生で定性的に記録し、追記経路は別の合成適合caseで確認する。 |
 
 ## 状態の正本と不確実性
 
@@ -30,7 +30,7 @@
 - `EvidenceRef` は `evidence_id`、utterance ID、Unicode code-point の `[start, end)`（終端はexclusive）、引用本文、`semantic_support` を持つ。ハーネスは範囲と文字列一致だけを検証し、引用が主張の意味を支持することは自動判定しない。`semantic_support` は別の明示入力であり、confirmed の根拠要件と文字列検証を混同しない。
 - `InformationValue` / `EntityLink` / `EntityList` の `unset`、`value`、`absent`、`dont_know` は別状態である。`CrudOperation` の `unknown` は業務操作種別としての値であり、DONT_KNOW への変換ではない。
 - `Claim.status` の `provisional`、`confirmed`、`rejected` は情報状態とは別軸。`confirmed` は evidence があり、少なくとも一つが明示的に `supports` とされた場合だけ受理する。これは意味的支持を自動証明するものではない。
-- `claims` は根拠付きの履歴の正本、`business_model` は同じ操作が同時に更新する現在の読み取り用projectionとした。訂正は旧claimを削除せず `rejected` にし、新claimの `supersedes` で結ぶ。現在の成果物は `business_model` の一意な値だけを読むため、失効した内容を現行フロー/CRUDに残さない。
+- `claims` は根拠付きの履歴の正本、`business_model` は同じ操作が同時に更新する現在の読み取り用projectionとした。訂正は旧claimを削除せず `rejected` にし、新claimの `supersedes` で結ぶ。現在の成果物は `business_model` の一意な値だけを読むため、失効した内容を現行フロー/CRUDに残さない。active claimは対象フィールドごとに高々1件で、保存/読込時にもprojectionとの一致を検証する。
 - `SOURCE` と `SINK` は `source_boundary` / `sink_boundary` の Flow としてだけ使う。normal/branch/exception flow の endpoint に混ぜない。
 - `Completion` の `status=ended`、`stakeholder_confirmed`、`content_completeness` は別フィールドである。`complete_interview` しただけでは承認済みにならない。
 
@@ -45,12 +45,27 @@ JSON Schema は `interview_tools.py` の入力Pydanticモデルから `get_tool_
 | `connect_process_steps` | flow ID、既存stepまたは `SOURCE`/`SINK`、kind、条件、evidence | endpoint参照を検証。境界は専用kind。 | 更新flow、claim IDs |
 | `record_resource_usage` | usage ID、既存step、system、data type、CRUD、evidence | system/data type はIDで再参照、label付きで作成。systemは named/manual または `dont_know`。CRUDは `create/read/update/delete/unknown` のいずれかで、writesから推測しない。 | 更新data operation、claim IDs |
 | `record_issue` | issue kind、対象、説明、必要ならclaim IDs/question、矛盾の解決claim、evidence | unknown は open question、contradiction は既存claim 2件以上を参照し、必要なら resolved と解決claimを明示。 | issue、質問/矛盾 IDs |
-| `revise_record` | 旧claim ID、replacement ID、置換値、訂正理由、evidence | 本試作では型付きclaim revisionのみ。旧claimをrejectedにし、対応するprocess/flow/resource projectionを置換する。任意JSON Patchではない。 | 新claim ID、`revised_from` |
+| `revise_record` | 対象レコードID、`field`、fieldに対応したPydantic値、replacement ID、更新理由、evidence | `activity` / `actor` / `inputs` / `outputs` / `condition` / `crud` / `system` / `data_type` の1フィールドだけを扱う。現在claimがなければ初回追記、あれば旧claimを`rejected`にして新claimの`supersedes`で訂正する。actor/system/data typeはID再利用または同じ操作内でlabel付き作成、inputs/outputsは型付きリスト全体置換。任意JSON Patchではない。 | 対象レコード、新claim、`revised_from`、作成/再利用entity IDs |
 | `complete_interview` | 終了理由、未解決質問、確認有無/根拠、内容完全性 | unresolved省略時はopen questionを保持。confirmation=trueには支持根拠が必要。終了後は編集不可。 | completion receipt |
 
 operation ID の生成は仕様上の暗黙の重複回避にしない。呼び出し側が安定IDを渡し、同じIDにlabelを添えれば再参照、別labelならエラーとする。発言保存やevidence発行のtoolは公開しない。
 
-## 3ケースの再生結果
+## 追記・訂正の回帰適合例
+
+レビューで再現した問題は、担当者・入出力を未指定のまま`record_process_step`で登録した後、同じstep IDを再送して重複エラーになり、未作成の`claim:review:actor`を旧形式の`revise_record`で指定して失敗することだった。`revise_record`はレコードIDとフィールドを指定する契約に変更し、この経路を解消した。
+
+`incremental_synthetic` は合成・手動ツール呼び出しによる適合例であり、モデルによる自動抽出や人間評価の成功を示さない。再生器はこのcaseだけ、未来の発言を先に登録せず、次の順で発言登録と操作を交互に実行する。
+
+1. 「まず申請内容を確認します」→ `review` をactivityだけで作成（actor/inputs/outputsは`unset`）。
+2. 「担当は経理で、申請書を確認します」→ 同じ`review`の`actor`と`inputs`を別々の型付き`revise_record`で初回追記。経理と申請書はこの時点で作成する。
+3. 「確認後は確認結果を残します」→ 同じ`review`の`outputs`を初回追記。actorとinputsは維持する。
+4. 「すみません、担当は経理ではなく営業です」→ actorだけを訂正。経理の旧claim/evidenceは`rejected`履歴に残し、現行actorは営業になる。
+
+このcaseの最終状態はprocess stepが1件のままで、actor=`sales`、inputs=`application`、outputs=`review_result`となる。初回追記は`supersedes`なし、訂正は`supersedes`ありとして履歴上区別され、保存/読込後にも同じ操作を続けられる。
+
+`claim_status="rejected"`の候補はclaim履歴だけに残り、projectionや新規entityを変更しない。不正引用、対象参照、entity label衝突はcandidate stateの検証前に失敗し、状態を差し替えない。
+
+## 既存3ケースの再生結果
 
 ### A: 既存の正常終了した公開 observation fixture
 

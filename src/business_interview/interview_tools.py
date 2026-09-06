@@ -191,18 +191,77 @@ class RecordIssueInput(BaseModel):
         return self
 
 
+class CrudInput(BaseModel):
+    """Typed CRUD value used when revising a resource-usage record."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    operation: CrudOperation
+
+
+RevisionField = Literal[
+    "activity",
+    "actor",
+    "inputs",
+    "outputs",
+    "condition",
+    "crud",
+    "system",
+    "data_type",
+]
+RevisionValue = ValueInput | DataListInput | SystemInput | EntityInput | CrudInput
+
+
 class ReviseRecordInput(BaseModel):
-    """A typed claim revision; it is not an arbitrary record patch."""
+    """Add or replace one typed field claim on an existing business record."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     record_id: str = Field(min_length=1)
+    field: RevisionField
     replacement_id: str = Field(min_length=1)
     statement: str = Field(min_length=1)
-    value: ValueInput
+    value: RevisionValue
     correction_note: str = Field(min_length=1)
     evidence: tuple[EvidenceCitation, ...] = Field(default_factory=tuple)
     claim_status: ClaimStatus = "provisional"
+    expected_claim_id: str | None = Field(default=None, min_length=1)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _parse_field_value(cls, data: object) -> object:
+        if not isinstance(data, dict):
+            return data
+        field = data.get("field")
+        if not isinstance(field, str):
+            return data
+        expected = _REVISION_VALUE_TYPES.get(field)
+        if expected is None or isinstance(data.get("value"), BaseModel):
+            return data
+        parsed = dict(data)
+        parsed["value"] = expected.model_validate(parsed.get("value"))
+        return parsed
+
+    @model_validator(mode="after")
+    def _value_matches_field(self) -> ReviseRecordInput:
+        expected = _REVISION_VALUE_TYPES[self.field]
+        if not isinstance(self.value, expected):
+            raise ValueError(
+                f"field {self.field!r} requires a {expected.__name__} value"
+            )
+        return self
+
+
+_REVISION_VALUE_TYPES: dict[str, type[BaseModel]] = {
+    "activity": ValueInput,
+    "actor": EntityInput,
+    "inputs": DataListInput,
+    "outputs": DataListInput,
+    "condition": ValueInput,
+    "crud": CrudInput,
+    "system": SystemInput,
+    "data_type": EntityInput,
+}
 
 
 class CompleteInterviewInput(BaseModel):
@@ -255,6 +314,8 @@ class ToolOutput(BaseModel):
     question_ids: tuple[str, ...] = Field(default_factory=tuple)
     contradiction_ids: tuple[str, ...] = Field(default_factory=tuple)
     revised_from: tuple[str, ...] = Field(default_factory=tuple)
+    created_entity_ids: tuple[str, ...] = Field(default_factory=tuple)
+    reused_entity_ids: tuple[str, ...] = Field(default_factory=tuple)
     errors: tuple[ToolError, ...] = Field(default_factory=tuple)
     snapshot: InspectionSnapshot | None = None
     completion: Completion | None = None
@@ -278,6 +339,7 @@ class InterviewToolExecutor:
 
     def __init__(self, harness: InterviewHarness) -> None:
         self.harness = harness
+        self._pending_evidence_count = 0
 
     @property
     def state(self) -> InterviewState:
@@ -371,12 +433,20 @@ class InterviewToolExecutor:
                 )
                 return updated, tuple(item.id for item in claims)
 
+            before_model = self.state.business_model
             updated, claim_ids = self._commit(build)
             self.harness.state = updated
+            created, reused = _entity_receipt(
+                before_model,
+                updated.business_model,
+                _step_entity_refs(request),
+            )
             return _success(
                 operation,
                 updated_ids=(request.step_id,),
                 claim_ids=claim_ids,
+                created_entity_ids=created,
+                reused_entity_ids=reused,
             )
         except (InterviewStateError, ValidationError, ValueError) as exc:
             return _failure(operation, exc)
@@ -477,12 +547,20 @@ class InterviewToolExecutor:
                 )
                 return updated, tuple(item.id for item in claims)
 
+            before_model = self.state.business_model
             updated, claim_ids = self._commit(build)
             self.harness.state = updated
+            created, reused = _entity_receipt(
+                before_model,
+                updated.business_model,
+                _resource_entity_refs(request),
+            )
             return _success(
                 operation,
                 updated_ids=(request.usage_id,),
                 claim_ids=claim_ids,
+                created_entity_ids=created,
+                reused_entity_ids=reused,
             )
         except (InterviewStateError, ValidationError, ValueError) as exc:
             return _failure(operation, exc)
@@ -604,43 +682,95 @@ class InterviewToolExecutor:
             evidence = self._resolve_evidence(request.evidence)
 
             def build(state: InterviewState) -> tuple[InterviewState, tuple[str, ...]]:
-                old_index = next(
-                    (
-                        index
-                        for index, item in enumerate(state.claims)
-                        if item.id == request.record_id
-                    ),
-                    None,
+                record_type = _revision_record_type(
+                    state.business_model, request.record_id, request.field
                 )
-                if old_index is None:
+                matching = [
+                    (index, item)
+                    for index, item in enumerate(state.claims)
+                    if item.record_type == record_type
+                    and item.target_id == request.record_id
+                    and item.predicate == request.field
+                    and item.status != "rejected"
+                ]
+                if len(matching) > 1:
                     raise InterviewStateError(
-                        f"record/claim does not exist: {request.record_id!r}"
+                        "multiple active claims match the requested record field"
                     )
-                old = state.claims[old_index]
-                if old.status == "rejected":
-                    raise InterviewStateError("a rejected claim cannot be revised")
+                old_index: int | None = None
+                old: Claim | None = matching[0][1] if matching else None
+                if matching:
+                    old_index = matching[0][0]
+
+                if request.expected_claim_id is not None:
+                    expected = next(
+                        (
+                            item
+                            for item in state.claims
+                            if item.id == request.expected_claim_id
+                        ),
+                        None,
+                    )
+                    if expected is None:
+                        raise InterviewStateError(
+                            f"expected claim does not exist: "
+                            f"{request.expected_claim_id!r}"
+                        )
+                    if expected.status == "rejected":
+                        raise InterviewStateError(
+                            "a rejected claim cannot be used as the current claim"
+                        )
+                    if (
+                        expected.record_type,
+                        expected.target_id,
+                        expected.predicate,
+                    ) != (record_type, request.record_id, request.field):
+                        raise InterviewStateError(
+                            "expected claim does not target the requested record field"
+                        )
+                    if old is None or old.id != expected.id:
+                        raise InterviewStateError(
+                            "expected claim is not the unique current claim"
+                        )
+
                 if any(item.id == request.replacement_id for item in state.claims):
                     raise InterviewStateError(
                         f"replacement claim ID already exists: {request.replacement_id!r}"
                     )
+
+                model_with_entities, value = _prepare_revision_value(
+                    state.business_model, request
+                )
                 replacement = Claim(
                     id=request.replacement_id,
-                    record_type=old.record_type,
-                    target_id=old.target_id,
-                    predicate=old.predicate,
+                    record_type=record_type,
+                    target_id=request.record_id,
+                    predicate=request.field,
                     statement=request.statement,
-                    value=InformationValue.model_validate(request.value.model_dump()),
+                    value=value,
                     evidence=evidence,
                     status=request.claim_status,
-                    supersedes=old.id,
+                    supersedes=(
+                        old.id
+                        if old is not None and request.claim_status != "rejected"
+                        else None
+                    ),
+                    change_reason=request.correction_note,
                 )
-                rejected = old.model_copy(update={"status": "rejected"})
                 updated_claims = list(state.claims)
-                updated_claims[old_index] = rejected
+                if (
+                    old is not None
+                    and old_index is not None
+                    and request.claim_status != "rejected"
+                ):
+                    updated_claims[old_index] = old.model_copy(
+                        update={"status": "rejected"}
+                    )
                 updated_claims.append(replacement)
-                updated_model = _apply_claim_to_model(
-                    state.business_model,
-                    replacement,
+                updated_model = (
+                    state.business_model
+                    if request.claim_status == "rejected"
+                    else _apply_claim_to_model(model_with_entities, replacement)
                 )
                 updated = state.model_copy(
                     update={
@@ -650,13 +780,25 @@ class InterviewToolExecutor:
                 )
                 return updated, (replacement.id,)
 
+            before_model = self.state.business_model
             updated, claim_ids = self._commit(build)
             self.harness.state = updated
+            created, reused = _entity_receipt(
+                before_model,
+                updated.business_model,
+                _revision_entity_refs(request),
+            )
             return _success(
                 operation,
-                updated_ids=claim_ids,
+                updated_ids=(request.record_id,),
                 claim_ids=claim_ids,
-                revised_from=(request.record_id,),
+                revised_from=tuple(
+                    item.supersedes
+                    for item in updated.claims
+                    if item.id in claim_ids and item.supersedes is not None
+                ),
+                created_entity_ids=created,
+                reused_entity_ids=reused,
             )
         except (InterviewStateError, ValidationError, ValueError) as exc:
             return _failure(operation, exc)
@@ -699,15 +841,20 @@ class InterviewToolExecutor:
                 confirmation_evidence=confirmation,
                 content_completeness=request.content_completeness,
             )
-            self.harness.state = self.state.model_copy(
-                update={"completion": completion}
+            updated = InterviewState.model_validate(
+                self.state.model_copy(update={"completion": completion}).model_dump(
+                    mode="python"
+                )
             )
+            self.harness.state = updated
+            self._finalize_evidence()
             return _success(
                 operation,
                 updated_ids=("completion",),
                 completion=completion,
             )
         except (InterviewStateError, ValidationError, ValueError) as exc:
+            self._discard_pending_evidence()
             return _failure(operation, exc)
 
     def _require_active(self) -> None:
@@ -726,16 +873,31 @@ class InterviewToolExecutor:
     def _resolve_evidence(
         self, citations: Sequence[EvidenceCitation]
     ) -> tuple[EvidenceRef, ...]:
-        for citation in citations:
-            self.harness.validate_citation(citation)
-        return tuple(self.harness.issue_evidence(citation) for citation in citations)
+        evidence = self.harness.prepare_evidence(citations)
+        self._pending_evidence_count = len(evidence)
+        return evidence
+
+    def _finalize_evidence(self) -> None:
+        self.harness.commit_evidence(self._pending_evidence_count)
+        self._pending_evidence_count = 0
+
+    def _discard_pending_evidence(self) -> None:
+        self._pending_evidence_count = 0
 
     def _commit(
         self,
         builder: Callable[[InterviewState], tuple[InterviewState, tuple[str, ...]]],
     ) -> tuple[InterviewState, tuple[str, ...]]:
-        candidate, ids = builder(self.state)
-        return InterviewState.model_validate(candidate.model_dump(mode="python")), ids
+        try:
+            candidate, ids = builder(self.state)
+            validated = InterviewState.model_validate(
+                candidate.model_dump(mode="python")
+            )
+            self._finalize_evidence()
+            return validated, ids
+        except Exception:
+            self._discard_pending_evidence()
+            raise
 
     def _commit_issue(
         self,
@@ -744,12 +906,16 @@ class InterviewToolExecutor:
             tuple[InterviewState, tuple[str | None, ...], tuple[str | None, ...]],
         ],
     ) -> tuple[InterviewState, tuple[str | None, ...], tuple[str | None, ...]]:
-        candidate, question_ids, contradiction_ids = builder(self.state)
-        return (
-            InterviewState.model_validate(candidate.model_dump(mode="python")),
-            question_ids,
-            contradiction_ids,
-        )
+        try:
+            candidate, question_ids, contradiction_ids = builder(self.state)
+            validated = InterviewState.model_validate(
+                candidate.model_dump(mode="python")
+            )
+            self._finalize_evidence()
+            return validated, question_ids, contradiction_ids
+        except Exception:
+            self._discard_pending_evidence()
+            raise
 
 
 def _success(
@@ -760,6 +926,8 @@ def _success(
     question_ids: Sequence[str] = (),
     contradiction_ids: Sequence[str] = (),
     revised_from: Sequence[str] = (),
+    created_entity_ids: Sequence[str] = (),
+    reused_entity_ids: Sequence[str] = (),
     completion: Completion | None = None,
 ) -> ToolOutput:
     return ToolOutput(
@@ -770,6 +938,8 @@ def _success(
         question_ids=tuple(question_ids),
         contradiction_ids=tuple(contradiction_ids),
         revised_from=tuple(revised_from),
+        created_entity_ids=tuple(created_entity_ids),
+        reused_entity_ids=tuple(reused_entity_ids),
         completion=completion,
     )
 
@@ -785,6 +955,161 @@ def _failure(operation: ToolName, error: Exception) -> ToolOutput:
 
 def _has_id(items: Sequence[BaseModel], item_id: str) -> bool:
     return any(getattr(item, "id") == item_id for item in items)
+
+
+def _entity_receipt(
+    before: BusinessModel,
+    after: BusinessModel,
+    references: Sequence[tuple[str, str]],
+) -> tuple[tuple[str, ...], tuple[str, ...]]:
+    created: list[str] = []
+    reused: list[str] = []
+    seen: set[tuple[str, str]] = set()
+    for kind, entity_id in references:
+        reference = (kind, entity_id)
+        if reference in seen:
+            continue
+        seen.add(reference)
+        before_ids = _entity_ids(before, kind)
+        after_ids = _entity_ids(after, kind)
+        if entity_id in before_ids:
+            reused.append(entity_id)
+        elif entity_id in after_ids:
+            created.append(entity_id)
+    return _unique_strings(created), _unique_strings(reused)
+
+
+def _entity_ids(model: BusinessModel, kind: str) -> set[str]:
+    if kind == "actor":
+        return {item.id for item in model.actors}
+    if kind == "data_type":
+        return {item.id for item in model.data_types}
+    if kind == "system":
+        return {item.id for item in model.systems}
+    raise InterviewStateError(f"unknown entity kind: {kind!r}")
+
+
+def _unique_strings(values: Sequence[str]) -> tuple[str, ...]:
+    return tuple(dict.fromkeys(values))
+
+
+def _step_entity_refs(
+    request: RecordProcessStepInput,
+) -> tuple[tuple[str, str], ...]:
+    references: list[tuple[str, str]] = []
+    if request.actor is not None and request.actor.state == "value":
+        if request.actor.id is not None:
+            references.append(("actor", request.actor.id))
+    for data_list in (request.inputs, request.outputs):
+        if data_list.state == "value":
+            references.extend(
+                ("data_type", item.id)
+                for item in data_list.items
+                if item.id is not None
+            )
+    return tuple(references)
+
+
+def _resource_entity_refs(
+    request: RecordResourceUsageInput,
+) -> tuple[tuple[str, str], ...]:
+    references: list[tuple[str, str]] = []
+    if request.system.state == "value" and request.system.id is not None:
+        references.append(("system", request.system.id))
+    if request.data_type.state == "value" and request.data_type.id is not None:
+        references.append(("data_type", request.data_type.id))
+    return tuple(references)
+
+
+def _revision_entity_refs(
+    request: ReviseRecordInput,
+) -> tuple[tuple[str, str], ...]:
+    if request.claim_status == "rejected":
+        return ()
+    value = request.value
+    if request.field == "actor" and isinstance(value, EntityInput):
+        return (("actor", value.id),) if value.state == "value" and value.id else ()
+    if request.field in {"inputs", "outputs"} and isinstance(value, DataListInput):
+        return tuple(
+            ("data_type", item.id)
+            for item in value.items
+            if value.state == "value" and item.id is not None
+        )
+    if request.field == "system" and isinstance(value, SystemInput):
+        return (("system", value.id),) if value.state == "value" and value.id else ()
+    if request.field == "data_type" and isinstance(value, EntityInput):
+        return (("data_type", value.id),) if value.state == "value" and value.id else ()
+    return ()
+
+
+def _revision_record_type(
+    model: BusinessModel,
+    record_id: str,
+    field: RevisionField,
+) -> Literal["process_step", "flow", "resource_usage"]:
+    if field in {"activity", "actor", "inputs", "outputs"}:
+        if not _has_id(model.process_steps, record_id):
+            raise InterviewStateError(f"process step does not exist: {record_id!r}")
+        return "process_step"
+    if field == "condition":
+        if not _has_id(model.flows, record_id):
+            raise InterviewStateError(f"flow does not exist: {record_id!r}")
+        return "flow"
+    if not _has_id(model.data_operations, record_id):
+        raise InterviewStateError(f"resource usage does not exist: {record_id!r}")
+    return "resource_usage"
+
+
+def _prepare_revision_value(
+    model: BusinessModel,
+    request: ReviseRecordInput,
+) -> tuple[BusinessModel, InformationValue]:
+    value = request.value
+    if request.field in {"activity", "condition"}:
+        if not isinstance(value, ValueInput):
+            raise InterviewStateError(
+                f"field {request.field!r} requires a scalar value"
+            )
+        return model, InformationValue.model_validate(value.model_dump())
+    if request.field == "actor":
+        if not isinstance(value, EntityInput):
+            raise InterviewStateError("actor revision requires an entity value")
+        actors, link = _ensure_actor(model.actors, value)
+        return model.model_copy(update={"actors": actors}), _link_value(link)
+    if request.field in {"inputs", "outputs"}:
+        if not isinstance(value, DataListInput):
+            raise InterviewStateError(
+                f"field {request.field!r} requires a typed data list"
+            )
+        data_types, entity_list = _ensure_data_list(model.data_types, value)
+        return (
+            model.model_copy(update={"data_types": data_types}),
+            _entity_list_value(entity_list),
+        )
+    if request.field == "crud":
+        if not isinstance(value, CrudInput):
+            raise InterviewStateError("CRUD revision requires a typed CRUD value")
+        return model, InformationValue(state="value", value=value.operation)
+    if request.field == "system":
+        if not isinstance(value, SystemInput):
+            raise InterviewStateError("system revision requires a typed system value")
+        systems, link = _ensure_system(model.systems, value)
+        return model.model_copy(update={"systems": systems}), _link_value(link)
+    if not isinstance(value, EntityInput):
+        raise InterviewStateError("data-type revision requires an entity value")
+    data_types, link = _ensure_one_data(model.data_types, value)
+    return model.model_copy(update={"data_types": data_types}), _link_value(link)
+
+
+def _entity_list_value(entity_list: EntityList) -> InformationValue:
+    if entity_list.state != "value":
+        return InformationValue(state=entity_list.state)
+    return InformationValue(
+        state="value",
+        value=json.dumps(
+            list(entity_list.entity_ids), ensure_ascii=False, separators=(",", ":")
+        ),
+    )
 
 
 def _ensure_actor(
@@ -1236,6 +1561,7 @@ def parse_tool_input(name: ToolName, payload: object) -> BaseModel:
 __all__ = [
     "CompleteInterviewInput",
     "ConnectProcessStepsInput",
+    "CrudInput",
     "DataListInput",
     "EntityInput",
     "InspectInterviewStateInput",
@@ -1245,6 +1571,8 @@ __all__ = [
     "RecordProcessStepInput",
     "RecordResourceUsageInput",
     "ReviseRecordInput",
+    "RevisionField",
+    "RevisionValue",
     "SystemInput",
     "ToolDefinition",
     "ToolError",

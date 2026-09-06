@@ -1,0 +1,208 @@
+{
+  "business_model": {
+    "actors": [
+      {
+        "id": "accounting",
+        "label": "経理"
+      },
+      {
+        "id": "sales",
+        "label": "営業"
+      }
+    ],
+    "data_operations": [],
+    "data_types": [
+      {
+        "id": "application",
+        "label": "申請書"
+      },
+      {
+        "id": "review_result",
+        "label": "確認結果"
+      }
+    ],
+    "flows": [],
+    "process_steps": [
+      {
+        "activity": {
+          "state": "value",
+          "value": "申請内容を確認"
+        },
+        "actor": {
+          "entity_id": "sales",
+          "state": "value"
+        },
+        "id": "review",
+        "inputs": {
+          "entity_ids": [
+            "application"
+          ],
+          "state": "value"
+        },
+        "outputs": {
+          "entity_ids": [
+            "review_result"
+          ],
+          "state": "value"
+        }
+      }
+    ],
+    "systems": []
+  },
+  "claims": [
+    {
+      "change_reason": null,
+      "evidence": [
+        {
+          "end": 12,
+          "evidence_id": "ev_0001",
+          "quote": "まず申請内容を確認します",
+          "semantic_support": "supports",
+          "start": 0,
+          "utterance_id": "i1"
+        }
+      ],
+      "id": "claim:review:activity",
+      "predicate": "activity",
+      "record_type": "process_step",
+      "statement": "Process step review has the recorded activity.",
+      "status": "provisional",
+      "supersedes": null,
+      "target_id": "review",
+      "value": {
+        "state": "value",
+        "value": "申請内容を確認"
+      }
+    },
+    {
+      "change_reason": "追加回答で担当者が判明した。",
+      "evidence": [
+        {
+          "end": 16,
+          "evidence_id": "ev_0002",
+          "quote": "担当は経理で、申請書を確認します",
+          "semantic_support": "supports",
+          "start": 0,
+          "utterance_id": "i2"
+        }
+      ],
+      "id": "claim:review:actor",
+      "predicate": "actor",
+      "record_type": "process_step",
+      "statement": "reviewの担当は経理です。",
+      "status": "rejected",
+      "supersedes": null,
+      "target_id": "review",
+      "value": {
+        "state": "value",
+        "value": "accounting"
+      }
+    },
+    {
+      "change_reason": "追加回答で入力データが判明した。",
+      "evidence": [
+        {
+          "end": 16,
+          "evidence_id": "ev_0003",
+          "quote": "担当は経理で、申請書を確認します",
+          "semantic_support": "supports",
+          "start": 0,
+          "utterance_id": "i2"
+        }
+      ],
+      "id": "claim:review:inputs",
+      "predicate": "inputs",
+      "record_type": "process_step",
+      "statement": "reviewの入力は申請書です。",
+      "status": "confirmed",
+      "supersedes": null,
+      "target_id": "review",
+      "value": {
+        "state": "value",
+        "value": "[\"application\"]"
+      }
+    },
+    {
+      "change_reason": "追加回答で出力データが判明した。",
+      "evidence": [
+        {
+          "end": 13,
+          "evidence_id": "ev_0004",
+          "quote": "確認後は確認結果を残します",
+          "semantic_support": "supports",
+          "start": 0,
+          "utterance_id": "i3"
+        }
+      ],
+      "id": "claim:review:outputs",
+      "predicate": "outputs",
+      "record_type": "process_step",
+      "statement": "reviewの出力は確認結果です。",
+      "status": "confirmed",
+      "supersedes": null,
+      "target_id": "review",
+      "value": {
+        "state": "value",
+        "value": "[\"review_result\"]"
+      }
+    },
+    {
+      "change_reason": "訂正回答で担当者が営業だと判明した。",
+      "evidence": [
+        {
+          "end": 19,
+          "evidence_id": "ev_0005",
+          "quote": "すみません、担当は経理ではなく営業です",
+          "semantic_support": "supports",
+          "start": 0,
+          "utterance_id": "i4"
+        }
+      ],
+      "id": "claim:review:actor:revision1",
+      "predicate": "actor",
+      "record_type": "process_step",
+      "statement": "reviewの担当は営業です。",
+      "status": "confirmed",
+      "supersedes": "claim:review:actor",
+      "target_id": "review",
+      "value": {
+        "state": "value",
+        "value": "sales"
+      }
+    }
+  ],
+  "completion": {
+    "confirmation_evidence": [],
+    "content_completeness": "unknown",
+    "stakeholder_confirmed": false,
+    "status": "active",
+    "termination_reason": null,
+    "unresolved_question_ids": []
+  },
+  "contradictions": [],
+  "issues": [],
+  "open_questions": [],
+  "schema_version": "business_interview.interview_state.v2",
+  "utterances": [
+    {
+      "id": "i1",
+      "speaker": "stakeholder",
+      "text": "まず申請内容を確認します"
+    },
+    {
+      "id": "i2",
+      "speaker": "stakeholder",
+      "text": "担当は経理で、申請書を確認します"
+    },
+    {
+      "id": "i3",
+      "speaker": "stakeholder",
+      "text": "確認後は確認結果を残します"
+    },
+    {
+      "id": "i4",
+      "speaker": "stakeholder",
+      "text": "すみません、担当は経理ではなく営業です"
+    }
+  ]
+}

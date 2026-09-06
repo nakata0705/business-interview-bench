@@ -14,6 +14,7 @@ operation validates successfully.
 
 from __future__ import annotations
 
+import json
 from collections.abc import Iterable, Sequence
 from typing import Literal
 
@@ -30,7 +31,7 @@ ContentCompleteness = Literal["unknown", "complete", "incomplete"]
 
 SOURCE_ENDPOINT = "SOURCE"
 SINK_ENDPOINT = "SINK"
-SCHEMA_VERSION = "business_interview.interview_state.v1"
+SCHEMA_VERSION = "business_interview.interview_state.v2"
 
 
 class InterviewStateError(ValueError):
@@ -215,6 +216,7 @@ class Claim(BaseModel):
     evidence: tuple[EvidenceRef, ...] = Field(default_factory=tuple)
     status: ClaimStatus = "provisional"
     supersedes: str | None = None
+    change_reason: str | None = Field(default=None, min_length=1)
 
     @model_validator(mode="after")
     def _confirmed_is_grounded(self) -> Claim:
@@ -307,7 +309,7 @@ class InterviewState(BaseModel):
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    schema_version: Literal["business_interview.interview_state.v1"] = SCHEMA_VERSION
+    schema_version: Literal["business_interview.interview_state.v2"] = SCHEMA_VERSION
     utterances: tuple[Utterance, ...] = Field(default_factory=tuple)
     claims: tuple[Claim, ...] = Field(default_factory=tuple)
     business_model: BusinessModel = Field(default_factory=BusinessModel)
@@ -342,6 +344,14 @@ class InterviewState(BaseModel):
                 if previous.status != "rejected":
                     raise ValueError(
                         f"superseded claim {claim.supersedes!r} must be rejected"
+                    )
+                if (
+                    previous.record_type,
+                    previous.target_id,
+                    previous.predicate,
+                ) != (claim.record_type, claim.target_id, claim.predicate):
+                    raise ValueError(
+                        f"claim {claim.id!r} supersedes a different record field"
                     )
 
         for evidence in _all_evidence(self):
@@ -405,6 +415,7 @@ class InterviewState(BaseModel):
                 )
 
         _validate_business_model(self.business_model)
+        _validate_active_claims(self.business_model, self.claims)
         return self
 
     def active_claims(self) -> tuple[Claim, ...]:
@@ -452,19 +463,35 @@ class InterviewHarness:
                 f"evidence quote does not match utterance {utterance.id!r}"
             )
 
+    def prepare_evidence(
+        self, citations: Sequence[EvidenceCitation]
+    ) -> tuple[EvidenceRef, ...]:
+        """Validate citations and prepare IDs without changing the counter."""
+        for citation in citations:
+            self.validate_citation(citation)
+        return tuple(
+            EvidenceRef(
+                evidence_id=f"ev_{self._next_evidence_number + index:04d}",
+                utterance_id=citation.utterance_id,
+                start=citation.start,
+                end=citation.end,
+                quote=citation.quote,
+                semantic_support=citation.semantic_support,
+            )
+            for index, citation in enumerate(citations)
+        )
+
+    def commit_evidence(self, count: int) -> None:
+        """Advance the harness counter after an operation commits."""
+        if count < 0:
+            raise InterviewStateError("evidence commit count cannot be negative")
+        self._next_evidence_number += count
+
     def issue_evidence(self, citation: EvidenceCitation) -> EvidenceRef:
         """Validate and issue a persisted ID; this method is harness-only."""
-        self.validate_citation(citation)
-        evidence = EvidenceRef(
-            evidence_id=f"ev_{self._next_evidence_number:04d}",
-            utterance_id=citation.utterance_id,
-            start=citation.start,
-            end=citation.end,
-            quote=citation.quote,
-            semantic_support=citation.semantic_support,
-        )
-        self._next_evidence_number += 1
-        return evidence
+        prepared = self.prepare_evidence((citation,))
+        self.commit_evidence(len(prepared))
+        return prepared[0]
 
     def _existing_evidence_count(self) -> int:
         highest = 0
@@ -557,6 +584,157 @@ def _validate_business_model(model: BusinessModel) -> None:
             operation.data_type,
             data_ids,
             f"data operation {operation.id!r} data type",
+        )
+
+
+_CLAIM_PREDICATES = {
+    "process_step": {"activity", "actor", "inputs", "outputs"},
+    "flow": {"relation", "condition"},
+    "resource_usage": {"crud", "system", "data_type"},
+}
+
+
+def _validate_active_claims(model: BusinessModel, claims: Sequence[Claim]) -> None:
+    """Ensure active claims are a unique, lossless projection explanation."""
+    steps = {item.id: item for item in model.process_steps}
+    flows = {item.id: item for item in model.flows}
+    operations = {item.id: item for item in model.data_operations}
+    active_keys: set[tuple[str, str, str]] = set()
+
+    for claim in claims:
+        predicates = _CLAIM_PREDICATES[claim.record_type]
+        if claim.predicate not in predicates:
+            raise ValueError(
+                f"claim {claim.id!r} has unsupported predicate "
+                f"{claim.predicate!r} for {claim.record_type}"
+            )
+        target = (
+            steps.get(claim.target_id)
+            if claim.record_type == "process_step"
+            else flows.get(claim.target_id)
+            if claim.record_type == "flow"
+            else operations.get(claim.target_id)
+        )
+        if target is None:
+            raise ValueError(
+                f"claim {claim.id!r} targets unknown {claim.record_type} "
+                f"record {claim.target_id!r}"
+            )
+        if claim.status == "rejected":
+            continue
+
+        key = (claim.record_type, claim.target_id, claim.predicate)
+        if key in active_keys:
+            raise ValueError(
+                f"multiple active claims target {claim.record_type}/"
+                f"{claim.target_id}/{claim.predicate}"
+            )
+        active_keys.add(key)
+        _validate_active_claim_value(claim, target)
+
+    required_keys: list[tuple[str, str, str]] = []
+    for step in steps.values():
+        if step.activity.state != "unset":
+            required_keys.append(("process_step", step.id, "activity"))
+        if step.actor.state != "unset":
+            required_keys.append(("process_step", step.id, "actor"))
+        if step.inputs.state != "unset":
+            required_keys.append(("process_step", step.id, "inputs"))
+        if step.outputs.state != "unset":
+            required_keys.append(("process_step", step.id, "outputs"))
+    for flow in flows.values():
+        required_keys.append(("flow", flow.id, "relation"))
+        if flow.condition.state != "unset":
+            required_keys.append(("flow", flow.id, "condition"))
+    for operation in operations.values():
+        required_keys.extend(
+            (
+                ("resource_usage", operation.id, "crud"),
+                ("resource_usage", operation.id, "system"),
+                ("resource_usage", operation.id, "data_type"),
+            )
+        )
+    missing = [key for key in required_keys if key not in active_keys]
+    if missing:
+        raise ValueError(f"projection has no active claim for fields: {missing}")
+
+
+def _validate_active_claim_value(claim: Claim, target: BaseModel) -> None:
+    if claim.record_type == "process_step":
+        step = target
+        if not isinstance(step, ProcessStep):
+            raise TypeError("process-step claim target has an invalid type")
+        if claim.predicate == "activity":
+            expected = step.activity
+        elif claim.predicate == "actor":
+            expected = _link_as_information_value(step.actor)
+        else:
+            expected_list = step.inputs if claim.predicate == "inputs" else step.outputs
+            _validate_claim_list_value(claim, expected_list)
+            return
+        if claim.value != expected:
+            raise ValueError(
+                f"active claim {claim.id!r} does not match the current projection"
+            )
+        return
+
+    if claim.record_type == "flow":
+        flow = target
+        if not isinstance(flow, ProcessFlow):
+            raise TypeError("flow claim target has an invalid type")
+        expected = (
+            InformationValue(state="value", value=f"{flow.from_id}->{flow.to_id}")
+            if claim.predicate == "relation"
+            else flow.condition
+        )
+        if claim.value != expected:
+            raise ValueError(
+                f"active claim {claim.id!r} does not match the current projection"
+            )
+        return
+
+    operation = target
+    if not isinstance(operation, DataOperation):
+        raise TypeError("resource-usage claim target has an invalid type")
+    if claim.predicate == "crud":
+        expected = InformationValue(state="value", value=operation.crud)
+    elif claim.predicate == "system":
+        expected = _link_as_information_value(operation.system)
+    else:
+        expected = _link_as_information_value(operation.data_type)
+    if claim.value != expected:
+        raise ValueError(
+            f"active claim {claim.id!r} does not match the current projection"
+        )
+
+
+def _link_as_information_value(link: EntityLink) -> InformationValue:
+    return InformationValue(
+        state=link.state,
+        value=link.entity_id if link.state == "value" else None,
+    )
+
+
+def _validate_claim_list_value(claim: Claim, expected: EntityList) -> None:
+    if claim.value.state != expected.state:
+        raise ValueError(
+            f"active claim {claim.id!r} does not match the current projection"
+        )
+    if expected.state != "value":
+        return
+    try:
+        raw = json.loads(claim.value.value or "")
+    except json.JSONDecodeError as exc:
+        raise ValueError(
+            f"active claim {claim.id!r} has an invalid data-list value"
+        ) from exc
+    if (
+        not isinstance(raw, list)
+        or not all(isinstance(item, str) and item for item in raw)
+        or tuple(raw) != expected.entity_ids
+    ):
+        raise ValueError(
+            f"active claim {claim.id!r} does not match the current projection"
         )
 
 
