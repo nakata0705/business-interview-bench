@@ -34,3 +34,40 @@ uv run python -m business_interview.prototype \
   --case-dir /tmp/authorized-interview-case \
   --output-dir /tmp/interview-state-replay
 ```
+
+## Model-selected short interview
+
+`business_interview_bench.interview_agent` is the next vertical slice: it
+registers each public utterance with `InterviewHarness`, supplies an exact
+citation candidate, and lets an Inspect model choose the typed operations. No
+manual operation list is read by this path. Provider credentials stay in the
+provider's normal environment configuration.
+
+```bash
+uv run python -m business_interview_bench.interview_agent \
+  --model openrouter/provider/model \
+  --text '担当は営業で、申請書を確認します。' \
+  --text '確認結果を記録します。' \
+  --complete \
+  --checkpoint /tmp/interview-state.checkpoint.json \
+  --output /tmp/interview-state.json
+```
+
+The checkpoint contains only the validated `InterviewState` and the next
+utterance counter. Resume it with another public utterance without exposing
+provider conversation state:
+
+```bash
+uv run python -m business_interview_bench.interview_agent \
+  --model openrouter/provider/model \
+  --resume /tmp/interview-state.checkpoint.json \
+  --text '訂正です。担当は経理です。' \
+  --complete
+```
+
+The model loop is bounded by `--max-tool-rounds`; failed typed operations are
+returned to the model as tool receipts, while the core executor remains the
+only state mutation boundary. `tests/test_interview_agent.py` exercises the
+same path with Inspect MockLLM and verifies incremental correction plus
+checkpoint resume. A real provider run is credential-gated and is not replaced
+by MockLLM in the user-facing command.

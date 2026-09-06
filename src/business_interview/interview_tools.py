@@ -1527,11 +1527,11 @@ _INPUT_MODELS: dict[ToolName, type[BaseModel]] = {
 
 _DESCRIPTIONS: dict[ToolName, str] = {
     "inspect_interview_state": "Read the current business understanding, evidence, open questions, and contradictions.",
-    "record_process_step": "Record one process step with actor, inputs, outputs, and public evidence.",
+    "record_process_step": "Record a new process step with any currently known actor, inputs, outputs, and public evidence; add later fields with revise_record.",
     "connect_process_steps": "Record an ordered, conditional, or exception flow between existing steps with evidence.",
     "record_resource_usage": "Link an existing process step to a system and data type with explicit CRUD, including unknown or manual use.",
     "record_issue": "Record an open question, contradiction, exception, or business rule with its target and evidence.",
-    "revise_record": "Replace one existing claim while preserving the old rejected claim and its evidence.",
+    "revise_record": "Add or replace one typed field on an existing record while preserving any superseded claim and its evidence.",
     "complete_interview": "Record termination separately from stakeholder confirmation and content completeness.",
 }
 

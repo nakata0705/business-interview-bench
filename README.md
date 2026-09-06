@@ -456,3 +456,24 @@ The DeepSeek V4 Flash 0731 OpenRouter preflight and the three one-epoch
 calibration results are recorded without credentials or raw logs under
 `experiments/phase15/`; see its README and safe summary for the observed
 quality and next hardening priority.
+
+## InterviewState model agent
+
+The typed `InterviewState` prototype now has a separate, minimal real-model
+adapter. `InterviewStateAgent` registers each public utterance, supplies an
+exact evidence candidate, and lets an Inspect model choose the seven typed
+operations; the manual replay operation list is not used.
+
+```bash
+uv run python -m business_interview_bench.interview_agent \
+  --model openrouter/provider/model \
+  --text '担当は営業で、申請書を確認します。' \
+  --complete \
+  --checkpoint /tmp/interview-state.checkpoint.json \
+  --output /tmp/interview-state.json
+```
+
+Use `--resume` to continue from a JSON checkpoint. The adapter is credential-
+gated and retains only validated `InterviewState` data in checkpoints. Offline
+MockLLM coverage is in `tests/test_interview_agent.py`; the user-facing command
+uses Inspect's normal provider configuration for a real model.

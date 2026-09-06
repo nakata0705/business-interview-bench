@@ -112,12 +112,29 @@ uv run python -m business_interview.prototype \
 - current projection と履歴を二重に自由編集できる契約ではない。訂正可能なclaim predicateは試作で限定し、任意JSON Patchを避けた。複雑なレコード分割・統合、複数人承認、意味的な証拠判定は未実装である。
 - Aは保存済み公開 observation 断片、B/Cは合成、Cの人間確認は未実施、という区別をstateとは別のcase metadata/reportに残した。
 
-## 次の最小縦断
+## 実モデルを使う最小縦断
 
-適合確認は成功したため、次に進める価値はある。ただし今回の範囲を広げず、次の一段だけを実装候補とする。
+`business_interview_bench.interview_agent.InterviewStateAgent` は上記の7操作を
+Pydantic入力SchemaからInspect `ToolDef`へ薄く変換し、公開発言ごとに実モデルを
+呼び出す。発言はモデル呼び出し前に`InterviewHarness`へ登録され、最新発言の
+`utterance_id + [0, len(text)) + quote`を引用候補としてモデルへ渡す。モデルが
+選んだtool callだけが`InterviewToolExecutor`を通り、失敗した型付きreceiptは次の
+モデル呼び出しへ返される。Pydanticの`$defs`/`$ref`はOpenAI互換providerで扱える
+ようadapter境界でinlineするが、実行時の入力検証は元のPydanticモデルを使う。
 
-1. 現行Inspect adapterとは別に、Pydantic入力Schemaをそのまま受ける薄いagent adapterを追加する。
-2. ハーネスの公開utterance登録と引用候補供給を既存の回答取り込み境界に接続する。
-3. 1会話を中断→JSON保存→再開する最小テストを追加する。
+```bash
+uv run python -m business_interview_bench.interview_agent \
+  --model openrouter/provider/model \
+  --text '担当は営業で、申請書を確認します。' \
+  --complete \
+  --checkpoint /tmp/interview-state.checkpoint.json
+```
 
-本格的な質問戦略、音声/Zoom/Teams、改善提案、スコア、Phase 21診断、旧19グラフツールの大規模置換は、この試作の結果だけで自動開始しない。
+checkpointは`InterviewState`と次の発言番号だけをJSON保存し、
+`--resume`で再構築できる。providerの会話履歴、認証情報、stakeholder private stateは
+保存しない。`tests/test_interview_agent.py`はMockLLMで、手動のtool列ではなくmodel
+outputのtool callを実行すること、追記・訂正、checkpoint再開、provider向けschemaを
+確認する。実providerの短いsmokeは環境変数のcredentialがある場合だけ実行する。
+
+本格的な質問戦略、音声/Zoom/Teams、改善提案、スコア、Phase 21診断、旧19グラフ
+ツールの大規模置換は、この最小縦断の結果だけで自動開始しない。
