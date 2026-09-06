@@ -1,0 +1,189 @@
+{
+  "case_id": "partial_synthetic",
+  "title": "Synthetic interrupted intake interview",
+  "source_kind": "synthetic_partial",
+  "source_reference": "hand-authored fixture; no raw Phase 20/21 conversation was committed",
+  "human_evaluation": "not_performed",
+  "notes": "A short synthetic case stands in for the unavailable failed/partial provider transcript. It intentionally ends with an open question and unknown CRUD; it is not an existing-log replay.",
+  "utterances": [
+    {
+      "id": "p1",
+      "speaker": "stakeholder",
+      "text": "A request usually arrives by email, and I copy it into the intake sheet."
+    },
+    {
+      "id": "p2",
+      "speaker": "stakeholder",
+      "text": "I review the request before someone decides what to do."
+    },
+    {
+      "id": "p3",
+      "speaker": "stakeholder",
+      "text": "I do not know whether reviewing creates a new record or only changes the intake sheet."
+    },
+    {
+      "id": "p4",
+      "speaker": "interviewer",
+      "text": "We have to stop here today; I will follow up about the review and the owner."
+    }
+  ],
+  "operations": [
+    {
+      "tool": "record_process_step",
+      "arguments": {
+        "step_id": "partial_receive",
+        "activity": {
+          "state": "value",
+          "value": "receive request"
+        },
+        "actor": {
+          "id": "actor_intake",
+          "label": "intake coordinator"
+        },
+        "inputs": {
+          "state": "value",
+          "items": [
+            {
+              "id": "data_request",
+              "label": "request"
+            }
+          ]
+        },
+        "evidence": [
+          {
+            "utterance_id": "p1",
+            "start": 0,
+            "end": 34,
+            "quote": "A request usually arrives by email",
+            "semantic_support": "supports"
+          }
+        ]
+      }
+    },
+    {
+      "tool": "record_process_step",
+      "arguments": {
+        "step_id": "partial_review",
+        "activity": {
+          "state": "value",
+          "value": "review request"
+        },
+        "actor": {
+          "state": "dont_know"
+        },
+        "inputs": {
+          "state": "value",
+          "items": [
+            {
+              "id": "data_request"
+            }
+          ]
+        },
+        "evidence": [
+          {
+            "utterance_id": "p2",
+            "start": 0,
+            "end": 20,
+            "quote": "I review the request",
+            "semantic_support": "supports"
+          }
+        ]
+      }
+    },
+    {
+      "tool": "connect_process_steps",
+      "arguments": {
+        "flow_id": "partial_receive_review",
+        "from_step_id": "partial_receive",
+        "to_step_id": "partial_review",
+        "evidence": [
+          {
+            "utterance_id": "p2",
+            "start": 21,
+            "end": 54,
+            "quote": "before someone decides what to do",
+            "semantic_support": "supports"
+          }
+        ]
+      }
+    },
+    {
+      "tool": "record_resource_usage",
+      "arguments": {
+        "usage_id": "partial_receive_email",
+        "process_step_id": "partial_receive",
+        "system": {
+          "id": "system_email",
+          "label": "email"
+        },
+        "data_type": {
+          "id": "data_request"
+        },
+        "crud": "unknown",
+        "evidence": [
+          {
+            "utterance_id": "p1",
+            "start": 18,
+            "end": 34,
+            "quote": "arrives by email",
+            "semantic_support": "supports"
+          }
+        ]
+      }
+    },
+    {
+      "tool": "record_resource_usage",
+      "arguments": {
+        "usage_id": "partial_review_sheet",
+        "process_step_id": "partial_review",
+        "system": {
+          "id": "system_intake_sheet",
+          "label": "intake sheet"
+        },
+        "data_type": {
+          "id": "data_request"
+        },
+        "crud": "unknown",
+        "evidence": [
+          {
+            "utterance_id": "p3",
+            "start": 14,
+            "end": 85,
+            "quote": "whether reviewing creates a new record or only changes the intake sheet",
+            "semantic_support": "supports"
+          }
+        ]
+      }
+    },
+    {
+      "tool": "record_issue",
+      "arguments": {
+        "issue_id": "partial_review_crud",
+        "kind": "unknown",
+        "information_state": "dont_know",
+        "description": "The review's effect on the intake sheet is not known.",
+        "target_ids": [
+          "partial_review",
+          "partial_review_sheet"
+        ],
+        "question": "Does reviewing create a new record or update the intake sheet?",
+        "evidence": [
+          {
+            "utterance_id": "p3",
+            "start": 0,
+            "end": 86,
+            "quote": "I do not know whether reviewing creates a new record or only changes the intake sheet.",
+            "semantic_support": "supports"
+          }
+        ]
+      }
+    },
+    {
+      "tool": "complete_interview",
+      "arguments": {
+        "termination_reason": "time limit before review ownership and CRUD could be confirmed",
+        "content_completeness": "incomplete"
+      }
+    }
+  ]
+}

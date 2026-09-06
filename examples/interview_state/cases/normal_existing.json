@@ -1,0 +1,619 @@
+{
+  "case_id": "normal_existing",
+  "title": "Seed 9004 public observation replay",
+  "source_kind": "existing_public_fixture",
+  "source_reference": "src/business_interview/replay_data/seed9004/evaluation_context.json",
+  "human_evaluation": "not_applicable",
+  "notes": "The repository stores these exact public stakeholder observations and a completed protocol flag, but not the full assistant transcript. This is a replay of the available public observation fixture, not a claim that the omitted transcript was reconstructed.",
+  "utterances": [
+    {
+      "id": "obs_1",
+      "speaker": "stakeholder",
+      "text": "Sure, that's fine. What would you like to know?"
+    },
+    {
+      "id": "obs_3",
+      "speaker": "stakeholder",
+      "text": "Sure. The process starts when the sales employee receives the customer's quotation request. That's the trigger. As for the intended outcome, I don't know."
+    },
+    {
+      "id": "obs_12",
+      "speaker": "stakeholder",
+      "text": "After that, I check the customer information in the CRM."
+    },
+    {
+      "id": "obs_14",
+      "speaker": "stakeholder",
+      "text": "Yes, I'm the sales employee. I check the customer information in the CRM."
+    },
+    {
+      "id": "obs_23",
+      "speaker": "stakeholder",
+      "text": "Next, I create the quotation in the quoting system using the customer information and the pricing information."
+    },
+    {
+      "id": "obs_33",
+      "speaker": "stakeholder",
+      "text": "After I create the quotation, if the amount is over 1,000,000 yen, the manager approves the high-value quotation; if it is at or below 1,000,000 yen, I send the quotation to the customer; and if it is month-end, I send the month-end summary to Accounting."
+    },
+    {
+      "id": "obs_51",
+      "speaker": "stakeholder",
+      "text": "I don't know whether the month-end summary is sent in addition to the amount-based path or instead of it. What I do know is that after I create the quotation, if the amount is over 1,000,000 yen the manager approves it, if it's at or below 1,000,000 yen I send the quotation to the customer, and if it's month-end I send the month-end summary to Accounting."
+    },
+    {
+      "id": "obs_53",
+      "speaker": "stakeholder",
+      "text": "After that, I send the quotation to the customer by email."
+    },
+    {
+      "id": "obs_60",
+      "speaker": "stakeholder",
+      "text": "Yes, after the manager approves the high-value quotation, I send the quotation to the customer by email. And yes, it's the same step as the low-value path — whether the amount is over 1,000,000 yen and the manager approves, or it's at or below 1,000,000 yen, the send step is the same. After that, I don't know of anything else happening."
+    },
+    {
+      "id": "obs_62",
+      "speaker": "stakeholder",
+      "text": "The manager's approval is needed for high-value quotations for credit risk management."
+    },
+    {
+      "id": "obs_67",
+      "speaker": "stakeholder",
+      "text": "I don't know why creating the quotation is necessary."
+    },
+    {
+      "id": "obs_71",
+      "speaker": "stakeholder",
+      "text": "I don't know why checking the customer information is necessary."
+    },
+    {
+      "id": "obs_77",
+      "speaker": "stakeholder",
+      "text": "I don't know why sending the quotation to the customer is necessary."
+    },
+    {
+      "id": "obs_81",
+      "speaker": "stakeholder",
+      "text": "I don't know why sending the month-end summary to Accounting is necessary."
+    }
+  ],
+  "operations": [
+    {
+      "tool": "record_process_step",
+      "arguments": {
+        "step_id": "step_receive_request",
+        "activity": {
+          "state": "value",
+          "value": "receive quotation request"
+        },
+        "actor": {
+          "id": "actor_sales",
+          "label": "sales employee"
+        },
+        "inputs": {
+          "state": "value",
+          "items": [
+            {
+              "id": "data_quotation_request",
+              "label": "quotation request"
+            }
+          ]
+        },
+        "evidence": [
+          {
+            "utterance_id": "obs_3",
+            "start": 6,
+            "end": 91,
+            "quote": "The process starts when the sales employee receives the customer's quotation request.",
+            "semantic_support": "supports"
+          }
+        ],
+        "claim_status": "confirmed"
+      }
+    },
+    {
+      "tool": "record_process_step",
+      "arguments": {
+        "step_id": "step_check_customer",
+        "activity": {
+          "state": "value",
+          "value": "check customer information"
+        },
+        "actor": {
+          "id": "actor_sales"
+        },
+        "inputs": {
+          "state": "value",
+          "items": [
+            {
+              "id": "data_customer_information",
+              "label": "customer information"
+            }
+          ]
+        },
+        "evidence": [
+          {
+            "utterance_id": "obs_12",
+            "start": 14,
+            "end": 55,
+            "quote": "check the customer information in the CRM",
+            "semantic_support": "supports"
+          }
+        ]
+      }
+    },
+    {
+      "tool": "record_process_step",
+      "arguments": {
+        "step_id": "step_create_quotation",
+        "activity": {
+          "state": "value",
+          "value": "create quotation"
+        },
+        "actor": {
+          "id": "actor_sales"
+        },
+        "inputs": {
+          "state": "value",
+          "items": [
+            {
+              "id": "data_customer_information"
+            },
+            {
+              "id": "data_pricing_information",
+              "label": "pricing information"
+            }
+          ]
+        },
+        "outputs": {
+          "state": "value",
+          "items": [
+            {
+              "id": "data_quotation",
+              "label": "quotation"
+            }
+          ]
+        },
+        "evidence": [
+          {
+            "utterance_id": "obs_23",
+            "start": 8,
+            "end": 109,
+            "quote": "create the quotation in the quoting system using the customer information and the pricing information",
+            "semantic_support": "supports"
+          }
+        ]
+      }
+    },
+    {
+      "tool": "record_process_step",
+      "arguments": {
+        "step_id": "step_approve_high_value",
+        "activity": {
+          "state": "value",
+          "value": "approve high-value quotation"
+        },
+        "actor": {
+          "id": "actor_manager",
+          "label": "manager"
+        },
+        "inputs": {
+          "state": "value",
+          "items": [
+            {
+              "id": "data_quotation"
+            }
+          ]
+        },
+        "evidence": [
+          {
+            "utterance_id": "obs_33",
+            "start": 67,
+            "end": 112,
+            "quote": "the manager approves the high-value quotation",
+            "semantic_support": "supports"
+          }
+        ]
+      }
+    },
+    {
+      "tool": "record_process_step",
+      "arguments": {
+        "step_id": "step_send_quotation",
+        "activity": {
+          "state": "value",
+          "value": "send quotation to customer"
+        },
+        "actor": {
+          "id": "actor_sales"
+        },
+        "inputs": {
+          "state": "value",
+          "items": [
+            {
+              "id": "data_quotation"
+            }
+          ]
+        },
+        "evidence": [
+          {
+            "utterance_id": "obs_53",
+            "start": 14,
+            "end": 57,
+            "quote": "send the quotation to the customer by email",
+            "semantic_support": "supports"
+          }
+        ]
+      }
+    },
+    {
+      "tool": "record_process_step",
+      "arguments": {
+        "step_id": "step_send_month_end_summary",
+        "activity": {
+          "state": "value",
+          "value": "send month-end summary to Accounting"
+        },
+        "actor": {
+          "id": "actor_sales"
+        },
+        "outputs": {
+          "state": "value",
+          "items": [
+            {
+              "id": "data_month_end_summary",
+              "label": "month-end summary"
+            }
+          ]
+        },
+        "evidence": [
+          {
+            "utterance_id": "obs_33",
+            "start": 214,
+            "end": 254,
+            "quote": "send the month-end summary to Accounting",
+            "semantic_support": "supports"
+          }
+        ]
+      }
+    },
+    {
+      "tool": "connect_process_steps",
+      "arguments": {
+        "flow_id": "flow_source_receive",
+        "from_step_id": "SOURCE",
+        "to_step_id": "step_receive_request",
+        "kind": "source_boundary",
+        "evidence": [
+          {
+            "utterance_id": "obs_3",
+            "start": 6,
+            "end": 24,
+            "quote": "The process starts",
+            "semantic_support": "supports"
+          }
+        ]
+      }
+    },
+    {
+      "tool": "connect_process_steps",
+      "arguments": {
+        "flow_id": "flow_receive_check",
+        "from_step_id": "step_receive_request",
+        "to_step_id": "step_check_customer",
+        "evidence": [
+          {
+            "utterance_id": "obs_12",
+            "start": 0,
+            "end": 56,
+            "quote": "After that, I check the customer information in the CRM.",
+            "semantic_support": "supports"
+          }
+        ]
+      }
+    },
+    {
+      "tool": "connect_process_steps",
+      "arguments": {
+        "flow_id": "flow_check_create",
+        "from_step_id": "step_check_customer",
+        "to_step_id": "step_create_quotation",
+        "evidence": [
+          {
+            "utterance_id": "obs_23",
+            "start": 0,
+            "end": 28,
+            "quote": "Next, I create the quotation",
+            "semantic_support": "supports"
+          }
+        ]
+      }
+    },
+    {
+      "tool": "connect_process_steps",
+      "arguments": {
+        "flow_id": "flow_create_approve",
+        "from_step_id": "step_create_quotation",
+        "to_step_id": "step_approve_high_value",
+        "kind": "branch",
+        "condition": {
+          "state": "value",
+          "value": "amount over 1,000,000 yen"
+        },
+        "evidence": [
+          {
+            "utterance_id": "obs_33",
+            "start": 30,
+            "end": 65,
+            "quote": "if the amount is over 1,000,000 yen",
+            "semantic_support": "supports"
+          }
+        ]
+      }
+    },
+    {
+      "tool": "connect_process_steps",
+      "arguments": {
+        "flow_id": "flow_create_send_low",
+        "from_step_id": "step_create_quotation",
+        "to_step_id": "step_send_quotation",
+        "kind": "branch",
+        "condition": {
+          "state": "value",
+          "value": "amount at or below 1,000,000 yen"
+        },
+        "evidence": [
+          {
+            "utterance_id": "obs_33",
+            "start": 114,
+            "end": 148,
+            "quote": "if it is at or below 1,000,000 yen",
+            "semantic_support": "supports"
+          }
+        ]
+      }
+    },
+    {
+      "tool": "connect_process_steps",
+      "arguments": {
+        "flow_id": "flow_create_month_end",
+        "from_step_id": "step_create_quotation",
+        "to_step_id": "step_send_month_end_summary",
+        "kind": "branch",
+        "condition": {
+          "state": "value",
+          "value": "month-end"
+        },
+        "evidence": [
+          {
+            "utterance_id": "obs_33",
+            "start": 192,
+            "end": 210,
+            "quote": "if it is month-end",
+            "semantic_support": "supports"
+          }
+        ]
+      }
+    },
+    {
+      "tool": "connect_process_steps",
+      "arguments": {
+        "flow_id": "flow_approve_send",
+        "from_step_id": "step_approve_high_value",
+        "to_step_id": "step_send_quotation",
+        "evidence": [
+          {
+            "utterance_id": "obs_60",
+            "start": 5,
+            "end": 103,
+            "quote": "after the manager approves the high-value quotation, I send the quotation to the customer by email",
+            "semantic_support": "supports"
+          }
+        ]
+      }
+    },
+    {
+      "tool": "connect_process_steps",
+      "arguments": {
+        "flow_id": "flow_send_sink",
+        "from_step_id": "step_send_quotation",
+        "to_step_id": "SINK",
+        "kind": "sink_boundary",
+        "evidence": [
+          {
+            "utterance_id": "obs_60",
+            "start": 286,
+            "end": 338,
+            "quote": "After that, I don't know of anything else happening.",
+            "semantic_support": "supports"
+          }
+        ]
+      }
+    },
+    {
+      "tool": "connect_process_steps",
+      "arguments": {
+        "flow_id": "flow_summary_sink",
+        "from_step_id": "step_send_month_end_summary",
+        "to_step_id": "SINK",
+        "kind": "sink_boundary",
+        "evidence": [
+          {
+            "utterance_id": "obs_33",
+            "start": 214,
+            "end": 254,
+            "quote": "send the month-end summary to Accounting",
+            "semantic_support": "supports"
+          }
+        ]
+      }
+    },
+    {
+      "tool": "record_resource_usage",
+      "arguments": {
+        "usage_id": "usage_check_customer",
+        "process_step_id": "step_check_customer",
+        "system": {
+          "id": "system_crm",
+          "label": "CRM"
+        },
+        "data_type": {
+          "id": "data_customer_information"
+        },
+        "crud": "read",
+        "evidence": [
+          {
+            "utterance_id": "obs_12",
+            "start": 14,
+            "end": 55,
+            "quote": "check the customer information in the CRM",
+            "semantic_support": "supports"
+          }
+        ]
+      }
+    },
+    {
+      "tool": "record_resource_usage",
+      "arguments": {
+        "usage_id": "usage_create_quotation",
+        "process_step_id": "step_create_quotation",
+        "system": {
+          "id": "system_quoting",
+          "label": "quoting system"
+        },
+        "data_type": {
+          "id": "data_quotation"
+        },
+        "crud": "create",
+        "evidence": [
+          {
+            "utterance_id": "obs_23",
+            "start": 8,
+            "end": 50,
+            "quote": "create the quotation in the quoting system",
+            "semantic_support": "supports"
+          }
+        ]
+      }
+    },
+    {
+      "tool": "record_resource_usage",
+      "arguments": {
+        "usage_id": "usage_send_quotation",
+        "process_step_id": "step_send_quotation",
+        "system": {
+          "id": "system_email",
+          "label": "email"
+        },
+        "data_type": {
+          "id": "data_quotation"
+        },
+        "crud": "unknown",
+        "evidence": [
+          {
+            "utterance_id": "obs_53",
+            "start": 14,
+            "end": 57,
+            "quote": "send the quotation to the customer by email",
+            "semantic_support": "supports"
+          }
+        ]
+      }
+    },
+    {
+      "tool": "record_resource_usage",
+      "arguments": {
+        "usage_id": "usage_approve_quotation",
+        "process_step_id": "step_approve_high_value",
+        "system": {
+          "state": "dont_know"
+        },
+        "data_type": {
+          "id": "data_quotation"
+        },
+        "crud": "unknown",
+        "evidence": [
+          {
+            "utterance_id": "obs_33",
+            "start": 67,
+            "end": 112,
+            "quote": "the manager approves the high-value quotation",
+            "semantic_support": "supports"
+          }
+        ]
+      }
+    },
+    {
+      "tool": "record_resource_usage",
+      "arguments": {
+        "usage_id": "usage_send_summary",
+        "process_step_id": "step_send_month_end_summary",
+        "system": {
+          "state": "dont_know"
+        },
+        "data_type": {
+          "id": "data_month_end_summary"
+        },
+        "crud": "unknown",
+        "evidence": [
+          {
+            "utterance_id": "obs_33",
+            "start": 214,
+            "end": 254,
+            "quote": "send the month-end summary to Accounting",
+            "semantic_support": "supports"
+          }
+        ]
+      }
+    },
+    {
+      "tool": "record_issue",
+      "arguments": {
+        "issue_id": "issue_month_end_path",
+        "kind": "unknown",
+        "description": "The relationship between the month-end summary path and the amount-based path is not confirmed.",
+        "target_ids": [
+          "step_send_month_end_summary",
+          "flow_create_month_end"
+        ],
+        "question": "Is the month-end summary sent in addition to the amount-based path or instead of it?",
+        "evidence": [
+          {
+            "utterance_id": "obs_51",
+            "start": 0,
+            "end": 105,
+            "quote": "I don't know whether the month-end summary is sent in addition to the amount-based path or instead of it.",
+            "semantic_support": "supports"
+          }
+        ]
+      }
+    },
+    {
+      "tool": "record_issue",
+      "arguments": {
+        "issue_id": "issue_approval_reason",
+        "kind": "business_rule",
+        "description": "High-value approval is needed for credit risk management.",
+        "target_ids": [
+          "step_approve_high_value"
+        ],
+        "evidence": [
+          {
+            "utterance_id": "obs_62",
+            "start": 14,
+            "end": 85,
+            "quote": "approval is needed for high-value quotations for credit risk management",
+            "semantic_support": "supports"
+          }
+        ]
+      }
+    },
+    {
+      "tool": "complete_interview",
+      "arguments": {
+        "termination_reason": "existing replay records a normal protocol completion",
+        "content_completeness": "incomplete"
+      }
+    }
+  ]
+}

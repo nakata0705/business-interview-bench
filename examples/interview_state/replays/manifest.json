@@ -1,0 +1,30 @@
+{
+  "cases": [
+    {
+      "case_id": "human_synthetic",
+      "completion_status": "ended",
+      "operation_count": 23,
+      "report_file": "human_synthetic.report.md",
+      "source_kind": "synthetic_human",
+      "state_file": "human_synthetic.state.json"
+    },
+    {
+      "case_id": "normal_existing",
+      "completion_status": "ended",
+      "operation_count": 23,
+      "report_file": "normal_existing.report.md",
+      "source_kind": "existing_public_fixture",
+      "state_file": "normal_existing.state.json"
+    },
+    {
+      "case_id": "partial_synthetic",
+      "completion_status": "ended",
+      "operation_count": 7,
+      "report_file": "partial_synthetic.report.md",
+      "source_kind": "synthetic_partial",
+      "state_file": "partial_synthetic.state.json"
+    }
+  ],
+  "schema_version": "business_interview.prototype_replay.v1",
+  "tool_schema_file": "tool-schemas.json"
+}

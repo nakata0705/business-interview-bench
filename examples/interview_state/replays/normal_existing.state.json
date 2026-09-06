@@ -1,0 +1,1548 @@
+{
+  "business_model": {
+    "actors": [
+      {
+        "id": "actor_sales",
+        "label": "sales employee"
+      },
+      {
+        "id": "actor_manager",
+        "label": "manager"
+      }
+    ],
+    "data_operations": [
+      {
+        "crud": "read",
+        "data_type": {
+          "entity_id": "data_customer_information",
+          "state": "value"
+        },
+        "id": "usage_check_customer",
+        "process_step_id": "step_check_customer",
+        "system": {
+          "entity_id": "system_crm",
+          "state": "value"
+        }
+      },
+      {
+        "crud": "create",
+        "data_type": {
+          "entity_id": "data_quotation",
+          "state": "value"
+        },
+        "id": "usage_create_quotation",
+        "process_step_id": "step_create_quotation",
+        "system": {
+          "entity_id": "system_quoting",
+          "state": "value"
+        }
+      },
+      {
+        "crud": "unknown",
+        "data_type": {
+          "entity_id": "data_quotation",
+          "state": "value"
+        },
+        "id": "usage_send_quotation",
+        "process_step_id": "step_send_quotation",
+        "system": {
+          "entity_id": "system_email",
+          "state": "value"
+        }
+      },
+      {
+        "crud": "unknown",
+        "data_type": {
+          "entity_id": "data_quotation",
+          "state": "value"
+        },
+        "id": "usage_approve_quotation",
+        "process_step_id": "step_approve_high_value",
+        "system": {
+          "entity_id": null,
+          "state": "dont_know"
+        }
+      },
+      {
+        "crud": "unknown",
+        "data_type": {
+          "entity_id": "data_month_end_summary",
+          "state": "value"
+        },
+        "id": "usage_send_summary",
+        "process_step_id": "step_send_month_end_summary",
+        "system": {
+          "entity_id": null,
+          "state": "dont_know"
+        }
+      }
+    ],
+    "data_types": [
+      {
+        "id": "data_quotation_request",
+        "label": "quotation request"
+      },
+      {
+        "id": "data_customer_information",
+        "label": "customer information"
+      },
+      {
+        "id": "data_pricing_information",
+        "label": "pricing information"
+      },
+      {
+        "id": "data_quotation",
+        "label": "quotation"
+      },
+      {
+        "id": "data_month_end_summary",
+        "label": "month-end summary"
+      }
+    ],
+    "flows": [
+      {
+        "condition": {
+          "state": "unset",
+          "value": null
+        },
+        "from_id": "SOURCE",
+        "id": "flow_source_receive",
+        "kind": "source_boundary",
+        "to_id": "step_receive_request"
+      },
+      {
+        "condition": {
+          "state": "unset",
+          "value": null
+        },
+        "from_id": "step_receive_request",
+        "id": "flow_receive_check",
+        "kind": "normal",
+        "to_id": "step_check_customer"
+      },
+      {
+        "condition": {
+          "state": "unset",
+          "value": null
+        },
+        "from_id": "step_check_customer",
+        "id": "flow_check_create",
+        "kind": "normal",
+        "to_id": "step_create_quotation"
+      },
+      {
+        "condition": {
+          "state": "value",
+          "value": "amount over 1,000,000 yen"
+        },
+        "from_id": "step_create_quotation",
+        "id": "flow_create_approve",
+        "kind": "branch",
+        "to_id": "step_approve_high_value"
+      },
+      {
+        "condition": {
+          "state": "value",
+          "value": "amount at or below 1,000,000 yen"
+        },
+        "from_id": "step_create_quotation",
+        "id": "flow_create_send_low",
+        "kind": "branch",
+        "to_id": "step_send_quotation"
+      },
+      {
+        "condition": {
+          "state": "value",
+          "value": "month-end"
+        },
+        "from_id": "step_create_quotation",
+        "id": "flow_create_month_end",
+        "kind": "branch",
+        "to_id": "step_send_month_end_summary"
+      },
+      {
+        "condition": {
+          "state": "unset",
+          "value": null
+        },
+        "from_id": "step_approve_high_value",
+        "id": "flow_approve_send",
+        "kind": "normal",
+        "to_id": "step_send_quotation"
+      },
+      {
+        "condition": {
+          "state": "unset",
+          "value": null
+        },
+        "from_id": "step_send_quotation",
+        "id": "flow_send_sink",
+        "kind": "sink_boundary",
+        "to_id": "SINK"
+      },
+      {
+        "condition": {
+          "state": "unset",
+          "value": null
+        },
+        "from_id": "step_send_month_end_summary",
+        "id": "flow_summary_sink",
+        "kind": "sink_boundary",
+        "to_id": "SINK"
+      }
+    ],
+    "process_steps": [
+      {
+        "activity": {
+          "state": "value",
+          "value": "receive quotation request"
+        },
+        "actor": {
+          "entity_id": "actor_sales",
+          "state": "value"
+        },
+        "id": "step_receive_request",
+        "inputs": {
+          "entity_ids": [
+            "data_quotation_request"
+          ],
+          "state": "value"
+        },
+        "outputs": {
+          "entity_ids": [],
+          "state": "unset"
+        }
+      },
+      {
+        "activity": {
+          "state": "value",
+          "value": "check customer information"
+        },
+        "actor": {
+          "entity_id": "actor_sales",
+          "state": "value"
+        },
+        "id": "step_check_customer",
+        "inputs": {
+          "entity_ids": [
+            "data_customer_information"
+          ],
+          "state": "value"
+        },
+        "outputs": {
+          "entity_ids": [],
+          "state": "unset"
+        }
+      },
+      {
+        "activity": {
+          "state": "value",
+          "value": "create quotation"
+        },
+        "actor": {
+          "entity_id": "actor_sales",
+          "state": "value"
+        },
+        "id": "step_create_quotation",
+        "inputs": {
+          "entity_ids": [
+            "data_customer_information",
+            "data_pricing_information"
+          ],
+          "state": "value"
+        },
+        "outputs": {
+          "entity_ids": [
+            "data_quotation"
+          ],
+          "state": "value"
+        }
+      },
+      {
+        "activity": {
+          "state": "value",
+          "value": "approve high-value quotation"
+        },
+        "actor": {
+          "entity_id": "actor_manager",
+          "state": "value"
+        },
+        "id": "step_approve_high_value",
+        "inputs": {
+          "entity_ids": [
+            "data_quotation"
+          ],
+          "state": "value"
+        },
+        "outputs": {
+          "entity_ids": [],
+          "state": "unset"
+        }
+      },
+      {
+        "activity": {
+          "state": "value",
+          "value": "send quotation to customer"
+        },
+        "actor": {
+          "entity_id": "actor_sales",
+          "state": "value"
+        },
+        "id": "step_send_quotation",
+        "inputs": {
+          "entity_ids": [
+            "data_quotation"
+          ],
+          "state": "value"
+        },
+        "outputs": {
+          "entity_ids": [],
+          "state": "unset"
+        }
+      },
+      {
+        "activity": {
+          "state": "value",
+          "value": "send month-end summary to Accounting"
+        },
+        "actor": {
+          "entity_id": "actor_sales",
+          "state": "value"
+        },
+        "id": "step_send_month_end_summary",
+        "inputs": {
+          "entity_ids": [],
+          "state": "unset"
+        },
+        "outputs": {
+          "entity_ids": [
+            "data_month_end_summary"
+          ],
+          "state": "value"
+        }
+      }
+    ],
+    "systems": [
+      {
+        "id": "system_crm",
+        "kind": "named",
+        "label": "CRM"
+      },
+      {
+        "id": "system_quoting",
+        "kind": "named",
+        "label": "quoting system"
+      },
+      {
+        "id": "system_email",
+        "kind": "named",
+        "label": "email"
+      }
+    ]
+  },
+  "claims": [
+    {
+      "evidence": [
+        {
+          "end": 91,
+          "evidence_id": "ev_0001",
+          "quote": "The process starts when the sales employee receives the customer's quotation request.",
+          "semantic_support": "supports",
+          "start": 6,
+          "utterance_id": "obs_3"
+        }
+      ],
+      "id": "claim:step_receive_request:activity",
+      "predicate": "activity",
+      "record_type": "process_step",
+      "statement": "Process step step_receive_request has the recorded activity.",
+      "status": "confirmed",
+      "supersedes": null,
+      "target_id": "step_receive_request",
+      "value": {
+        "state": "value",
+        "value": "receive quotation request"
+      }
+    },
+    {
+      "evidence": [
+        {
+          "end": 91,
+          "evidence_id": "ev_0001",
+          "quote": "The process starts when the sales employee receives the customer's quotation request.",
+          "semantic_support": "supports",
+          "start": 6,
+          "utterance_id": "obs_3"
+        }
+      ],
+      "id": "claim:step_receive_request:actor",
+      "predicate": "actor",
+      "record_type": "process_step",
+      "statement": "Process step step_receive_request has the recorded actor.",
+      "status": "confirmed",
+      "supersedes": null,
+      "target_id": "step_receive_request",
+      "value": {
+        "state": "value",
+        "value": "actor_sales"
+      }
+    },
+    {
+      "evidence": [
+        {
+          "end": 91,
+          "evidence_id": "ev_0001",
+          "quote": "The process starts when the sales employee receives the customer's quotation request.",
+          "semantic_support": "supports",
+          "start": 6,
+          "utterance_id": "obs_3"
+        }
+      ],
+      "id": "claim:step_receive_request:inputs",
+      "predicate": "inputs",
+      "record_type": "process_step",
+      "statement": "Process step step_receive_request has the recorded inputs.",
+      "status": "confirmed",
+      "supersedes": null,
+      "target_id": "step_receive_request",
+      "value": {
+        "state": "value",
+        "value": "[\"data_quotation_request\"]"
+      }
+    },
+    {
+      "evidence": [
+        {
+          "end": 55,
+          "evidence_id": "ev_0002",
+          "quote": "check the customer information in the CRM",
+          "semantic_support": "supports",
+          "start": 14,
+          "utterance_id": "obs_12"
+        }
+      ],
+      "id": "claim:step_check_customer:activity",
+      "predicate": "activity",
+      "record_type": "process_step",
+      "statement": "Process step step_check_customer has the recorded activity.",
+      "status": "provisional",
+      "supersedes": null,
+      "target_id": "step_check_customer",
+      "value": {
+        "state": "value",
+        "value": "check customer information"
+      }
+    },
+    {
+      "evidence": [
+        {
+          "end": 55,
+          "evidence_id": "ev_0002",
+          "quote": "check the customer information in the CRM",
+          "semantic_support": "supports",
+          "start": 14,
+          "utterance_id": "obs_12"
+        }
+      ],
+      "id": "claim:step_check_customer:actor",
+      "predicate": "actor",
+      "record_type": "process_step",
+      "statement": "Process step step_check_customer has the recorded actor.",
+      "status": "provisional",
+      "supersedes": null,
+      "target_id": "step_check_customer",
+      "value": {
+        "state": "value",
+        "value": "actor_sales"
+      }
+    },
+    {
+      "evidence": [
+        {
+          "end": 55,
+          "evidence_id": "ev_0002",
+          "quote": "check the customer information in the CRM",
+          "semantic_support": "supports",
+          "start": 14,
+          "utterance_id": "obs_12"
+        }
+      ],
+      "id": "claim:step_check_customer:inputs",
+      "predicate": "inputs",
+      "record_type": "process_step",
+      "statement": "Process step step_check_customer has the recorded inputs.",
+      "status": "provisional",
+      "supersedes": null,
+      "target_id": "step_check_customer",
+      "value": {
+        "state": "value",
+        "value": "[\"data_customer_information\"]"
+      }
+    },
+    {
+      "evidence": [
+        {
+          "end": 109,
+          "evidence_id": "ev_0003",
+          "quote": "create the quotation in the quoting system using the customer information and the pricing information",
+          "semantic_support": "supports",
+          "start": 8,
+          "utterance_id": "obs_23"
+        }
+      ],
+      "id": "claim:step_create_quotation:activity",
+      "predicate": "activity",
+      "record_type": "process_step",
+      "statement": "Process step step_create_quotation has the recorded activity.",
+      "status": "provisional",
+      "supersedes": null,
+      "target_id": "step_create_quotation",
+      "value": {
+        "state": "value",
+        "value": "create quotation"
+      }
+    },
+    {
+      "evidence": [
+        {
+          "end": 109,
+          "evidence_id": "ev_0003",
+          "quote": "create the quotation in the quoting system using the customer information and the pricing information",
+          "semantic_support": "supports",
+          "start": 8,
+          "utterance_id": "obs_23"
+        }
+      ],
+      "id": "claim:step_create_quotation:actor",
+      "predicate": "actor",
+      "record_type": "process_step",
+      "statement": "Process step step_create_quotation has the recorded actor.",
+      "status": "provisional",
+      "supersedes": null,
+      "target_id": "step_create_quotation",
+      "value": {
+        "state": "value",
+        "value": "actor_sales"
+      }
+    },
+    {
+      "evidence": [
+        {
+          "end": 109,
+          "evidence_id": "ev_0003",
+          "quote": "create the quotation in the quoting system using the customer information and the pricing information",
+          "semantic_support": "supports",
+          "start": 8,
+          "utterance_id": "obs_23"
+        }
+      ],
+      "id": "claim:step_create_quotation:inputs",
+      "predicate": "inputs",
+      "record_type": "process_step",
+      "statement": "Process step step_create_quotation has the recorded inputs.",
+      "status": "provisional",
+      "supersedes": null,
+      "target_id": "step_create_quotation",
+      "value": {
+        "state": "value",
+        "value": "[\"data_customer_information\",\"data_pricing_information\"]"
+      }
+    },
+    {
+      "evidence": [
+        {
+          "end": 109,
+          "evidence_id": "ev_0003",
+          "quote": "create the quotation in the quoting system using the customer information and the pricing information",
+          "semantic_support": "supports",
+          "start": 8,
+          "utterance_id": "obs_23"
+        }
+      ],
+      "id": "claim:step_create_quotation:outputs",
+      "predicate": "outputs",
+      "record_type": "process_step",
+      "statement": "Process step step_create_quotation has the recorded outputs.",
+      "status": "provisional",
+      "supersedes": null,
+      "target_id": "step_create_quotation",
+      "value": {
+        "state": "value",
+        "value": "[\"data_quotation\"]"
+      }
+    },
+    {
+      "evidence": [
+        {
+          "end": 112,
+          "evidence_id": "ev_0004",
+          "quote": "the manager approves the high-value quotation",
+          "semantic_support": "supports",
+          "start": 67,
+          "utterance_id": "obs_33"
+        }
+      ],
+      "id": "claim:step_approve_high_value:activity",
+      "predicate": "activity",
+      "record_type": "process_step",
+      "statement": "Process step step_approve_high_value has the recorded activity.",
+      "status": "provisional",
+      "supersedes": null,
+      "target_id": "step_approve_high_value",
+      "value": {
+        "state": "value",
+        "value": "approve high-value quotation"
+      }
+    },
+    {
+      "evidence": [
+        {
+          "end": 112,
+          "evidence_id": "ev_0004",
+          "quote": "the manager approves the high-value quotation",
+          "semantic_support": "supports",
+          "start": 67,
+          "utterance_id": "obs_33"
+        }
+      ],
+      "id": "claim:step_approve_high_value:actor",
+      "predicate": "actor",
+      "record_type": "process_step",
+      "statement": "Process step step_approve_high_value has the recorded actor.",
+      "status": "provisional",
+      "supersedes": null,
+      "target_id": "step_approve_high_value",
+      "value": {
+        "state": "value",
+        "value": "actor_manager"
+      }
+    },
+    {
+      "evidence": [
+        {
+          "end": 112,
+          "evidence_id": "ev_0004",
+          "quote": "the manager approves the high-value quotation",
+          "semantic_support": "supports",
+          "start": 67,
+          "utterance_id": "obs_33"
+        }
+      ],
+      "id": "claim:step_approve_high_value:inputs",
+      "predicate": "inputs",
+      "record_type": "process_step",
+      "statement": "Process step step_approve_high_value has the recorded inputs.",
+      "status": "provisional",
+      "supersedes": null,
+      "target_id": "step_approve_high_value",
+      "value": {
+        "state": "value",
+        "value": "[\"data_quotation\"]"
+      }
+    },
+    {
+      "evidence": [
+        {
+          "end": 57,
+          "evidence_id": "ev_0005",
+          "quote": "send the quotation to the customer by email",
+          "semantic_support": "supports",
+          "start": 14,
+          "utterance_id": "obs_53"
+        }
+      ],
+      "id": "claim:step_send_quotation:activity",
+      "predicate": "activity",
+      "record_type": "process_step",
+      "statement": "Process step step_send_quotation has the recorded activity.",
+      "status": "provisional",
+      "supersedes": null,
+      "target_id": "step_send_quotation",
+      "value": {
+        "state": "value",
+        "value": "send quotation to customer"
+      }
+    },
+    {
+      "evidence": [
+        {
+          "end": 57,
+          "evidence_id": "ev_0005",
+          "quote": "send the quotation to the customer by email",
+          "semantic_support": "supports",
+          "start": 14,
+          "utterance_id": "obs_53"
+        }
+      ],
+      "id": "claim:step_send_quotation:actor",
+      "predicate": "actor",
+      "record_type": "process_step",
+      "statement": "Process step step_send_quotation has the recorded actor.",
+      "status": "provisional",
+      "supersedes": null,
+      "target_id": "step_send_quotation",
+      "value": {
+        "state": "value",
+        "value": "actor_sales"
+      }
+    },
+    {
+      "evidence": [
+        {
+          "end": 57,
+          "evidence_id": "ev_0005",
+          "quote": "send the quotation to the customer by email",
+          "semantic_support": "supports",
+          "start": 14,
+          "utterance_id": "obs_53"
+        }
+      ],
+      "id": "claim:step_send_quotation:inputs",
+      "predicate": "inputs",
+      "record_type": "process_step",
+      "statement": "Process step step_send_quotation has the recorded inputs.",
+      "status": "provisional",
+      "supersedes": null,
+      "target_id": "step_send_quotation",
+      "value": {
+        "state": "value",
+        "value": "[\"data_quotation\"]"
+      }
+    },
+    {
+      "evidence": [
+        {
+          "end": 254,
+          "evidence_id": "ev_0006",
+          "quote": "send the month-end summary to Accounting",
+          "semantic_support": "supports",
+          "start": 214,
+          "utterance_id": "obs_33"
+        }
+      ],
+      "id": "claim:step_send_month_end_summary:activity",
+      "predicate": "activity",
+      "record_type": "process_step",
+      "statement": "Process step step_send_month_end_summary has the recorded activity.",
+      "status": "provisional",
+      "supersedes": null,
+      "target_id": "step_send_month_end_summary",
+      "value": {
+        "state": "value",
+        "value": "send month-end summary to Accounting"
+      }
+    },
+    {
+      "evidence": [
+        {
+          "end": 254,
+          "evidence_id": "ev_0006",
+          "quote": "send the month-end summary to Accounting",
+          "semantic_support": "supports",
+          "start": 214,
+          "utterance_id": "obs_33"
+        }
+      ],
+      "id": "claim:step_send_month_end_summary:actor",
+      "predicate": "actor",
+      "record_type": "process_step",
+      "statement": "Process step step_send_month_end_summary has the recorded actor.",
+      "status": "provisional",
+      "supersedes": null,
+      "target_id": "step_send_month_end_summary",
+      "value": {
+        "state": "value",
+        "value": "actor_sales"
+      }
+    },
+    {
+      "evidence": [
+        {
+          "end": 254,
+          "evidence_id": "ev_0006",
+          "quote": "send the month-end summary to Accounting",
+          "semantic_support": "supports",
+          "start": 214,
+          "utterance_id": "obs_33"
+        }
+      ],
+      "id": "claim:step_send_month_end_summary:outputs",
+      "predicate": "outputs",
+      "record_type": "process_step",
+      "statement": "Process step step_send_month_end_summary has the recorded outputs.",
+      "status": "provisional",
+      "supersedes": null,
+      "target_id": "step_send_month_end_summary",
+      "value": {
+        "state": "value",
+        "value": "[\"data_month_end_summary\"]"
+      }
+    },
+    {
+      "evidence": [
+        {
+          "end": 24,
+          "evidence_id": "ev_0007",
+          "quote": "The process starts",
+          "semantic_support": "supports",
+          "start": 6,
+          "utterance_id": "obs_3"
+        }
+      ],
+      "id": "claim:flow_source_receive:relation",
+      "predicate": "relation",
+      "record_type": "flow",
+      "statement": "Flow flow_source_receive connects SOURCE to step_receive_request.",
+      "status": "provisional",
+      "supersedes": null,
+      "target_id": "flow_source_receive",
+      "value": {
+        "state": "value",
+        "value": "SOURCE->step_receive_request"
+      }
+    },
+    {
+      "evidence": [
+        {
+          "end": 56,
+          "evidence_id": "ev_0008",
+          "quote": "After that, I check the customer information in the CRM.",
+          "semantic_support": "supports",
+          "start": 0,
+          "utterance_id": "obs_12"
+        }
+      ],
+      "id": "claim:flow_receive_check:relation",
+      "predicate": "relation",
+      "record_type": "flow",
+      "statement": "Flow flow_receive_check connects step_receive_request to step_check_customer.",
+      "status": "provisional",
+      "supersedes": null,
+      "target_id": "flow_receive_check",
+      "value": {
+        "state": "value",
+        "value": "step_receive_request->step_check_customer"
+      }
+    },
+    {
+      "evidence": [
+        {
+          "end": 28,
+          "evidence_id": "ev_0009",
+          "quote": "Next, I create the quotation",
+          "semantic_support": "supports",
+          "start": 0,
+          "utterance_id": "obs_23"
+        }
+      ],
+      "id": "claim:flow_check_create:relation",
+      "predicate": "relation",
+      "record_type": "flow",
+      "statement": "Flow flow_check_create connects step_check_customer to step_create_quotation.",
+      "status": "provisional",
+      "supersedes": null,
+      "target_id": "flow_check_create",
+      "value": {
+        "state": "value",
+        "value": "step_check_customer->step_create_quotation"
+      }
+    },
+    {
+      "evidence": [
+        {
+          "end": 65,
+          "evidence_id": "ev_0010",
+          "quote": "if the amount is over 1,000,000 yen",
+          "semantic_support": "supports",
+          "start": 30,
+          "utterance_id": "obs_33"
+        }
+      ],
+      "id": "claim:flow_create_approve:relation",
+      "predicate": "relation",
+      "record_type": "flow",
+      "statement": "Flow flow_create_approve connects step_create_quotation to step_approve_high_value.",
+      "status": "provisional",
+      "supersedes": null,
+      "target_id": "flow_create_approve",
+      "value": {
+        "state": "value",
+        "value": "step_create_quotation->step_approve_high_value"
+      }
+    },
+    {
+      "evidence": [
+        {
+          "end": 65,
+          "evidence_id": "ev_0010",
+          "quote": "if the amount is over 1,000,000 yen",
+          "semantic_support": "supports",
+          "start": 30,
+          "utterance_id": "obs_33"
+        }
+      ],
+      "id": "claim:flow_create_approve:condition",
+      "predicate": "condition",
+      "record_type": "flow",
+      "statement": "Flow flow_create_approve has the recorded condition.",
+      "status": "provisional",
+      "supersedes": null,
+      "target_id": "flow_create_approve",
+      "value": {
+        "state": "value",
+        "value": "amount over 1,000,000 yen"
+      }
+    },
+    {
+      "evidence": [
+        {
+          "end": 148,
+          "evidence_id": "ev_0011",
+          "quote": "if it is at or below 1,000,000 yen",
+          "semantic_support": "supports",
+          "start": 114,
+          "utterance_id": "obs_33"
+        }
+      ],
+      "id": "claim:flow_create_send_low:relation",
+      "predicate": "relation",
+      "record_type": "flow",
+      "statement": "Flow flow_create_send_low connects step_create_quotation to step_send_quotation.",
+      "status": "provisional",
+      "supersedes": null,
+      "target_id": "flow_create_send_low",
+      "value": {
+        "state": "value",
+        "value": "step_create_quotation->step_send_quotation"
+      }
+    },
+    {
+      "evidence": [
+        {
+          "end": 148,
+          "evidence_id": "ev_0011",
+          "quote": "if it is at or below 1,000,000 yen",
+          "semantic_support": "supports",
+          "start": 114,
+          "utterance_id": "obs_33"
+        }
+      ],
+      "id": "claim:flow_create_send_low:condition",
+      "predicate": "condition",
+      "record_type": "flow",
+      "statement": "Flow flow_create_send_low has the recorded condition.",
+      "status": "provisional",
+      "supersedes": null,
+      "target_id": "flow_create_send_low",
+      "value": {
+        "state": "value",
+        "value": "amount at or below 1,000,000 yen"
+      }
+    },
+    {
+      "evidence": [
+        {
+          "end": 210,
+          "evidence_id": "ev_0012",
+          "quote": "if it is month-end",
+          "semantic_support": "supports",
+          "start": 192,
+          "utterance_id": "obs_33"
+        }
+      ],
+      "id": "claim:flow_create_month_end:relation",
+      "predicate": "relation",
+      "record_type": "flow",
+      "statement": "Flow flow_create_month_end connects step_create_quotation to step_send_month_end_summary.",
+      "status": "provisional",
+      "supersedes": null,
+      "target_id": "flow_create_month_end",
+      "value": {
+        "state": "value",
+        "value": "step_create_quotation->step_send_month_end_summary"
+      }
+    },
+    {
+      "evidence": [
+        {
+          "end": 210,
+          "evidence_id": "ev_0012",
+          "quote": "if it is month-end",
+          "semantic_support": "supports",
+          "start": 192,
+          "utterance_id": "obs_33"
+        }
+      ],
+      "id": "claim:flow_create_month_end:condition",
+      "predicate": "condition",
+      "record_type": "flow",
+      "statement": "Flow flow_create_month_end has the recorded condition.",
+      "status": "provisional",
+      "supersedes": null,
+      "target_id": "flow_create_month_end",
+      "value": {
+        "state": "value",
+        "value": "month-end"
+      }
+    },
+    {
+      "evidence": [
+        {
+          "end": 103,
+          "evidence_id": "ev_0013",
+          "quote": "after the manager approves the high-value quotation, I send the quotation to the customer by email",
+          "semantic_support": "supports",
+          "start": 5,
+          "utterance_id": "obs_60"
+        }
+      ],
+      "id": "claim:flow_approve_send:relation",
+      "predicate": "relation",
+      "record_type": "flow",
+      "statement": "Flow flow_approve_send connects step_approve_high_value to step_send_quotation.",
+      "status": "provisional",
+      "supersedes": null,
+      "target_id": "flow_approve_send",
+      "value": {
+        "state": "value",
+        "value": "step_approve_high_value->step_send_quotation"
+      }
+    },
+    {
+      "evidence": [
+        {
+          "end": 338,
+          "evidence_id": "ev_0014",
+          "quote": "After that, I don't know of anything else happening.",
+          "semantic_support": "supports",
+          "start": 286,
+          "utterance_id": "obs_60"
+        }
+      ],
+      "id": "claim:flow_send_sink:relation",
+      "predicate": "relation",
+      "record_type": "flow",
+      "statement": "Flow flow_send_sink connects step_send_quotation to SINK.",
+      "status": "provisional",
+      "supersedes": null,
+      "target_id": "flow_send_sink",
+      "value": {
+        "state": "value",
+        "value": "step_send_quotation->SINK"
+      }
+    },
+    {
+      "evidence": [
+        {
+          "end": 254,
+          "evidence_id": "ev_0015",
+          "quote": "send the month-end summary to Accounting",
+          "semantic_support": "supports",
+          "start": 214,
+          "utterance_id": "obs_33"
+        }
+      ],
+      "id": "claim:flow_summary_sink:relation",
+      "predicate": "relation",
+      "record_type": "flow",
+      "statement": "Flow flow_summary_sink connects step_send_month_end_summary to SINK.",
+      "status": "provisional",
+      "supersedes": null,
+      "target_id": "flow_summary_sink",
+      "value": {
+        "state": "value",
+        "value": "step_send_month_end_summary->SINK"
+      }
+    },
+    {
+      "evidence": [
+        {
+          "end": 55,
+          "evidence_id": "ev_0016",
+          "quote": "check the customer information in the CRM",
+          "semantic_support": "supports",
+          "start": 14,
+          "utterance_id": "obs_12"
+        }
+      ],
+      "id": "claim:usage_check_customer:crud",
+      "predicate": "crud",
+      "record_type": "resource_usage",
+      "statement": "Resource usage usage_check_customer has the recorded CRUD operation.",
+      "status": "provisional",
+      "supersedes": null,
+      "target_id": "usage_check_customer",
+      "value": {
+        "state": "value",
+        "value": "read"
+      }
+    },
+    {
+      "evidence": [
+        {
+          "end": 55,
+          "evidence_id": "ev_0016",
+          "quote": "check the customer information in the CRM",
+          "semantic_support": "supports",
+          "start": 14,
+          "utterance_id": "obs_12"
+        }
+      ],
+      "id": "claim:usage_check_customer:system",
+      "predicate": "system",
+      "record_type": "resource_usage",
+      "statement": "Resource usage usage_check_customer has the recorded system.",
+      "status": "provisional",
+      "supersedes": null,
+      "target_id": "usage_check_customer",
+      "value": {
+        "state": "value",
+        "value": "system_crm"
+      }
+    },
+    {
+      "evidence": [
+        {
+          "end": 55,
+          "evidence_id": "ev_0016",
+          "quote": "check the customer information in the CRM",
+          "semantic_support": "supports",
+          "start": 14,
+          "utterance_id": "obs_12"
+        }
+      ],
+      "id": "claim:usage_check_customer:data_type",
+      "predicate": "data_type",
+      "record_type": "resource_usage",
+      "statement": "Resource usage usage_check_customer has the recorded data type.",
+      "status": "provisional",
+      "supersedes": null,
+      "target_id": "usage_check_customer",
+      "value": {
+        "state": "value",
+        "value": "data_customer_information"
+      }
+    },
+    {
+      "evidence": [
+        {
+          "end": 50,
+          "evidence_id": "ev_0017",
+          "quote": "create the quotation in the quoting system",
+          "semantic_support": "supports",
+          "start": 8,
+          "utterance_id": "obs_23"
+        }
+      ],
+      "id": "claim:usage_create_quotation:crud",
+      "predicate": "crud",
+      "record_type": "resource_usage",
+      "statement": "Resource usage usage_create_quotation has the recorded CRUD operation.",
+      "status": "provisional",
+      "supersedes": null,
+      "target_id": "usage_create_quotation",
+      "value": {
+        "state": "value",
+        "value": "create"
+      }
+    },
+    {
+      "evidence": [
+        {
+          "end": 50,
+          "evidence_id": "ev_0017",
+          "quote": "create the quotation in the quoting system",
+          "semantic_support": "supports",
+          "start": 8,
+          "utterance_id": "obs_23"
+        }
+      ],
+      "id": "claim:usage_create_quotation:system",
+      "predicate": "system",
+      "record_type": "resource_usage",
+      "statement": "Resource usage usage_create_quotation has the recorded system.",
+      "status": "provisional",
+      "supersedes": null,
+      "target_id": "usage_create_quotation",
+      "value": {
+        "state": "value",
+        "value": "system_quoting"
+      }
+    },
+    {
+      "evidence": [
+        {
+          "end": 50,
+          "evidence_id": "ev_0017",
+          "quote": "create the quotation in the quoting system",
+          "semantic_support": "supports",
+          "start": 8,
+          "utterance_id": "obs_23"
+        }
+      ],
+      "id": "claim:usage_create_quotation:data_type",
+      "predicate": "data_type",
+      "record_type": "resource_usage",
+      "statement": "Resource usage usage_create_quotation has the recorded data type.",
+      "status": "provisional",
+      "supersedes": null,
+      "target_id": "usage_create_quotation",
+      "value": {
+        "state": "value",
+        "value": "data_quotation"
+      }
+    },
+    {
+      "evidence": [
+        {
+          "end": 57,
+          "evidence_id": "ev_0018",
+          "quote": "send the quotation to the customer by email",
+          "semantic_support": "supports",
+          "start": 14,
+          "utterance_id": "obs_53"
+        }
+      ],
+      "id": "claim:usage_send_quotation:crud",
+      "predicate": "crud",
+      "record_type": "resource_usage",
+      "statement": "Resource usage usage_send_quotation has the recorded CRUD operation.",
+      "status": "provisional",
+      "supersedes": null,
+      "target_id": "usage_send_quotation",
+      "value": {
+        "state": "value",
+        "value": "unknown"
+      }
+    },
+    {
+      "evidence": [
+        {
+          "end": 57,
+          "evidence_id": "ev_0018",
+          "quote": "send the quotation to the customer by email",
+          "semantic_support": "supports",
+          "start": 14,
+          "utterance_id": "obs_53"
+        }
+      ],
+      "id": "claim:usage_send_quotation:system",
+      "predicate": "system",
+      "record_type": "resource_usage",
+      "statement": "Resource usage usage_send_quotation has the recorded system.",
+      "status": "provisional",
+      "supersedes": null,
+      "target_id": "usage_send_quotation",
+      "value": {
+        "state": "value",
+        "value": "system_email"
+      }
+    },
+    {
+      "evidence": [
+        {
+          "end": 57,
+          "evidence_id": "ev_0018",
+          "quote": "send the quotation to the customer by email",
+          "semantic_support": "supports",
+          "start": 14,
+          "utterance_id": "obs_53"
+        }
+      ],
+      "id": "claim:usage_send_quotation:data_type",
+      "predicate": "data_type",
+      "record_type": "resource_usage",
+      "statement": "Resource usage usage_send_quotation has the recorded data type.",
+      "status": "provisional",
+      "supersedes": null,
+      "target_id": "usage_send_quotation",
+      "value": {
+        "state": "value",
+        "value": "data_quotation"
+      }
+    },
+    {
+      "evidence": [
+        {
+          "end": 112,
+          "evidence_id": "ev_0019",
+          "quote": "the manager approves the high-value quotation",
+          "semantic_support": "supports",
+          "start": 67,
+          "utterance_id": "obs_33"
+        }
+      ],
+      "id": "claim:usage_approve_quotation:crud",
+      "predicate": "crud",
+      "record_type": "resource_usage",
+      "statement": "Resource usage usage_approve_quotation has the recorded CRUD operation.",
+      "status": "provisional",
+      "supersedes": null,
+      "target_id": "usage_approve_quotation",
+      "value": {
+        "state": "value",
+        "value": "unknown"
+      }
+    },
+    {
+      "evidence": [
+        {
+          "end": 112,
+          "evidence_id": "ev_0019",
+          "quote": "the manager approves the high-value quotation",
+          "semantic_support": "supports",
+          "start": 67,
+          "utterance_id": "obs_33"
+        }
+      ],
+      "id": "claim:usage_approve_quotation:system",
+      "predicate": "system",
+      "record_type": "resource_usage",
+      "statement": "Resource usage usage_approve_quotation has the recorded system.",
+      "status": "provisional",
+      "supersedes": null,
+      "target_id": "usage_approve_quotation",
+      "value": {
+        "state": "dont_know",
+        "value": null
+      }
+    },
+    {
+      "evidence": [
+        {
+          "end": 112,
+          "evidence_id": "ev_0019",
+          "quote": "the manager approves the high-value quotation",
+          "semantic_support": "supports",
+          "start": 67,
+          "utterance_id": "obs_33"
+        }
+      ],
+      "id": "claim:usage_approve_quotation:data_type",
+      "predicate": "data_type",
+      "record_type": "resource_usage",
+      "statement": "Resource usage usage_approve_quotation has the recorded data type.",
+      "status": "provisional",
+      "supersedes": null,
+      "target_id": "usage_approve_quotation",
+      "value": {
+        "state": "value",
+        "value": "data_quotation"
+      }
+    },
+    {
+      "evidence": [
+        {
+          "end": 254,
+          "evidence_id": "ev_0020",
+          "quote": "send the month-end summary to Accounting",
+          "semantic_support": "supports",
+          "start": 214,
+          "utterance_id": "obs_33"
+        }
+      ],
+      "id": "claim:usage_send_summary:crud",
+      "predicate": "crud",
+      "record_type": "resource_usage",
+      "statement": "Resource usage usage_send_summary has the recorded CRUD operation.",
+      "status": "provisional",
+      "supersedes": null,
+      "target_id": "usage_send_summary",
+      "value": {
+        "state": "value",
+        "value": "unknown"
+      }
+    },
+    {
+      "evidence": [
+        {
+          "end": 254,
+          "evidence_id": "ev_0020",
+          "quote": "send the month-end summary to Accounting",
+          "semantic_support": "supports",
+          "start": 214,
+          "utterance_id": "obs_33"
+        }
+      ],
+      "id": "claim:usage_send_summary:system",
+      "predicate": "system",
+      "record_type": "resource_usage",
+      "statement": "Resource usage usage_send_summary has the recorded system.",
+      "status": "provisional",
+      "supersedes": null,
+      "target_id": "usage_send_summary",
+      "value": {
+        "state": "dont_know",
+        "value": null
+      }
+    },
+    {
+      "evidence": [
+        {
+          "end": 254,
+          "evidence_id": "ev_0020",
+          "quote": "send the month-end summary to Accounting",
+          "semantic_support": "supports",
+          "start": 214,
+          "utterance_id": "obs_33"
+        }
+      ],
+      "id": "claim:usage_send_summary:data_type",
+      "predicate": "data_type",
+      "record_type": "resource_usage",
+      "statement": "Resource usage usage_send_summary has the recorded data type.",
+      "status": "provisional",
+      "supersedes": null,
+      "target_id": "usage_send_summary",
+      "value": {
+        "state": "value",
+        "value": "data_month_end_summary"
+      }
+    }
+  ],
+  "completion": {
+    "confirmation_evidence": [],
+    "content_completeness": "incomplete",
+    "stakeholder_confirmed": false,
+    "status": "ended",
+    "termination_reason": "existing replay records a normal protocol completion",
+    "unresolved_question_ids": [
+      "question:issue_month_end_path"
+    ]
+  },
+  "contradictions": [],
+  "issues": [
+    {
+      "claim_ids": [],
+      "contradiction_id": null,
+      "description": "The relationship between the month-end summary path and the amount-based path is not confirmed.",
+      "evidence": [
+        {
+          "end": 105,
+          "evidence_id": "ev_0021",
+          "quote": "I don't know whether the month-end summary is sent in addition to the amount-based path or instead of it.",
+          "semantic_support": "supports",
+          "start": 0,
+          "utterance_id": "obs_51"
+        }
+      ],
+      "id": "issue_month_end_path",
+      "information_state": "unset",
+      "kind": "unknown",
+      "question_id": "question:issue_month_end_path",
+      "status": "open",
+      "target_ids": [
+        "step_send_month_end_summary",
+        "flow_create_month_end"
+      ]
+    },
+    {
+      "claim_ids": [],
+      "contradiction_id": null,
+      "description": "High-value approval is needed for credit risk management.",
+      "evidence": [
+        {
+          "end": 85,
+          "evidence_id": "ev_0022",
+          "quote": "approval is needed for high-value quotations for credit risk management",
+          "semantic_support": "supports",
+          "start": 14,
+          "utterance_id": "obs_62"
+        }
+      ],
+      "id": "issue_approval_reason",
+      "information_state": "unset",
+      "kind": "business_rule",
+      "question_id": null,
+      "status": "open",
+      "target_ids": [
+        "step_approve_high_value"
+      ]
+    }
+  ],
+  "open_questions": [
+    {
+      "id": "question:issue_month_end_path",
+      "resolution_claim_id": null,
+      "status": "open",
+      "target_ids": [
+        "step_send_month_end_summary",
+        "flow_create_month_end"
+      ],
+      "text": "Is the month-end summary sent in addition to the amount-based path or instead of it?"
+    }
+  ],
+  "schema_version": "business_interview.interview_state.v1",
+  "utterances": [
+    {
+      "id": "obs_1",
+      "speaker": "stakeholder",
+      "text": "Sure, that's fine. What would you like to know?"
+    },
+    {
+      "id": "obs_3",
+      "speaker": "stakeholder",
+      "text": "Sure. The process starts when the sales employee receives the customer's quotation request. That's the trigger. As for the intended outcome, I don't know."
+    },
+    {
+      "id": "obs_12",
+      "speaker": "stakeholder",
+      "text": "After that, I check the customer information in the CRM."
+    },
+    {
+      "id": "obs_14",
+      "speaker": "stakeholder",
+      "text": "Yes, I'm the sales employee. I check the customer information in the CRM."
+    },
+    {
+      "id": "obs_23",
+      "speaker": "stakeholder",
+      "text": "Next, I create the quotation in the quoting system using the customer information and the pricing information."
+    },
+    {
+      "id": "obs_33",
+      "speaker": "stakeholder",
+      "text": "After I create the quotation, if the amount is over 1,000,000 yen, the manager approves the high-value quotation; if it is at or below 1,000,000 yen, I send the quotation to the customer; and if it is month-end, I send the month-end summary to Accounting."
+    },
+    {
+      "id": "obs_51",
+      "speaker": "stakeholder",
+      "text": "I don't know whether the month-end summary is sent in addition to the amount-based path or instead of it. What I do know is that after I create the quotation, if the amount is over 1,000,000 yen the manager approves it, if it's at or below 1,000,000 yen I send the quotation to the customer, and if it's month-end I send the month-end summary to Accounting."
+    },
+    {
+      "id": "obs_53",
+      "speaker": "stakeholder",
+      "text": "After that, I send the quotation to the customer by email."
+    },
+    {
+      "id": "obs_60",
+      "speaker": "stakeholder",
+      "text": "Yes, after the manager approves the high-value quotation, I send the quotation to the customer by email. And yes, it's the same step as the low-value path — whether the amount is over 1,000,000 yen and the manager approves, or it's at or below 1,000,000 yen, the send step is the same. After that, I don't know of anything else happening."
+    },
+    {
+      "id": "obs_62",
+      "speaker": "stakeholder",
+      "text": "The manager's approval is needed for high-value quotations for credit risk management."
+    },
+    {
+      "id": "obs_67",
+      "speaker": "stakeholder",
+      "text": "I don't know why creating the quotation is necessary."
+    },
+    {
+      "id": "obs_71",
+      "speaker": "stakeholder",
+      "text": "I don't know why checking the customer information is necessary."
+    },
+    {
+      "id": "obs_77",
+      "speaker": "stakeholder",
+      "text": "I don't know why sending the quotation to the customer is necessary."
+    },
+    {
+      "id": "obs_81",
+      "speaker": "stakeholder",
+      "text": "I don't know why sending the month-end summary to Accounting is necessary."
+    }
+  ]
+}

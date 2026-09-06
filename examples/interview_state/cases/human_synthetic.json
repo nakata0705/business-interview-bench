@@ -1,0 +1,607 @@
+{
+  "case_id": "human_synthetic",
+  "title": "Synthetic five-to-ten-minute human-check script",
+  "source_kind": "synthetic_human",
+  "source_reference": "hand-authored practice script; no human participant was available in this run",
+  "human_evaluation": "not_performed",
+  "notes": "This is the short script a user can run with a human later. The tool-call sequence is manually authored to exercise correction, unknown CRUD, a branch, a manual system, and a DONT_KNOW issue; it is not automatic extraction.",
+  "utterances": [
+    {
+      "id": "h1",
+      "speaker": "stakeholder",
+      "text": "I receive a request in the shared inbox."
+    },
+    {
+      "id": "h2",
+      "speaker": "stakeholder",
+      "text": "Then I copy the customer details into our tracker, which creates a request record."
+    },
+    {
+      "id": "h3",
+      "speaker": "stakeholder",
+      "text": "If the request is urgent, I call the on-call engineer; otherwise I schedule a normal review."
+    },
+    {
+      "id": "h4",
+      "speaker": "stakeholder",
+      "text": "During review I update the tracker with the decision."
+    },
+    {
+      "id": "h5",
+      "speaker": "stakeholder",
+      "text": "Sorry, correction: I only read the tracker during review. The coordinator updates it after review."
+    },
+    {
+      "id": "h6",
+      "speaker": "stakeholder",
+      "text": "The coordinator updates the tracker after the review."
+    },
+    {
+      "id": "h7",
+      "speaker": "stakeholder",
+      "text": "We do not know whether the customer has approved the request, so the approval status remains blank."
+    },
+    {
+      "id": "h8",
+      "speaker": "stakeholder",
+      "text": "The call to the engineer is manual; there is no separate system."
+    },
+    {
+      "id": "h9",
+      "speaker": "interviewer",
+      "text": "Thank you. I will mark the remaining approval question for follow-up."
+    }
+  ],
+  "operations": [
+    {
+      "tool": "record_process_step",
+      "arguments": {
+        "step_id": "human_receive",
+        "activity": {
+          "state": "value",
+          "value": "receive request"
+        },
+        "actor": {
+          "id": "actor_intake",
+          "label": "intake coordinator"
+        },
+        "inputs": {
+          "state": "value",
+          "items": [
+            {
+              "id": "data_request",
+              "label": "request"
+            }
+          ]
+        },
+        "evidence": [
+          {
+            "utterance_id": "h1",
+            "start": 2,
+            "end": 39,
+            "quote": "receive a request in the shared inbox",
+            "semantic_support": "supports"
+          }
+        ]
+      }
+    },
+    {
+      "tool": "record_resource_usage",
+      "arguments": {
+        "usage_id": "human_receive_inbox",
+        "process_step_id": "human_receive",
+        "system": {
+          "id": "system_shared_inbox",
+          "label": "shared inbox"
+        },
+        "data_type": {
+          "id": "data_request"
+        },
+        "crud": "unknown",
+        "evidence": [
+          {
+            "utterance_id": "h1",
+            "start": 20,
+            "end": 39,
+            "quote": "in the shared inbox",
+            "semantic_support": "supports"
+          }
+        ]
+      }
+    },
+    {
+      "tool": "record_process_step",
+      "arguments": {
+        "step_id": "human_log_request",
+        "activity": {
+          "state": "value",
+          "value": "copy customer details into tracker"
+        },
+        "actor": {
+          "id": "actor_intake"
+        },
+        "inputs": {
+          "state": "value",
+          "items": [
+            {
+              "id": "data_request"
+            }
+          ]
+        },
+        "outputs": {
+          "state": "value",
+          "items": [
+            {
+              "id": "data_request_record",
+              "label": "request record"
+            }
+          ]
+        },
+        "evidence": [
+          {
+            "utterance_id": "h2",
+            "start": 7,
+            "end": 81,
+            "quote": "copy the customer details into our tracker, which creates a request record",
+            "semantic_support": "supports"
+          }
+        ]
+      }
+    },
+    {
+      "tool": "record_resource_usage",
+      "arguments": {
+        "usage_id": "human_log_tracker",
+        "process_step_id": "human_log_request",
+        "system": {
+          "id": "system_tracker",
+          "label": "tracker"
+        },
+        "data_type": {
+          "id": "data_request_record"
+        },
+        "crud": "create",
+        "evidence": [
+          {
+            "utterance_id": "h2",
+            "start": 57,
+            "end": 81,
+            "quote": "creates a request record",
+            "semantic_support": "supports"
+          }
+        ]
+      }
+    },
+    {
+      "tool": "record_process_step",
+      "arguments": {
+        "step_id": "human_review",
+        "activity": {
+          "state": "value",
+          "value": "review request"
+        },
+        "actor": {
+          "state": "dont_know"
+        },
+        "inputs": {
+          "state": "value",
+          "items": [
+            {
+              "id": "data_request_record"
+            }
+          ]
+        },
+        "evidence": [
+          {
+            "utterance_id": "h4",
+            "start": 0,
+            "end": 13,
+            "quote": "During review",
+            "semantic_support": "supports"
+          }
+        ]
+      }
+    },
+    {
+      "tool": "record_resource_usage",
+      "arguments": {
+        "usage_id": "human_review_tracker",
+        "process_step_id": "human_review",
+        "system": {
+          "id": "system_tracker"
+        },
+        "data_type": {
+          "id": "data_request_record"
+        },
+        "crud": "update",
+        "evidence": [
+          {
+            "utterance_id": "h4",
+            "start": 16,
+            "end": 52,
+            "quote": "update the tracker with the decision",
+            "semantic_support": "supports"
+          }
+        ]
+      }
+    },
+    {
+      "tool": "record_process_step",
+      "arguments": {
+        "step_id": "human_call_engineer",
+        "activity": {
+          "state": "value",
+          "value": "call on-call engineer"
+        },
+        "actor": {
+          "state": "dont_know"
+        },
+        "inputs": {
+          "state": "value",
+          "items": [
+            {
+              "id": "data_request_record"
+            }
+          ]
+        },
+        "evidence": [
+          {
+            "utterance_id": "h3",
+            "start": 26,
+            "end": 53,
+            "quote": "I call the on-call engineer",
+            "semantic_support": "supports"
+          }
+        ]
+      }
+    },
+    {
+      "tool": "record_process_step",
+      "arguments": {
+        "step_id": "human_schedule_review",
+        "activity": {
+          "state": "value",
+          "value": "schedule normal review"
+        },
+        "actor": {
+          "state": "dont_know"
+        },
+        "inputs": {
+          "state": "value",
+          "items": [
+            {
+              "id": "data_request_record"
+            }
+          ]
+        },
+        "evidence": [
+          {
+            "utterance_id": "h3",
+            "start": 65,
+            "end": 91,
+            "quote": "I schedule a normal review",
+            "semantic_support": "supports"
+          }
+        ]
+      }
+    },
+    {
+      "tool": "record_process_step",
+      "arguments": {
+        "step_id": "human_coordinator_update",
+        "activity": {
+          "state": "value",
+          "value": "update tracker after review"
+        },
+        "actor": {
+          "id": "actor_coordinator",
+          "label": "coordinator"
+        },
+        "inputs": {
+          "state": "value",
+          "items": [
+            {
+              "id": "data_request_record"
+            }
+          ]
+        },
+        "outputs": {
+          "state": "value",
+          "items": [
+            {
+              "id": "data_request_record"
+            }
+          ]
+        },
+        "evidence": [
+          {
+            "utterance_id": "h6",
+            "start": 0,
+            "end": 52,
+            "quote": "The coordinator updates the tracker after the review",
+            "semantic_support": "supports"
+          }
+        ]
+      }
+    },
+    {
+      "tool": "connect_process_steps",
+      "arguments": {
+        "flow_id": "human_source_receive",
+        "from_step_id": "SOURCE",
+        "to_step_id": "human_receive",
+        "kind": "source_boundary",
+        "evidence": [
+          {
+            "utterance_id": "h1",
+            "start": 2,
+            "end": 19,
+            "quote": "receive a request",
+            "semantic_support": "supports"
+          }
+        ]
+      }
+    },
+    {
+      "tool": "connect_process_steps",
+      "arguments": {
+        "flow_id": "human_receive_log",
+        "from_step_id": "human_receive",
+        "to_step_id": "human_log_request",
+        "evidence": [
+          {
+            "utterance_id": "h2",
+            "start": 0,
+            "end": 32,
+            "quote": "Then I copy the customer details",
+            "semantic_support": "supports"
+          }
+        ]
+      }
+    },
+    {
+      "tool": "connect_process_steps",
+      "arguments": {
+        "flow_id": "human_log_review",
+        "from_step_id": "human_log_request",
+        "to_step_id": "human_review",
+        "evidence": [
+          {
+            "utterance_id": "h4",
+            "start": 0,
+            "end": 13,
+            "quote": "During review",
+            "semantic_support": "supports"
+          }
+        ]
+      }
+    },
+    {
+      "tool": "connect_process_steps",
+      "arguments": {
+        "flow_id": "human_review_urgent",
+        "from_step_id": "human_review",
+        "to_step_id": "human_call_engineer",
+        "kind": "branch",
+        "condition": {
+          "state": "value",
+          "value": "request is urgent"
+        },
+        "evidence": [
+          {
+            "utterance_id": "h3",
+            "start": 0,
+            "end": 24,
+            "quote": "If the request is urgent",
+            "semantic_support": "supports"
+          }
+        ]
+      }
+    },
+    {
+      "tool": "connect_process_steps",
+      "arguments": {
+        "flow_id": "human_review_normal",
+        "from_step_id": "human_review",
+        "to_step_id": "human_schedule_review",
+        "kind": "branch",
+        "condition": {
+          "state": "value",
+          "value": "request is not urgent"
+        },
+        "evidence": [
+          {
+            "utterance_id": "h3",
+            "start": 55,
+            "end": 91,
+            "quote": "otherwise I schedule a normal review",
+            "semantic_support": "supports"
+          }
+        ]
+      }
+    },
+    {
+      "tool": "connect_process_steps",
+      "arguments": {
+        "flow_id": "human_call_update",
+        "from_step_id": "human_call_engineer",
+        "to_step_id": "human_coordinator_update",
+        "evidence": [
+          {
+            "utterance_id": "h6",
+            "start": 16,
+            "end": 52,
+            "quote": "updates the tracker after the review",
+            "semantic_support": "supports"
+          }
+        ]
+      }
+    },
+    {
+      "tool": "connect_process_steps",
+      "arguments": {
+        "flow_id": "human_schedule_update",
+        "from_step_id": "human_schedule_review",
+        "to_step_id": "human_coordinator_update",
+        "evidence": [
+          {
+            "utterance_id": "h6",
+            "start": 16,
+            "end": 52,
+            "quote": "updates the tracker after the review",
+            "semantic_support": "supports"
+          }
+        ]
+      }
+    },
+    {
+      "tool": "record_resource_usage",
+      "arguments": {
+        "usage_id": "human_manual_call",
+        "process_step_id": "human_call_engineer",
+        "system": {
+          "id": "system_manual",
+          "label": "manual work",
+          "kind": "manual"
+        },
+        "data_type": {
+          "id": "data_request_record"
+        },
+        "crud": "unknown",
+        "evidence": [
+          {
+            "utterance_id": "h8",
+            "start": 0,
+            "end": 63,
+            "quote": "The call to the engineer is manual; there is no separate system",
+            "semantic_support": "supports"
+          }
+        ]
+      }
+    },
+    {
+      "tool": "record_resource_usage",
+      "arguments": {
+        "usage_id": "human_schedule_unknown",
+        "process_step_id": "human_schedule_review",
+        "system": {
+          "state": "dont_know"
+        },
+        "data_type": {
+          "id": "data_request_record"
+        },
+        "crud": "unknown",
+        "evidence": [
+          {
+            "utterance_id": "h3",
+            "start": 67,
+            "end": 91,
+            "quote": "schedule a normal review",
+            "semantic_support": "supports"
+          }
+        ]
+      }
+    },
+    {
+      "tool": "revise_record",
+      "arguments": {
+        "record_id": "claim:human_review_tracker:crud",
+        "replacement_id": "claim:human_review_tracker:crud:revision1",
+        "statement": "During review the tracker is read; the coordinator performs the later update.",
+        "value": {
+          "state": "value",
+          "value": "read"
+        },
+        "correction_note": "The stakeholder explicitly corrected the earlier update description.",
+        "evidence": [
+          {
+            "utterance_id": "h5",
+            "start": 0,
+            "end": 56,
+            "quote": "Sorry, correction: I only read the tracker during review",
+            "semantic_support": "supports"
+          }
+        ],
+        "claim_status": "confirmed"
+      }
+    },
+    {
+      "tool": "record_issue",
+      "arguments": {
+        "issue_id": "human_review_correction",
+        "kind": "contradiction",
+        "description": "The initial update claim conflicts with the explicit correction that review only reads the tracker.",
+        "target_ids": [
+          "human_review_tracker"
+        ],
+        "claim_ids": [
+          "claim:human_review_tracker:crud",
+          "claim:human_review_tracker:crud:revision1"
+        ],
+        "contradiction_status": "resolved",
+        "resolution_claim_id": "claim:human_review_tracker:crud:revision1",
+        "evidence": [
+          {
+            "utterance_id": "h5",
+            "start": 0,
+            "end": 56,
+            "quote": "Sorry, correction: I only read the tracker during review",
+            "semantic_support": "supports"
+          }
+        ]
+      }
+    },
+    {
+      "tool": "record_resource_usage",
+      "arguments": {
+        "usage_id": "human_coordinator_tracker_update",
+        "process_step_id": "human_coordinator_update",
+        "system": {
+          "id": "system_tracker"
+        },
+        "data_type": {
+          "id": "data_request_record"
+        },
+        "crud": "update",
+        "evidence": [
+          {
+            "utterance_id": "h6",
+            "start": 0,
+            "end": 52,
+            "quote": "The coordinator updates the tracker after the review",
+            "semantic_support": "supports"
+          }
+        ]
+      }
+    },
+    {
+      "tool": "record_issue",
+      "arguments": {
+        "issue_id": "human_approval_unknown",
+        "kind": "unknown",
+        "information_state": "dont_know",
+        "description": "The interviewee does not know whether the customer has approved the request; the approval status is blank.",
+        "target_ids": [
+          "human_review"
+        ],
+        "question": "Is customer approval recorded anywhere, and who confirms it?",
+        "evidence": [
+          {
+            "utterance_id": "h7",
+            "start": 0,
+            "end": 99,
+            "quote": "We do not know whether the customer has approved the request, so the approval status remains blank.",
+            "semantic_support": "supports"
+          }
+        ]
+      }
+    },
+    {
+      "tool": "complete_interview",
+      "arguments": {
+        "termination_reason": "short practice interview ended after the planned questions",
+        "content_completeness": "incomplete"
+      }
+    }
+  ]
+}

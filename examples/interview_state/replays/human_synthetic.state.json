@@ -1,0 +1,1572 @@
+{
+  "business_model": {
+    "actors": [
+      {
+        "id": "actor_intake",
+        "label": "intake coordinator"
+      },
+      {
+        "id": "actor_coordinator",
+        "label": "coordinator"
+      }
+    ],
+    "data_operations": [
+      {
+        "crud": "unknown",
+        "data_type": {
+          "entity_id": "data_request",
+          "state": "value"
+        },
+        "id": "human_receive_inbox",
+        "process_step_id": "human_receive",
+        "system": {
+          "entity_id": "system_shared_inbox",
+          "state": "value"
+        }
+      },
+      {
+        "crud": "create",
+        "data_type": {
+          "entity_id": "data_request_record",
+          "state": "value"
+        },
+        "id": "human_log_tracker",
+        "process_step_id": "human_log_request",
+        "system": {
+          "entity_id": "system_tracker",
+          "state": "value"
+        }
+      },
+      {
+        "crud": "read",
+        "data_type": {
+          "entity_id": "data_request_record",
+          "state": "value"
+        },
+        "id": "human_review_tracker",
+        "process_step_id": "human_review",
+        "system": {
+          "entity_id": "system_tracker",
+          "state": "value"
+        }
+      },
+      {
+        "crud": "unknown",
+        "data_type": {
+          "entity_id": "data_request_record",
+          "state": "value"
+        },
+        "id": "human_manual_call",
+        "process_step_id": "human_call_engineer",
+        "system": {
+          "entity_id": "system_manual",
+          "state": "value"
+        }
+      },
+      {
+        "crud": "unknown",
+        "data_type": {
+          "entity_id": "data_request_record",
+          "state": "value"
+        },
+        "id": "human_schedule_unknown",
+        "process_step_id": "human_schedule_review",
+        "system": {
+          "entity_id": null,
+          "state": "dont_know"
+        }
+      },
+      {
+        "crud": "update",
+        "data_type": {
+          "entity_id": "data_request_record",
+          "state": "value"
+        },
+        "id": "human_coordinator_tracker_update",
+        "process_step_id": "human_coordinator_update",
+        "system": {
+          "entity_id": "system_tracker",
+          "state": "value"
+        }
+      }
+    ],
+    "data_types": [
+      {
+        "id": "data_request",
+        "label": "request"
+      },
+      {
+        "id": "data_request_record",
+        "label": "request record"
+      }
+    ],
+    "flows": [
+      {
+        "condition": {
+          "state": "unset",
+          "value": null
+        },
+        "from_id": "SOURCE",
+        "id": "human_source_receive",
+        "kind": "source_boundary",
+        "to_id": "human_receive"
+      },
+      {
+        "condition": {
+          "state": "unset",
+          "value": null
+        },
+        "from_id": "human_receive",
+        "id": "human_receive_log",
+        "kind": "normal",
+        "to_id": "human_log_request"
+      },
+      {
+        "condition": {
+          "state": "unset",
+          "value": null
+        },
+        "from_id": "human_log_request",
+        "id": "human_log_review",
+        "kind": "normal",
+        "to_id": "human_review"
+      },
+      {
+        "condition": {
+          "state": "value",
+          "value": "request is urgent"
+        },
+        "from_id": "human_review",
+        "id": "human_review_urgent",
+        "kind": "branch",
+        "to_id": "human_call_engineer"
+      },
+      {
+        "condition": {
+          "state": "value",
+          "value": "request is not urgent"
+        },
+        "from_id": "human_review",
+        "id": "human_review_normal",
+        "kind": "branch",
+        "to_id": "human_schedule_review"
+      },
+      {
+        "condition": {
+          "state": "unset",
+          "value": null
+        },
+        "from_id": "human_call_engineer",
+        "id": "human_call_update",
+        "kind": "normal",
+        "to_id": "human_coordinator_update"
+      },
+      {
+        "condition": {
+          "state": "unset",
+          "value": null
+        },
+        "from_id": "human_schedule_review",
+        "id": "human_schedule_update",
+        "kind": "normal",
+        "to_id": "human_coordinator_update"
+      }
+    ],
+    "process_steps": [
+      {
+        "activity": {
+          "state": "value",
+          "value": "receive request"
+        },
+        "actor": {
+          "entity_id": "actor_intake",
+          "state": "value"
+        },
+        "id": "human_receive",
+        "inputs": {
+          "entity_ids": [
+            "data_request"
+          ],
+          "state": "value"
+        },
+        "outputs": {
+          "entity_ids": [],
+          "state": "unset"
+        }
+      },
+      {
+        "activity": {
+          "state": "value",
+          "value": "copy customer details into tracker"
+        },
+        "actor": {
+          "entity_id": "actor_intake",
+          "state": "value"
+        },
+        "id": "human_log_request",
+        "inputs": {
+          "entity_ids": [
+            "data_request"
+          ],
+          "state": "value"
+        },
+        "outputs": {
+          "entity_ids": [
+            "data_request_record"
+          ],
+          "state": "value"
+        }
+      },
+      {
+        "activity": {
+          "state": "value",
+          "value": "review request"
+        },
+        "actor": {
+          "entity_id": null,
+          "state": "dont_know"
+        },
+        "id": "human_review",
+        "inputs": {
+          "entity_ids": [
+            "data_request_record"
+          ],
+          "state": "value"
+        },
+        "outputs": {
+          "entity_ids": [],
+          "state": "unset"
+        }
+      },
+      {
+        "activity": {
+          "state": "value",
+          "value": "call on-call engineer"
+        },
+        "actor": {
+          "entity_id": null,
+          "state": "dont_know"
+        },
+        "id": "human_call_engineer",
+        "inputs": {
+          "entity_ids": [
+            "data_request_record"
+          ],
+          "state": "value"
+        },
+        "outputs": {
+          "entity_ids": [],
+          "state": "unset"
+        }
+      },
+      {
+        "activity": {
+          "state": "value",
+          "value": "schedule normal review"
+        },
+        "actor": {
+          "entity_id": null,
+          "state": "dont_know"
+        },
+        "id": "human_schedule_review",
+        "inputs": {
+          "entity_ids": [
+            "data_request_record"
+          ],
+          "state": "value"
+        },
+        "outputs": {
+          "entity_ids": [],
+          "state": "unset"
+        }
+      },
+      {
+        "activity": {
+          "state": "value",
+          "value": "update tracker after review"
+        },
+        "actor": {
+          "entity_id": "actor_coordinator",
+          "state": "value"
+        },
+        "id": "human_coordinator_update",
+        "inputs": {
+          "entity_ids": [
+            "data_request_record"
+          ],
+          "state": "value"
+        },
+        "outputs": {
+          "entity_ids": [
+            "data_request_record"
+          ],
+          "state": "value"
+        }
+      }
+    ],
+    "systems": [
+      {
+        "id": "system_shared_inbox",
+        "kind": "named",
+        "label": "shared inbox"
+      },
+      {
+        "id": "system_tracker",
+        "kind": "named",
+        "label": "tracker"
+      },
+      {
+        "id": "system_manual",
+        "kind": "manual",
+        "label": "manual work"
+      }
+    ]
+  },
+  "claims": [
+    {
+      "evidence": [
+        {
+          "end": 39,
+          "evidence_id": "ev_0001",
+          "quote": "receive a request in the shared inbox",
+          "semantic_support": "supports",
+          "start": 2,
+          "utterance_id": "h1"
+        }
+      ],
+      "id": "claim:human_receive:activity",
+      "predicate": "activity",
+      "record_type": "process_step",
+      "statement": "Process step human_receive has the recorded activity.",
+      "status": "provisional",
+      "supersedes": null,
+      "target_id": "human_receive",
+      "value": {
+        "state": "value",
+        "value": "receive request"
+      }
+    },
+    {
+      "evidence": [
+        {
+          "end": 39,
+          "evidence_id": "ev_0001",
+          "quote": "receive a request in the shared inbox",
+          "semantic_support": "supports",
+          "start": 2,
+          "utterance_id": "h1"
+        }
+      ],
+      "id": "claim:human_receive:actor",
+      "predicate": "actor",
+      "record_type": "process_step",
+      "statement": "Process step human_receive has the recorded actor.",
+      "status": "provisional",
+      "supersedes": null,
+      "target_id": "human_receive",
+      "value": {
+        "state": "value",
+        "value": "actor_intake"
+      }
+    },
+    {
+      "evidence": [
+        {
+          "end": 39,
+          "evidence_id": "ev_0001",
+          "quote": "receive a request in the shared inbox",
+          "semantic_support": "supports",
+          "start": 2,
+          "utterance_id": "h1"
+        }
+      ],
+      "id": "claim:human_receive:inputs",
+      "predicate": "inputs",
+      "record_type": "process_step",
+      "statement": "Process step human_receive has the recorded inputs.",
+      "status": "provisional",
+      "supersedes": null,
+      "target_id": "human_receive",
+      "value": {
+        "state": "value",
+        "value": "[\"data_request\"]"
+      }
+    },
+    {
+      "evidence": [
+        {
+          "end": 39,
+          "evidence_id": "ev_0002",
+          "quote": "in the shared inbox",
+          "semantic_support": "supports",
+          "start": 20,
+          "utterance_id": "h1"
+        }
+      ],
+      "id": "claim:human_receive_inbox:crud",
+      "predicate": "crud",
+      "record_type": "resource_usage",
+      "statement": "Resource usage human_receive_inbox has the recorded CRUD operation.",
+      "status": "provisional",
+      "supersedes": null,
+      "target_id": "human_receive_inbox",
+      "value": {
+        "state": "value",
+        "value": "unknown"
+      }
+    },
+    {
+      "evidence": [
+        {
+          "end": 39,
+          "evidence_id": "ev_0002",
+          "quote": "in the shared inbox",
+          "semantic_support": "supports",
+          "start": 20,
+          "utterance_id": "h1"
+        }
+      ],
+      "id": "claim:human_receive_inbox:system",
+      "predicate": "system",
+      "record_type": "resource_usage",
+      "statement": "Resource usage human_receive_inbox has the recorded system.",
+      "status": "provisional",
+      "supersedes": null,
+      "target_id": "human_receive_inbox",
+      "value": {
+        "state": "value",
+        "value": "system_shared_inbox"
+      }
+    },
+    {
+      "evidence": [
+        {
+          "end": 39,
+          "evidence_id": "ev_0002",
+          "quote": "in the shared inbox",
+          "semantic_support": "supports",
+          "start": 20,
+          "utterance_id": "h1"
+        }
+      ],
+      "id": "claim:human_receive_inbox:data_type",
+      "predicate": "data_type",
+      "record_type": "resource_usage",
+      "statement": "Resource usage human_receive_inbox has the recorded data type.",
+      "status": "provisional",
+      "supersedes": null,
+      "target_id": "human_receive_inbox",
+      "value": {
+        "state": "value",
+        "value": "data_request"
+      }
+    },
+    {
+      "evidence": [
+        {
+          "end": 81,
+          "evidence_id": "ev_0003",
+          "quote": "copy the customer details into our tracker, which creates a request record",
+          "semantic_support": "supports",
+          "start": 7,
+          "utterance_id": "h2"
+        }
+      ],
+      "id": "claim:human_log_request:activity",
+      "predicate": "activity",
+      "record_type": "process_step",
+      "statement": "Process step human_log_request has the recorded activity.",
+      "status": "provisional",
+      "supersedes": null,
+      "target_id": "human_log_request",
+      "value": {
+        "state": "value",
+        "value": "copy customer details into tracker"
+      }
+    },
+    {
+      "evidence": [
+        {
+          "end": 81,
+          "evidence_id": "ev_0003",
+          "quote": "copy the customer details into our tracker, which creates a request record",
+          "semantic_support": "supports",
+          "start": 7,
+          "utterance_id": "h2"
+        }
+      ],
+      "id": "claim:human_log_request:actor",
+      "predicate": "actor",
+      "record_type": "process_step",
+      "statement": "Process step human_log_request has the recorded actor.",
+      "status": "provisional",
+      "supersedes": null,
+      "target_id": "human_log_request",
+      "value": {
+        "state": "value",
+        "value": "actor_intake"
+      }
+    },
+    {
+      "evidence": [
+        {
+          "end": 81,
+          "evidence_id": "ev_0003",
+          "quote": "copy the customer details into our tracker, which creates a request record",
+          "semantic_support": "supports",
+          "start": 7,
+          "utterance_id": "h2"
+        }
+      ],
+      "id": "claim:human_log_request:inputs",
+      "predicate": "inputs",
+      "record_type": "process_step",
+      "statement": "Process step human_log_request has the recorded inputs.",
+      "status": "provisional",
+      "supersedes": null,
+      "target_id": "human_log_request",
+      "value": {
+        "state": "value",
+        "value": "[\"data_request\"]"
+      }
+    },
+    {
+      "evidence": [
+        {
+          "end": 81,
+          "evidence_id": "ev_0003",
+          "quote": "copy the customer details into our tracker, which creates a request record",
+          "semantic_support": "supports",
+          "start": 7,
+          "utterance_id": "h2"
+        }
+      ],
+      "id": "claim:human_log_request:outputs",
+      "predicate": "outputs",
+      "record_type": "process_step",
+      "statement": "Process step human_log_request has the recorded outputs.",
+      "status": "provisional",
+      "supersedes": null,
+      "target_id": "human_log_request",
+      "value": {
+        "state": "value",
+        "value": "[\"data_request_record\"]"
+      }
+    },
+    {
+      "evidence": [
+        {
+          "end": 81,
+          "evidence_id": "ev_0004",
+          "quote": "creates a request record",
+          "semantic_support": "supports",
+          "start": 57,
+          "utterance_id": "h2"
+        }
+      ],
+      "id": "claim:human_log_tracker:crud",
+      "predicate": "crud",
+      "record_type": "resource_usage",
+      "statement": "Resource usage human_log_tracker has the recorded CRUD operation.",
+      "status": "provisional",
+      "supersedes": null,
+      "target_id": "human_log_tracker",
+      "value": {
+        "state": "value",
+        "value": "create"
+      }
+    },
+    {
+      "evidence": [
+        {
+          "end": 81,
+          "evidence_id": "ev_0004",
+          "quote": "creates a request record",
+          "semantic_support": "supports",
+          "start": 57,
+          "utterance_id": "h2"
+        }
+      ],
+      "id": "claim:human_log_tracker:system",
+      "predicate": "system",
+      "record_type": "resource_usage",
+      "statement": "Resource usage human_log_tracker has the recorded system.",
+      "status": "provisional",
+      "supersedes": null,
+      "target_id": "human_log_tracker",
+      "value": {
+        "state": "value",
+        "value": "system_tracker"
+      }
+    },
+    {
+      "evidence": [
+        {
+          "end": 81,
+          "evidence_id": "ev_0004",
+          "quote": "creates a request record",
+          "semantic_support": "supports",
+          "start": 57,
+          "utterance_id": "h2"
+        }
+      ],
+      "id": "claim:human_log_tracker:data_type",
+      "predicate": "data_type",
+      "record_type": "resource_usage",
+      "statement": "Resource usage human_log_tracker has the recorded data type.",
+      "status": "provisional",
+      "supersedes": null,
+      "target_id": "human_log_tracker",
+      "value": {
+        "state": "value",
+        "value": "data_request_record"
+      }
+    },
+    {
+      "evidence": [
+        {
+          "end": 13,
+          "evidence_id": "ev_0005",
+          "quote": "During review",
+          "semantic_support": "supports",
+          "start": 0,
+          "utterance_id": "h4"
+        }
+      ],
+      "id": "claim:human_review:activity",
+      "predicate": "activity",
+      "record_type": "process_step",
+      "statement": "Process step human_review has the recorded activity.",
+      "status": "provisional",
+      "supersedes": null,
+      "target_id": "human_review",
+      "value": {
+        "state": "value",
+        "value": "review request"
+      }
+    },
+    {
+      "evidence": [
+        {
+          "end": 13,
+          "evidence_id": "ev_0005",
+          "quote": "During review",
+          "semantic_support": "supports",
+          "start": 0,
+          "utterance_id": "h4"
+        }
+      ],
+      "id": "claim:human_review:actor",
+      "predicate": "actor",
+      "record_type": "process_step",
+      "statement": "Process step human_review has the recorded actor.",
+      "status": "provisional",
+      "supersedes": null,
+      "target_id": "human_review",
+      "value": {
+        "state": "dont_know",
+        "value": null
+      }
+    },
+    {
+      "evidence": [
+        {
+          "end": 13,
+          "evidence_id": "ev_0005",
+          "quote": "During review",
+          "semantic_support": "supports",
+          "start": 0,
+          "utterance_id": "h4"
+        }
+      ],
+      "id": "claim:human_review:inputs",
+      "predicate": "inputs",
+      "record_type": "process_step",
+      "statement": "Process step human_review has the recorded inputs.",
+      "status": "provisional",
+      "supersedes": null,
+      "target_id": "human_review",
+      "value": {
+        "state": "value",
+        "value": "[\"data_request_record\"]"
+      }
+    },
+    {
+      "evidence": [
+        {
+          "end": 52,
+          "evidence_id": "ev_0006",
+          "quote": "update the tracker with the decision",
+          "semantic_support": "supports",
+          "start": 16,
+          "utterance_id": "h4"
+        }
+      ],
+      "id": "claim:human_review_tracker:crud",
+      "predicate": "crud",
+      "record_type": "resource_usage",
+      "statement": "Resource usage human_review_tracker has the recorded CRUD operation.",
+      "status": "rejected",
+      "supersedes": null,
+      "target_id": "human_review_tracker",
+      "value": {
+        "state": "value",
+        "value": "update"
+      }
+    },
+    {
+      "evidence": [
+        {
+          "end": 52,
+          "evidence_id": "ev_0006",
+          "quote": "update the tracker with the decision",
+          "semantic_support": "supports",
+          "start": 16,
+          "utterance_id": "h4"
+        }
+      ],
+      "id": "claim:human_review_tracker:system",
+      "predicate": "system",
+      "record_type": "resource_usage",
+      "statement": "Resource usage human_review_tracker has the recorded system.",
+      "status": "provisional",
+      "supersedes": null,
+      "target_id": "human_review_tracker",
+      "value": {
+        "state": "value",
+        "value": "system_tracker"
+      }
+    },
+    {
+      "evidence": [
+        {
+          "end": 52,
+          "evidence_id": "ev_0006",
+          "quote": "update the tracker with the decision",
+          "semantic_support": "supports",
+          "start": 16,
+          "utterance_id": "h4"
+        }
+      ],
+      "id": "claim:human_review_tracker:data_type",
+      "predicate": "data_type",
+      "record_type": "resource_usage",
+      "statement": "Resource usage human_review_tracker has the recorded data type.",
+      "status": "provisional",
+      "supersedes": null,
+      "target_id": "human_review_tracker",
+      "value": {
+        "state": "value",
+        "value": "data_request_record"
+      }
+    },
+    {
+      "evidence": [
+        {
+          "end": 53,
+          "evidence_id": "ev_0007",
+          "quote": "I call the on-call engineer",
+          "semantic_support": "supports",
+          "start": 26,
+          "utterance_id": "h3"
+        }
+      ],
+      "id": "claim:human_call_engineer:activity",
+      "predicate": "activity",
+      "record_type": "process_step",
+      "statement": "Process step human_call_engineer has the recorded activity.",
+      "status": "provisional",
+      "supersedes": null,
+      "target_id": "human_call_engineer",
+      "value": {
+        "state": "value",
+        "value": "call on-call engineer"
+      }
+    },
+    {
+      "evidence": [
+        {
+          "end": 53,
+          "evidence_id": "ev_0007",
+          "quote": "I call the on-call engineer",
+          "semantic_support": "supports",
+          "start": 26,
+          "utterance_id": "h3"
+        }
+      ],
+      "id": "claim:human_call_engineer:actor",
+      "predicate": "actor",
+      "record_type": "process_step",
+      "statement": "Process step human_call_engineer has the recorded actor.",
+      "status": "provisional",
+      "supersedes": null,
+      "target_id": "human_call_engineer",
+      "value": {
+        "state": "dont_know",
+        "value": null
+      }
+    },
+    {
+      "evidence": [
+        {
+          "end": 53,
+          "evidence_id": "ev_0007",
+          "quote": "I call the on-call engineer",
+          "semantic_support": "supports",
+          "start": 26,
+          "utterance_id": "h3"
+        }
+      ],
+      "id": "claim:human_call_engineer:inputs",
+      "predicate": "inputs",
+      "record_type": "process_step",
+      "statement": "Process step human_call_engineer has the recorded inputs.",
+      "status": "provisional",
+      "supersedes": null,
+      "target_id": "human_call_engineer",
+      "value": {
+        "state": "value",
+        "value": "[\"data_request_record\"]"
+      }
+    },
+    {
+      "evidence": [
+        {
+          "end": 91,
+          "evidence_id": "ev_0008",
+          "quote": "I schedule a normal review",
+          "semantic_support": "supports",
+          "start": 65,
+          "utterance_id": "h3"
+        }
+      ],
+      "id": "claim:human_schedule_review:activity",
+      "predicate": "activity",
+      "record_type": "process_step",
+      "statement": "Process step human_schedule_review has the recorded activity.",
+      "status": "provisional",
+      "supersedes": null,
+      "target_id": "human_schedule_review",
+      "value": {
+        "state": "value",
+        "value": "schedule normal review"
+      }
+    },
+    {
+      "evidence": [
+        {
+          "end": 91,
+          "evidence_id": "ev_0008",
+          "quote": "I schedule a normal review",
+          "semantic_support": "supports",
+          "start": 65,
+          "utterance_id": "h3"
+        }
+      ],
+      "id": "claim:human_schedule_review:actor",
+      "predicate": "actor",
+      "record_type": "process_step",
+      "statement": "Process step human_schedule_review has the recorded actor.",
+      "status": "provisional",
+      "supersedes": null,
+      "target_id": "human_schedule_review",
+      "value": {
+        "state": "dont_know",
+        "value": null
+      }
+    },
+    {
+      "evidence": [
+        {
+          "end": 91,
+          "evidence_id": "ev_0008",
+          "quote": "I schedule a normal review",
+          "semantic_support": "supports",
+          "start": 65,
+          "utterance_id": "h3"
+        }
+      ],
+      "id": "claim:human_schedule_review:inputs",
+      "predicate": "inputs",
+      "record_type": "process_step",
+      "statement": "Process step human_schedule_review has the recorded inputs.",
+      "status": "provisional",
+      "supersedes": null,
+      "target_id": "human_schedule_review",
+      "value": {
+        "state": "value",
+        "value": "[\"data_request_record\"]"
+      }
+    },
+    {
+      "evidence": [
+        {
+          "end": 52,
+          "evidence_id": "ev_0009",
+          "quote": "The coordinator updates the tracker after the review",
+          "semantic_support": "supports",
+          "start": 0,
+          "utterance_id": "h6"
+        }
+      ],
+      "id": "claim:human_coordinator_update:activity",
+      "predicate": "activity",
+      "record_type": "process_step",
+      "statement": "Process step human_coordinator_update has the recorded activity.",
+      "status": "provisional",
+      "supersedes": null,
+      "target_id": "human_coordinator_update",
+      "value": {
+        "state": "value",
+        "value": "update tracker after review"
+      }
+    },
+    {
+      "evidence": [
+        {
+          "end": 52,
+          "evidence_id": "ev_0009",
+          "quote": "The coordinator updates the tracker after the review",
+          "semantic_support": "supports",
+          "start": 0,
+          "utterance_id": "h6"
+        }
+      ],
+      "id": "claim:human_coordinator_update:actor",
+      "predicate": "actor",
+      "record_type": "process_step",
+      "statement": "Process step human_coordinator_update has the recorded actor.",
+      "status": "provisional",
+      "supersedes": null,
+      "target_id": "human_coordinator_update",
+      "value": {
+        "state": "value",
+        "value": "actor_coordinator"
+      }
+    },
+    {
+      "evidence": [
+        {
+          "end": 52,
+          "evidence_id": "ev_0009",
+          "quote": "The coordinator updates the tracker after the review",
+          "semantic_support": "supports",
+          "start": 0,
+          "utterance_id": "h6"
+        }
+      ],
+      "id": "claim:human_coordinator_update:inputs",
+      "predicate": "inputs",
+      "record_type": "process_step",
+      "statement": "Process step human_coordinator_update has the recorded inputs.",
+      "status": "provisional",
+      "supersedes": null,
+      "target_id": "human_coordinator_update",
+      "value": {
+        "state": "value",
+        "value": "[\"data_request_record\"]"
+      }
+    },
+    {
+      "evidence": [
+        {
+          "end": 52,
+          "evidence_id": "ev_0009",
+          "quote": "The coordinator updates the tracker after the review",
+          "semantic_support": "supports",
+          "start": 0,
+          "utterance_id": "h6"
+        }
+      ],
+      "id": "claim:human_coordinator_update:outputs",
+      "predicate": "outputs",
+      "record_type": "process_step",
+      "statement": "Process step human_coordinator_update has the recorded outputs.",
+      "status": "provisional",
+      "supersedes": null,
+      "target_id": "human_coordinator_update",
+      "value": {
+        "state": "value",
+        "value": "[\"data_request_record\"]"
+      }
+    },
+    {
+      "evidence": [
+        {
+          "end": 19,
+          "evidence_id": "ev_0010",
+          "quote": "receive a request",
+          "semantic_support": "supports",
+          "start": 2,
+          "utterance_id": "h1"
+        }
+      ],
+      "id": "claim:human_source_receive:relation",
+      "predicate": "relation",
+      "record_type": "flow",
+      "statement": "Flow human_source_receive connects SOURCE to human_receive.",
+      "status": "provisional",
+      "supersedes": null,
+      "target_id": "human_source_receive",
+      "value": {
+        "state": "value",
+        "value": "SOURCE->human_receive"
+      }
+    },
+    {
+      "evidence": [
+        {
+          "end": 32,
+          "evidence_id": "ev_0011",
+          "quote": "Then I copy the customer details",
+          "semantic_support": "supports",
+          "start": 0,
+          "utterance_id": "h2"
+        }
+      ],
+      "id": "claim:human_receive_log:relation",
+      "predicate": "relation",
+      "record_type": "flow",
+      "statement": "Flow human_receive_log connects human_receive to human_log_request.",
+      "status": "provisional",
+      "supersedes": null,
+      "target_id": "human_receive_log",
+      "value": {
+        "state": "value",
+        "value": "human_receive->human_log_request"
+      }
+    },
+    {
+      "evidence": [
+        {
+          "end": 13,
+          "evidence_id": "ev_0012",
+          "quote": "During review",
+          "semantic_support": "supports",
+          "start": 0,
+          "utterance_id": "h4"
+        }
+      ],
+      "id": "claim:human_log_review:relation",
+      "predicate": "relation",
+      "record_type": "flow",
+      "statement": "Flow human_log_review connects human_log_request to human_review.",
+      "status": "provisional",
+      "supersedes": null,
+      "target_id": "human_log_review",
+      "value": {
+        "state": "value",
+        "value": "human_log_request->human_review"
+      }
+    },
+    {
+      "evidence": [
+        {
+          "end": 24,
+          "evidence_id": "ev_0013",
+          "quote": "If the request is urgent",
+          "semantic_support": "supports",
+          "start": 0,
+          "utterance_id": "h3"
+        }
+      ],
+      "id": "claim:human_review_urgent:relation",
+      "predicate": "relation",
+      "record_type": "flow",
+      "statement": "Flow human_review_urgent connects human_review to human_call_engineer.",
+      "status": "provisional",
+      "supersedes": null,
+      "target_id": "human_review_urgent",
+      "value": {
+        "state": "value",
+        "value": "human_review->human_call_engineer"
+      }
+    },
+    {
+      "evidence": [
+        {
+          "end": 24,
+          "evidence_id": "ev_0013",
+          "quote": "If the request is urgent",
+          "semantic_support": "supports",
+          "start": 0,
+          "utterance_id": "h3"
+        }
+      ],
+      "id": "claim:human_review_urgent:condition",
+      "predicate": "condition",
+      "record_type": "flow",
+      "statement": "Flow human_review_urgent has the recorded condition.",
+      "status": "provisional",
+      "supersedes": null,
+      "target_id": "human_review_urgent",
+      "value": {
+        "state": "value",
+        "value": "request is urgent"
+      }
+    },
+    {
+      "evidence": [
+        {
+          "end": 91,
+          "evidence_id": "ev_0014",
+          "quote": "otherwise I schedule a normal review",
+          "semantic_support": "supports",
+          "start": 55,
+          "utterance_id": "h3"
+        }
+      ],
+      "id": "claim:human_review_normal:relation",
+      "predicate": "relation",
+      "record_type": "flow",
+      "statement": "Flow human_review_normal connects human_review to human_schedule_review.",
+      "status": "provisional",
+      "supersedes": null,
+      "target_id": "human_review_normal",
+      "value": {
+        "state": "value",
+        "value": "human_review->human_schedule_review"
+      }
+    },
+    {
+      "evidence": [
+        {
+          "end": 91,
+          "evidence_id": "ev_0014",
+          "quote": "otherwise I schedule a normal review",
+          "semantic_support": "supports",
+          "start": 55,
+          "utterance_id": "h3"
+        }
+      ],
+      "id": "claim:human_review_normal:condition",
+      "predicate": "condition",
+      "record_type": "flow",
+      "statement": "Flow human_review_normal has the recorded condition.",
+      "status": "provisional",
+      "supersedes": null,
+      "target_id": "human_review_normal",
+      "value": {
+        "state": "value",
+        "value": "request is not urgent"
+      }
+    },
+    {
+      "evidence": [
+        {
+          "end": 52,
+          "evidence_id": "ev_0015",
+          "quote": "updates the tracker after the review",
+          "semantic_support": "supports",
+          "start": 16,
+          "utterance_id": "h6"
+        }
+      ],
+      "id": "claim:human_call_update:relation",
+      "predicate": "relation",
+      "record_type": "flow",
+      "statement": "Flow human_call_update connects human_call_engineer to human_coordinator_update.",
+      "status": "provisional",
+      "supersedes": null,
+      "target_id": "human_call_update",
+      "value": {
+        "state": "value",
+        "value": "human_call_engineer->human_coordinator_update"
+      }
+    },
+    {
+      "evidence": [
+        {
+          "end": 52,
+          "evidence_id": "ev_0016",
+          "quote": "updates the tracker after the review",
+          "semantic_support": "supports",
+          "start": 16,
+          "utterance_id": "h6"
+        }
+      ],
+      "id": "claim:human_schedule_update:relation",
+      "predicate": "relation",
+      "record_type": "flow",
+      "statement": "Flow human_schedule_update connects human_schedule_review to human_coordinator_update.",
+      "status": "provisional",
+      "supersedes": null,
+      "target_id": "human_schedule_update",
+      "value": {
+        "state": "value",
+        "value": "human_schedule_review->human_coordinator_update"
+      }
+    },
+    {
+      "evidence": [
+        {
+          "end": 63,
+          "evidence_id": "ev_0017",
+          "quote": "The call to the engineer is manual; there is no separate system",
+          "semantic_support": "supports",
+          "start": 0,
+          "utterance_id": "h8"
+        }
+      ],
+      "id": "claim:human_manual_call:crud",
+      "predicate": "crud",
+      "record_type": "resource_usage",
+      "statement": "Resource usage human_manual_call has the recorded CRUD operation.",
+      "status": "provisional",
+      "supersedes": null,
+      "target_id": "human_manual_call",
+      "value": {
+        "state": "value",
+        "value": "unknown"
+      }
+    },
+    {
+      "evidence": [
+        {
+          "end": 63,
+          "evidence_id": "ev_0017",
+          "quote": "The call to the engineer is manual; there is no separate system",
+          "semantic_support": "supports",
+          "start": 0,
+          "utterance_id": "h8"
+        }
+      ],
+      "id": "claim:human_manual_call:system",
+      "predicate": "system",
+      "record_type": "resource_usage",
+      "statement": "Resource usage human_manual_call has the recorded system.",
+      "status": "provisional",
+      "supersedes": null,
+      "target_id": "human_manual_call",
+      "value": {
+        "state": "value",
+        "value": "system_manual"
+      }
+    },
+    {
+      "evidence": [
+        {
+          "end": 63,
+          "evidence_id": "ev_0017",
+          "quote": "The call to the engineer is manual; there is no separate system",
+          "semantic_support": "supports",
+          "start": 0,
+          "utterance_id": "h8"
+        }
+      ],
+      "id": "claim:human_manual_call:data_type",
+      "predicate": "data_type",
+      "record_type": "resource_usage",
+      "statement": "Resource usage human_manual_call has the recorded data type.",
+      "status": "provisional",
+      "supersedes": null,
+      "target_id": "human_manual_call",
+      "value": {
+        "state": "value",
+        "value": "data_request_record"
+      }
+    },
+    {
+      "evidence": [
+        {
+          "end": 91,
+          "evidence_id": "ev_0018",
+          "quote": "schedule a normal review",
+          "semantic_support": "supports",
+          "start": 67,
+          "utterance_id": "h3"
+        }
+      ],
+      "id": "claim:human_schedule_unknown:crud",
+      "predicate": "crud",
+      "record_type": "resource_usage",
+      "statement": "Resource usage human_schedule_unknown has the recorded CRUD operation.",
+      "status": "provisional",
+      "supersedes": null,
+      "target_id": "human_schedule_unknown",
+      "value": {
+        "state": "value",
+        "value": "unknown"
+      }
+    },
+    {
+      "evidence": [
+        {
+          "end": 91,
+          "evidence_id": "ev_0018",
+          "quote": "schedule a normal review",
+          "semantic_support": "supports",
+          "start": 67,
+          "utterance_id": "h3"
+        }
+      ],
+      "id": "claim:human_schedule_unknown:system",
+      "predicate": "system",
+      "record_type": "resource_usage",
+      "statement": "Resource usage human_schedule_unknown has the recorded system.",
+      "status": "provisional",
+      "supersedes": null,
+      "target_id": "human_schedule_unknown",
+      "value": {
+        "state": "dont_know",
+        "value": null
+      }
+    },
+    {
+      "evidence": [
+        {
+          "end": 91,
+          "evidence_id": "ev_0018",
+          "quote": "schedule a normal review",
+          "semantic_support": "supports",
+          "start": 67,
+          "utterance_id": "h3"
+        }
+      ],
+      "id": "claim:human_schedule_unknown:data_type",
+      "predicate": "data_type",
+      "record_type": "resource_usage",
+      "statement": "Resource usage human_schedule_unknown has the recorded data type.",
+      "status": "provisional",
+      "supersedes": null,
+      "target_id": "human_schedule_unknown",
+      "value": {
+        "state": "value",
+        "value": "data_request_record"
+      }
+    },
+    {
+      "evidence": [
+        {
+          "end": 56,
+          "evidence_id": "ev_0019",
+          "quote": "Sorry, correction: I only read the tracker during review",
+          "semantic_support": "supports",
+          "start": 0,
+          "utterance_id": "h5"
+        }
+      ],
+      "id": "claim:human_review_tracker:crud:revision1",
+      "predicate": "crud",
+      "record_type": "resource_usage",
+      "statement": "During review the tracker is read; the coordinator performs the later update.",
+      "status": "confirmed",
+      "supersedes": "claim:human_review_tracker:crud",
+      "target_id": "human_review_tracker",
+      "value": {
+        "state": "value",
+        "value": "read"
+      }
+    },
+    {
+      "evidence": [
+        {
+          "end": 52,
+          "evidence_id": "ev_0021",
+          "quote": "The coordinator updates the tracker after the review",
+          "semantic_support": "supports",
+          "start": 0,
+          "utterance_id": "h6"
+        }
+      ],
+      "id": "claim:human_coordinator_tracker_update:crud",
+      "predicate": "crud",
+      "record_type": "resource_usage",
+      "statement": "Resource usage human_coordinator_tracker_update has the recorded CRUD operation.",
+      "status": "provisional",
+      "supersedes": null,
+      "target_id": "human_coordinator_tracker_update",
+      "value": {
+        "state": "value",
+        "value": "update"
+      }
+    },
+    {
+      "evidence": [
+        {
+          "end": 52,
+          "evidence_id": "ev_0021",
+          "quote": "The coordinator updates the tracker after the review",
+          "semantic_support": "supports",
+          "start": 0,
+          "utterance_id": "h6"
+        }
+      ],
+      "id": "claim:human_coordinator_tracker_update:system",
+      "predicate": "system",
+      "record_type": "resource_usage",
+      "statement": "Resource usage human_coordinator_tracker_update has the recorded system.",
+      "status": "provisional",
+      "supersedes": null,
+      "target_id": "human_coordinator_tracker_update",
+      "value": {
+        "state": "value",
+        "value": "system_tracker"
+      }
+    },
+    {
+      "evidence": [
+        {
+          "end": 52,
+          "evidence_id": "ev_0021",
+          "quote": "The coordinator updates the tracker after the review",
+          "semantic_support": "supports",
+          "start": 0,
+          "utterance_id": "h6"
+        }
+      ],
+      "id": "claim:human_coordinator_tracker_update:data_type",
+      "predicate": "data_type",
+      "record_type": "resource_usage",
+      "statement": "Resource usage human_coordinator_tracker_update has the recorded data type.",
+      "status": "provisional",
+      "supersedes": null,
+      "target_id": "human_coordinator_tracker_update",
+      "value": {
+        "state": "value",
+        "value": "data_request_record"
+      }
+    }
+  ],
+  "completion": {
+    "confirmation_evidence": [],
+    "content_completeness": "incomplete",
+    "stakeholder_confirmed": false,
+    "status": "ended",
+    "termination_reason": "short practice interview ended after the planned questions",
+    "unresolved_question_ids": [
+      "question:human_approval_unknown"
+    ]
+  },
+  "contradictions": [
+    {
+      "claim_ids": [
+        "claim:human_review_tracker:crud",
+        "claim:human_review_tracker:crud:revision1"
+      ],
+      "evidence": [
+        {
+          "end": 56,
+          "evidence_id": "ev_0020",
+          "quote": "Sorry, correction: I only read the tracker during review",
+          "semantic_support": "supports",
+          "start": 0,
+          "utterance_id": "h5"
+        }
+      ],
+      "id": "contradiction:human_review_correction",
+      "resolution_claim_id": "claim:human_review_tracker:crud:revision1",
+      "status": "resolved"
+    }
+  ],
+  "issues": [
+    {
+      "claim_ids": [
+        "claim:human_review_tracker:crud",
+        "claim:human_review_tracker:crud:revision1"
+      ],
+      "contradiction_id": "contradiction:human_review_correction",
+      "description": "The initial update claim conflicts with the explicit correction that review only reads the tracker.",
+      "evidence": [
+        {
+          "end": 56,
+          "evidence_id": "ev_0020",
+          "quote": "Sorry, correction: I only read the tracker during review",
+          "semantic_support": "supports",
+          "start": 0,
+          "utterance_id": "h5"
+        }
+      ],
+      "id": "human_review_correction",
+      "information_state": "unset",
+      "kind": "contradiction",
+      "question_id": null,
+      "status": "resolved",
+      "target_ids": [
+        "human_review_tracker"
+      ]
+    },
+    {
+      "claim_ids": [],
+      "contradiction_id": null,
+      "description": "The interviewee does not know whether the customer has approved the request; the approval status is blank.",
+      "evidence": [
+        {
+          "end": 99,
+          "evidence_id": "ev_0022",
+          "quote": "We do not know whether the customer has approved the request, so the approval status remains blank.",
+          "semantic_support": "supports",
+          "start": 0,
+          "utterance_id": "h7"
+        }
+      ],
+      "id": "human_approval_unknown",
+      "information_state": "dont_know",
+      "kind": "unknown",
+      "question_id": "question:human_approval_unknown",
+      "status": "open",
+      "target_ids": [
+        "human_review"
+      ]
+    }
+  ],
+  "open_questions": [
+    {
+      "id": "question:human_approval_unknown",
+      "resolution_claim_id": null,
+      "status": "open",
+      "target_ids": [
+        "human_review"
+      ],
+      "text": "Is customer approval recorded anywhere, and who confirms it?"
+    }
+  ],
+  "schema_version": "business_interview.interview_state.v1",
+  "utterances": [
+    {
+      "id": "h1",
+      "speaker": "stakeholder",
+      "text": "I receive a request in the shared inbox."
+    },
+    {
+      "id": "h2",
+      "speaker": "stakeholder",
+      "text": "Then I copy the customer details into our tracker, which creates a request record."
+    },
+    {
+      "id": "h3",
+      "speaker": "stakeholder",
+      "text": "If the request is urgent, I call the on-call engineer; otherwise I schedule a normal review."
+    },
+    {
+      "id": "h4",
+      "speaker": "stakeholder",
+      "text": "During review I update the tracker with the decision."
+    },
+    {
+      "id": "h5",
+      "speaker": "stakeholder",
+      "text": "Sorry, correction: I only read the tracker during review. The coordinator updates it after review."
+    },
+    {
+      "id": "h6",
+      "speaker": "stakeholder",
+      "text": "The coordinator updates the tracker after the review."
+    },
+    {
+      "id": "h7",
+      "speaker": "stakeholder",
+      "text": "We do not know whether the customer has approved the request, so the approval status remains blank."
+    },
+    {
+      "id": "h8",
+      "speaker": "stakeholder",
+      "text": "The call to the engineer is manual; there is no separate system."
+    },
+    {
+      "id": "h9",
+      "speaker": "interviewer",
+      "text": "Thank you. I will mark the remaining approval question for follow-up."
+    }
+  ]
+}

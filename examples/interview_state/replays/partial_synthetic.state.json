@@ -1,0 +1,485 @@
+{
+  "business_model": {
+    "actors": [
+      {
+        "id": "actor_intake",
+        "label": "intake coordinator"
+      }
+    ],
+    "data_operations": [
+      {
+        "crud": "unknown",
+        "data_type": {
+          "entity_id": "data_request",
+          "state": "value"
+        },
+        "id": "partial_receive_email",
+        "process_step_id": "partial_receive",
+        "system": {
+          "entity_id": "system_email",
+          "state": "value"
+        }
+      },
+      {
+        "crud": "unknown",
+        "data_type": {
+          "entity_id": "data_request",
+          "state": "value"
+        },
+        "id": "partial_review_sheet",
+        "process_step_id": "partial_review",
+        "system": {
+          "entity_id": "system_intake_sheet",
+          "state": "value"
+        }
+      }
+    ],
+    "data_types": [
+      {
+        "id": "data_request",
+        "label": "request"
+      }
+    ],
+    "flows": [
+      {
+        "condition": {
+          "state": "unset",
+          "value": null
+        },
+        "from_id": "partial_receive",
+        "id": "partial_receive_review",
+        "kind": "normal",
+        "to_id": "partial_review"
+      }
+    ],
+    "process_steps": [
+      {
+        "activity": {
+          "state": "value",
+          "value": "receive request"
+        },
+        "actor": {
+          "entity_id": "actor_intake",
+          "state": "value"
+        },
+        "id": "partial_receive",
+        "inputs": {
+          "entity_ids": [
+            "data_request"
+          ],
+          "state": "value"
+        },
+        "outputs": {
+          "entity_ids": [],
+          "state": "unset"
+        }
+      },
+      {
+        "activity": {
+          "state": "value",
+          "value": "review request"
+        },
+        "actor": {
+          "entity_id": null,
+          "state": "dont_know"
+        },
+        "id": "partial_review",
+        "inputs": {
+          "entity_ids": [
+            "data_request"
+          ],
+          "state": "value"
+        },
+        "outputs": {
+          "entity_ids": [],
+          "state": "unset"
+        }
+      }
+    ],
+    "systems": [
+      {
+        "id": "system_email",
+        "kind": "named",
+        "label": "email"
+      },
+      {
+        "id": "system_intake_sheet",
+        "kind": "named",
+        "label": "intake sheet"
+      }
+    ]
+  },
+  "claims": [
+    {
+      "evidence": [
+        {
+          "end": 34,
+          "evidence_id": "ev_0001",
+          "quote": "A request usually arrives by email",
+          "semantic_support": "supports",
+          "start": 0,
+          "utterance_id": "p1"
+        }
+      ],
+      "id": "claim:partial_receive:activity",
+      "predicate": "activity",
+      "record_type": "process_step",
+      "statement": "Process step partial_receive has the recorded activity.",
+      "status": "provisional",
+      "supersedes": null,
+      "target_id": "partial_receive",
+      "value": {
+        "state": "value",
+        "value": "receive request"
+      }
+    },
+    {
+      "evidence": [
+        {
+          "end": 34,
+          "evidence_id": "ev_0001",
+          "quote": "A request usually arrives by email",
+          "semantic_support": "supports",
+          "start": 0,
+          "utterance_id": "p1"
+        }
+      ],
+      "id": "claim:partial_receive:actor",
+      "predicate": "actor",
+      "record_type": "process_step",
+      "statement": "Process step partial_receive has the recorded actor.",
+      "status": "provisional",
+      "supersedes": null,
+      "target_id": "partial_receive",
+      "value": {
+        "state": "value",
+        "value": "actor_intake"
+      }
+    },
+    {
+      "evidence": [
+        {
+          "end": 34,
+          "evidence_id": "ev_0001",
+          "quote": "A request usually arrives by email",
+          "semantic_support": "supports",
+          "start": 0,
+          "utterance_id": "p1"
+        }
+      ],
+      "id": "claim:partial_receive:inputs",
+      "predicate": "inputs",
+      "record_type": "process_step",
+      "statement": "Process step partial_receive has the recorded inputs.",
+      "status": "provisional",
+      "supersedes": null,
+      "target_id": "partial_receive",
+      "value": {
+        "state": "value",
+        "value": "[\"data_request\"]"
+      }
+    },
+    {
+      "evidence": [
+        {
+          "end": 20,
+          "evidence_id": "ev_0002",
+          "quote": "I review the request",
+          "semantic_support": "supports",
+          "start": 0,
+          "utterance_id": "p2"
+        }
+      ],
+      "id": "claim:partial_review:activity",
+      "predicate": "activity",
+      "record_type": "process_step",
+      "statement": "Process step partial_review has the recorded activity.",
+      "status": "provisional",
+      "supersedes": null,
+      "target_id": "partial_review",
+      "value": {
+        "state": "value",
+        "value": "review request"
+      }
+    },
+    {
+      "evidence": [
+        {
+          "end": 20,
+          "evidence_id": "ev_0002",
+          "quote": "I review the request",
+          "semantic_support": "supports",
+          "start": 0,
+          "utterance_id": "p2"
+        }
+      ],
+      "id": "claim:partial_review:actor",
+      "predicate": "actor",
+      "record_type": "process_step",
+      "statement": "Process step partial_review has the recorded actor.",
+      "status": "provisional",
+      "supersedes": null,
+      "target_id": "partial_review",
+      "value": {
+        "state": "dont_know",
+        "value": null
+      }
+    },
+    {
+      "evidence": [
+        {
+          "end": 20,
+          "evidence_id": "ev_0002",
+          "quote": "I review the request",
+          "semantic_support": "supports",
+          "start": 0,
+          "utterance_id": "p2"
+        }
+      ],
+      "id": "claim:partial_review:inputs",
+      "predicate": "inputs",
+      "record_type": "process_step",
+      "statement": "Process step partial_review has the recorded inputs.",
+      "status": "provisional",
+      "supersedes": null,
+      "target_id": "partial_review",
+      "value": {
+        "state": "value",
+        "value": "[\"data_request\"]"
+      }
+    },
+    {
+      "evidence": [
+        {
+          "end": 54,
+          "evidence_id": "ev_0003",
+          "quote": "before someone decides what to do",
+          "semantic_support": "supports",
+          "start": 21,
+          "utterance_id": "p2"
+        }
+      ],
+      "id": "claim:partial_receive_review:relation",
+      "predicate": "relation",
+      "record_type": "flow",
+      "statement": "Flow partial_receive_review connects partial_receive to partial_review.",
+      "status": "provisional",
+      "supersedes": null,
+      "target_id": "partial_receive_review",
+      "value": {
+        "state": "value",
+        "value": "partial_receive->partial_review"
+      }
+    },
+    {
+      "evidence": [
+        {
+          "end": 34,
+          "evidence_id": "ev_0004",
+          "quote": "arrives by email",
+          "semantic_support": "supports",
+          "start": 18,
+          "utterance_id": "p1"
+        }
+      ],
+      "id": "claim:partial_receive_email:crud",
+      "predicate": "crud",
+      "record_type": "resource_usage",
+      "statement": "Resource usage partial_receive_email has the recorded CRUD operation.",
+      "status": "provisional",
+      "supersedes": null,
+      "target_id": "partial_receive_email",
+      "value": {
+        "state": "value",
+        "value": "unknown"
+      }
+    },
+    {
+      "evidence": [
+        {
+          "end": 34,
+          "evidence_id": "ev_0004",
+          "quote": "arrives by email",
+          "semantic_support": "supports",
+          "start": 18,
+          "utterance_id": "p1"
+        }
+      ],
+      "id": "claim:partial_receive_email:system",
+      "predicate": "system",
+      "record_type": "resource_usage",
+      "statement": "Resource usage partial_receive_email has the recorded system.",
+      "status": "provisional",
+      "supersedes": null,
+      "target_id": "partial_receive_email",
+      "value": {
+        "state": "value",
+        "value": "system_email"
+      }
+    },
+    {
+      "evidence": [
+        {
+          "end": 34,
+          "evidence_id": "ev_0004",
+          "quote": "arrives by email",
+          "semantic_support": "supports",
+          "start": 18,
+          "utterance_id": "p1"
+        }
+      ],
+      "id": "claim:partial_receive_email:data_type",
+      "predicate": "data_type",
+      "record_type": "resource_usage",
+      "statement": "Resource usage partial_receive_email has the recorded data type.",
+      "status": "provisional",
+      "supersedes": null,
+      "target_id": "partial_receive_email",
+      "value": {
+        "state": "value",
+        "value": "data_request"
+      }
+    },
+    {
+      "evidence": [
+        {
+          "end": 85,
+          "evidence_id": "ev_0005",
+          "quote": "whether reviewing creates a new record or only changes the intake sheet",
+          "semantic_support": "supports",
+          "start": 14,
+          "utterance_id": "p3"
+        }
+      ],
+      "id": "claim:partial_review_sheet:crud",
+      "predicate": "crud",
+      "record_type": "resource_usage",
+      "statement": "Resource usage partial_review_sheet has the recorded CRUD operation.",
+      "status": "provisional",
+      "supersedes": null,
+      "target_id": "partial_review_sheet",
+      "value": {
+        "state": "value",
+        "value": "unknown"
+      }
+    },
+    {
+      "evidence": [
+        {
+          "end": 85,
+          "evidence_id": "ev_0005",
+          "quote": "whether reviewing creates a new record or only changes the intake sheet",
+          "semantic_support": "supports",
+          "start": 14,
+          "utterance_id": "p3"
+        }
+      ],
+      "id": "claim:partial_review_sheet:system",
+      "predicate": "system",
+      "record_type": "resource_usage",
+      "statement": "Resource usage partial_review_sheet has the recorded system.",
+      "status": "provisional",
+      "supersedes": null,
+      "target_id": "partial_review_sheet",
+      "value": {
+        "state": "value",
+        "value": "system_intake_sheet"
+      }
+    },
+    {
+      "evidence": [
+        {
+          "end": 85,
+          "evidence_id": "ev_0005",
+          "quote": "whether reviewing creates a new record or only changes the intake sheet",
+          "semantic_support": "supports",
+          "start": 14,
+          "utterance_id": "p3"
+        }
+      ],
+      "id": "claim:partial_review_sheet:data_type",
+      "predicate": "data_type",
+      "record_type": "resource_usage",
+      "statement": "Resource usage partial_review_sheet has the recorded data type.",
+      "status": "provisional",
+      "supersedes": null,
+      "target_id": "partial_review_sheet",
+      "value": {
+        "state": "value",
+        "value": "data_request"
+      }
+    }
+  ],
+  "completion": {
+    "confirmation_evidence": [],
+    "content_completeness": "incomplete",
+    "stakeholder_confirmed": false,
+    "status": "ended",
+    "termination_reason": "time limit before review ownership and CRUD could be confirmed",
+    "unresolved_question_ids": [
+      "question:partial_review_crud"
+    ]
+  },
+  "contradictions": [],
+  "issues": [
+    {
+      "claim_ids": [],
+      "contradiction_id": null,
+      "description": "The review's effect on the intake sheet is not known.",
+      "evidence": [
+        {
+          "end": 86,
+          "evidence_id": "ev_0006",
+          "quote": "I do not know whether reviewing creates a new record or only changes the intake sheet.",
+          "semantic_support": "supports",
+          "start": 0,
+          "utterance_id": "p3"
+        }
+      ],
+      "id": "partial_review_crud",
+      "information_state": "dont_know",
+      "kind": "unknown",
+      "question_id": "question:partial_review_crud",
+      "status": "open",
+      "target_ids": [
+        "partial_review",
+        "partial_review_sheet"
+      ]
+    }
+  ],
+  "open_questions": [
+    {
+      "id": "question:partial_review_crud",
+      "resolution_claim_id": null,
+      "status": "open",
+      "target_ids": [
+        "partial_review",
+        "partial_review_sheet"
+      ],
+      "text": "Does reviewing create a new record or update the intake sheet?"
+    }
+  ],
+  "schema_version": "business_interview.interview_state.v1",
+  "utterances": [
+    {
+      "id": "p1",
+      "speaker": "stakeholder",
+      "text": "A request usually arrives by email, and I copy it into the intake sheet."
+    },
+    {
+      "id": "p2",
+      "speaker": "stakeholder",
+      "text": "I review the request before someone decides what to do."
+    },
+    {
+      "id": "p3",
+      "speaker": "stakeholder",
+      "text": "I do not know whether reviewing creates a new record or only changes the intake sheet."
+    },
+    {
+      "id": "p4",
+      "speaker": "interviewer",
+      "text": "We have to stop here today; I will follow up about the review and the owner."
+    }
+  ]
+}

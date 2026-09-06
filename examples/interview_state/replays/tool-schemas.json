@@ -1,0 +1,924 @@
+{
+  "complete_interview": {
+    "$defs": {
+      "EvidenceCitation": {
+        "additionalProperties": false,
+        "description": "Agent-supplied citation coordinates before the harness assigns an ID.\n\n``start`` is inclusive and ``end`` is exclusive.  Both indexes are Python\nUnicode code-point indexes.  The harness checks the quote against the\nimmutable utterance; it does not decide whether the quote semantically\nsupports a claim.",
+        "properties": {
+          "end": {
+            "minimum": 1,
+            "title": "End",
+            "type": "integer"
+          },
+          "quote": {
+            "minLength": 1,
+            "title": "Quote",
+            "type": "string"
+          },
+          "semantic_support": {
+            "default": "unassessed",
+            "enum": [
+              "unassessed",
+              "supports",
+              "contradicts"
+            ],
+            "title": "Semantic Support",
+            "type": "string"
+          },
+          "start": {
+            "minimum": 0,
+            "title": "Start",
+            "type": "integer"
+          },
+          "utterance_id": {
+            "minLength": 1,
+            "title": "Utterance Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "utterance_id",
+          "start",
+          "end",
+          "quote"
+        ],
+        "title": "EvidenceCitation",
+        "type": "object"
+      }
+    },
+    "additionalProperties": false,
+    "properties": {
+      "confirmation_evidence": {
+        "items": {
+          "$ref": "#/$defs/EvidenceCitation"
+        },
+        "title": "Confirmation Evidence",
+        "type": "array"
+      },
+      "content_completeness": {
+        "default": "unknown",
+        "enum": [
+          "unknown",
+          "complete",
+          "incomplete"
+        ],
+        "title": "Content Completeness",
+        "type": "string"
+      },
+      "stakeholder_confirmed": {
+        "default": false,
+        "title": "Stakeholder Confirmed",
+        "type": "boolean"
+      },
+      "termination_reason": {
+        "minLength": 1,
+        "title": "Termination Reason",
+        "type": "string"
+      },
+      "unresolved_question_ids": {
+        "anyOf": [
+          {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Unresolved Question Ids"
+      }
+    },
+    "required": [
+      "termination_reason"
+    ],
+    "title": "CompleteInterviewInput",
+    "type": "object"
+  },
+  "connect_process_steps": {
+    "$defs": {
+      "EvidenceCitation": {
+        "additionalProperties": false,
+        "description": "Agent-supplied citation coordinates before the harness assigns an ID.\n\n``start`` is inclusive and ``end`` is exclusive.  Both indexes are Python\nUnicode code-point indexes.  The harness checks the quote against the\nimmutable utterance; it does not decide whether the quote semantically\nsupports a claim.",
+        "properties": {
+          "end": {
+            "minimum": 1,
+            "title": "End",
+            "type": "integer"
+          },
+          "quote": {
+            "minLength": 1,
+            "title": "Quote",
+            "type": "string"
+          },
+          "semantic_support": {
+            "default": "unassessed",
+            "enum": [
+              "unassessed",
+              "supports",
+              "contradicts"
+            ],
+            "title": "Semantic Support",
+            "type": "string"
+          },
+          "start": {
+            "minimum": 0,
+            "title": "Start",
+            "type": "integer"
+          },
+          "utterance_id": {
+            "minLength": 1,
+            "title": "Utterance Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "utterance_id",
+          "start",
+          "end",
+          "quote"
+        ],
+        "title": "EvidenceCitation",
+        "type": "object"
+      },
+      "ValueInput": {
+        "additionalProperties": false,
+        "description": "Typed tool input for a scalar that may be unset, absent, or unknown.",
+        "properties": {
+          "state": {
+            "default": "unset",
+            "enum": [
+              "unset",
+              "value",
+              "absent",
+              "dont_know"
+            ],
+            "title": "State",
+            "type": "string"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Value"
+          }
+        },
+        "title": "ValueInput",
+        "type": "object"
+      }
+    },
+    "additionalProperties": false,
+    "properties": {
+      "claim_status": {
+        "default": "provisional",
+        "enum": [
+          "provisional",
+          "confirmed",
+          "rejected"
+        ],
+        "title": "Claim Status",
+        "type": "string"
+      },
+      "condition": {
+        "$ref": "#/$defs/ValueInput"
+      },
+      "evidence": {
+        "items": {
+          "$ref": "#/$defs/EvidenceCitation"
+        },
+        "title": "Evidence",
+        "type": "array"
+      },
+      "flow_id": {
+        "minLength": 1,
+        "title": "Flow Id",
+        "type": "string"
+      },
+      "from_step_id": {
+        "minLength": 1,
+        "title": "From Step Id",
+        "type": "string"
+      },
+      "kind": {
+        "default": "normal",
+        "enum": [
+          "normal",
+          "branch",
+          "exception",
+          "source_boundary",
+          "sink_boundary"
+        ],
+        "title": "Kind",
+        "type": "string"
+      },
+      "to_step_id": {
+        "minLength": 1,
+        "title": "To Step Id",
+        "type": "string"
+      }
+    },
+    "required": [
+      "flow_id",
+      "from_step_id",
+      "to_step_id"
+    ],
+    "title": "ConnectProcessStepsInput",
+    "type": "object"
+  },
+  "inspect_interview_state": {
+    "additionalProperties": false,
+    "properties": {
+      "include_evidence": {
+        "default": true,
+        "title": "Include Evidence",
+        "type": "boolean"
+      },
+      "target_ids": {
+        "items": {
+          "type": "string"
+        },
+        "title": "Target Ids",
+        "type": "array"
+      }
+    },
+    "title": "InspectInterviewStateInput",
+    "type": "object"
+  },
+  "record_issue": {
+    "$defs": {
+      "EvidenceCitation": {
+        "additionalProperties": false,
+        "description": "Agent-supplied citation coordinates before the harness assigns an ID.\n\n``start`` is inclusive and ``end`` is exclusive.  Both indexes are Python\nUnicode code-point indexes.  The harness checks the quote against the\nimmutable utterance; it does not decide whether the quote semantically\nsupports a claim.",
+        "properties": {
+          "end": {
+            "minimum": 1,
+            "title": "End",
+            "type": "integer"
+          },
+          "quote": {
+            "minLength": 1,
+            "title": "Quote",
+            "type": "string"
+          },
+          "semantic_support": {
+            "default": "unassessed",
+            "enum": [
+              "unassessed",
+              "supports",
+              "contradicts"
+            ],
+            "title": "Semantic Support",
+            "type": "string"
+          },
+          "start": {
+            "minimum": 0,
+            "title": "Start",
+            "type": "integer"
+          },
+          "utterance_id": {
+            "minLength": 1,
+            "title": "Utterance Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "utterance_id",
+          "start",
+          "end",
+          "quote"
+        ],
+        "title": "EvidenceCitation",
+        "type": "object"
+      }
+    },
+    "additionalProperties": false,
+    "properties": {
+      "claim_ids": {
+        "items": {
+          "type": "string"
+        },
+        "title": "Claim Ids",
+        "type": "array"
+      },
+      "contradiction_status": {
+        "default": "open",
+        "enum": [
+          "open",
+          "resolved"
+        ],
+        "title": "Contradiction Status",
+        "type": "string"
+      },
+      "description": {
+        "minLength": 1,
+        "title": "Description",
+        "type": "string"
+      },
+      "evidence": {
+        "items": {
+          "$ref": "#/$defs/EvidenceCitation"
+        },
+        "title": "Evidence",
+        "type": "array"
+      },
+      "information_state": {
+        "default": "unset",
+        "enum": [
+          "unset",
+          "value",
+          "absent",
+          "dont_know"
+        ],
+        "title": "Information State",
+        "type": "string"
+      },
+      "issue_id": {
+        "minLength": 1,
+        "title": "Issue Id",
+        "type": "string"
+      },
+      "kind": {
+        "enum": [
+          "unknown",
+          "contradiction",
+          "exception",
+          "business_rule"
+        ],
+        "title": "Kind",
+        "type": "string"
+      },
+      "question": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Question"
+      },
+      "resolution_claim_id": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Resolution Claim Id"
+      },
+      "target_ids": {
+        "items": {
+          "type": "string"
+        },
+        "title": "Target Ids",
+        "type": "array"
+      }
+    },
+    "required": [
+      "issue_id",
+      "kind",
+      "description"
+    ],
+    "title": "RecordIssueInput",
+    "type": "object"
+  },
+  "record_process_step": {
+    "$defs": {
+      "DataListInput": {
+        "additionalProperties": false,
+        "description": "Inputs/outputs of a step with an explicit empty/unknown distinction.",
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/$defs/EntityInput"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "state": {
+            "default": "unset",
+            "enum": [
+              "unset",
+              "value",
+              "absent",
+              "dont_know"
+            ],
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "title": "DataListInput",
+        "type": "object"
+      },
+      "EntityInput": {
+        "additionalProperties": false,
+        "description": "Create or reuse a local actor/data entity, or state why it is unknown.",
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Id"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Label"
+          },
+          "state": {
+            "default": "value",
+            "enum": [
+              "value",
+              "absent",
+              "dont_know"
+            ],
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "title": "EntityInput",
+        "type": "object"
+      },
+      "EvidenceCitation": {
+        "additionalProperties": false,
+        "description": "Agent-supplied citation coordinates before the harness assigns an ID.\n\n``start`` is inclusive and ``end`` is exclusive.  Both indexes are Python\nUnicode code-point indexes.  The harness checks the quote against the\nimmutable utterance; it does not decide whether the quote semantically\nsupports a claim.",
+        "properties": {
+          "end": {
+            "minimum": 1,
+            "title": "End",
+            "type": "integer"
+          },
+          "quote": {
+            "minLength": 1,
+            "title": "Quote",
+            "type": "string"
+          },
+          "semantic_support": {
+            "default": "unassessed",
+            "enum": [
+              "unassessed",
+              "supports",
+              "contradicts"
+            ],
+            "title": "Semantic Support",
+            "type": "string"
+          },
+          "start": {
+            "minimum": 0,
+            "title": "Start",
+            "type": "integer"
+          },
+          "utterance_id": {
+            "minLength": 1,
+            "title": "Utterance Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "utterance_id",
+          "start",
+          "end",
+          "quote"
+        ],
+        "title": "EvidenceCitation",
+        "type": "object"
+      },
+      "ValueInput": {
+        "additionalProperties": false,
+        "description": "Typed tool input for a scalar that may be unset, absent, or unknown.",
+        "properties": {
+          "state": {
+            "default": "unset",
+            "enum": [
+              "unset",
+              "value",
+              "absent",
+              "dont_know"
+            ],
+            "title": "State",
+            "type": "string"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Value"
+          }
+        },
+        "title": "ValueInput",
+        "type": "object"
+      }
+    },
+    "additionalProperties": false,
+    "properties": {
+      "activity": {
+        "$ref": "#/$defs/ValueInput"
+      },
+      "actor": {
+        "anyOf": [
+          {
+            "$ref": "#/$defs/EntityInput"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null
+      },
+      "claim_status": {
+        "default": "provisional",
+        "enum": [
+          "provisional",
+          "confirmed",
+          "rejected"
+        ],
+        "title": "Claim Status",
+        "type": "string"
+      },
+      "evidence": {
+        "items": {
+          "$ref": "#/$defs/EvidenceCitation"
+        },
+        "title": "Evidence",
+        "type": "array"
+      },
+      "inputs": {
+        "$ref": "#/$defs/DataListInput"
+      },
+      "outputs": {
+        "$ref": "#/$defs/DataListInput"
+      },
+      "step_id": {
+        "minLength": 1,
+        "title": "Step Id",
+        "type": "string"
+      }
+    },
+    "required": [
+      "step_id",
+      "activity"
+    ],
+    "title": "RecordProcessStepInput",
+    "type": "object"
+  },
+  "record_resource_usage": {
+    "$defs": {
+      "EntityInput": {
+        "additionalProperties": false,
+        "description": "Create or reuse a local actor/data entity, or state why it is unknown.",
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Id"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Label"
+          },
+          "state": {
+            "default": "value",
+            "enum": [
+              "value",
+              "absent",
+              "dont_know"
+            ],
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "title": "EntityInput",
+        "type": "object"
+      },
+      "EvidenceCitation": {
+        "additionalProperties": false,
+        "description": "Agent-supplied citation coordinates before the harness assigns an ID.\n\n``start`` is inclusive and ``end`` is exclusive.  Both indexes are Python\nUnicode code-point indexes.  The harness checks the quote against the\nimmutable utterance; it does not decide whether the quote semantically\nsupports a claim.",
+        "properties": {
+          "end": {
+            "minimum": 1,
+            "title": "End",
+            "type": "integer"
+          },
+          "quote": {
+            "minLength": 1,
+            "title": "Quote",
+            "type": "string"
+          },
+          "semantic_support": {
+            "default": "unassessed",
+            "enum": [
+              "unassessed",
+              "supports",
+              "contradicts"
+            ],
+            "title": "Semantic Support",
+            "type": "string"
+          },
+          "start": {
+            "minimum": 0,
+            "title": "Start",
+            "type": "integer"
+          },
+          "utterance_id": {
+            "minLength": 1,
+            "title": "Utterance Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "utterance_id",
+          "start",
+          "end",
+          "quote"
+        ],
+        "title": "EvidenceCitation",
+        "type": "object"
+      },
+      "SystemInput": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Id"
+          },
+          "kind": {
+            "default": "named",
+            "enum": [
+              "named",
+              "manual"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Label"
+          },
+          "state": {
+            "default": "value",
+            "enum": [
+              "value",
+              "absent",
+              "dont_know"
+            ],
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "title": "SystemInput",
+        "type": "object"
+      }
+    },
+    "additionalProperties": false,
+    "properties": {
+      "claim_status": {
+        "default": "provisional",
+        "enum": [
+          "provisional",
+          "confirmed",
+          "rejected"
+        ],
+        "title": "Claim Status",
+        "type": "string"
+      },
+      "crud": {
+        "enum": [
+          "create",
+          "read",
+          "update",
+          "delete",
+          "unknown"
+        ],
+        "title": "Crud",
+        "type": "string"
+      },
+      "data_type": {
+        "$ref": "#/$defs/EntityInput"
+      },
+      "evidence": {
+        "items": {
+          "$ref": "#/$defs/EvidenceCitation"
+        },
+        "title": "Evidence",
+        "type": "array"
+      },
+      "process_step_id": {
+        "minLength": 1,
+        "title": "Process Step Id",
+        "type": "string"
+      },
+      "system": {
+        "$ref": "#/$defs/SystemInput"
+      },
+      "usage_id": {
+        "minLength": 1,
+        "title": "Usage Id",
+        "type": "string"
+      }
+    },
+    "required": [
+      "usage_id",
+      "process_step_id",
+      "system",
+      "data_type",
+      "crud"
+    ],
+    "title": "RecordResourceUsageInput",
+    "type": "object"
+  },
+  "revise_record": {
+    "$defs": {
+      "EvidenceCitation": {
+        "additionalProperties": false,
+        "description": "Agent-supplied citation coordinates before the harness assigns an ID.\n\n``start`` is inclusive and ``end`` is exclusive.  Both indexes are Python\nUnicode code-point indexes.  The harness checks the quote against the\nimmutable utterance; it does not decide whether the quote semantically\nsupports a claim.",
+        "properties": {
+          "end": {
+            "minimum": 1,
+            "title": "End",
+            "type": "integer"
+          },
+          "quote": {
+            "minLength": 1,
+            "title": "Quote",
+            "type": "string"
+          },
+          "semantic_support": {
+            "default": "unassessed",
+            "enum": [
+              "unassessed",
+              "supports",
+              "contradicts"
+            ],
+            "title": "Semantic Support",
+            "type": "string"
+          },
+          "start": {
+            "minimum": 0,
+            "title": "Start",
+            "type": "integer"
+          },
+          "utterance_id": {
+            "minLength": 1,
+            "title": "Utterance Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "utterance_id",
+          "start",
+          "end",
+          "quote"
+        ],
+        "title": "EvidenceCitation",
+        "type": "object"
+      },
+      "ValueInput": {
+        "additionalProperties": false,
+        "description": "Typed tool input for a scalar that may be unset, absent, or unknown.",
+        "properties": {
+          "state": {
+            "default": "unset",
+            "enum": [
+              "unset",
+              "value",
+              "absent",
+              "dont_know"
+            ],
+            "title": "State",
+            "type": "string"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Value"
+          }
+        },
+        "title": "ValueInput",
+        "type": "object"
+      }
+    },
+    "additionalProperties": false,
+    "description": "A typed claim revision; it is not an arbitrary record patch.",
+    "properties": {
+      "claim_status": {
+        "default": "provisional",
+        "enum": [
+          "provisional",
+          "confirmed",
+          "rejected"
+        ],
+        "title": "Claim Status",
+        "type": "string"
+      },
+      "correction_note": {
+        "minLength": 1,
+        "title": "Correction Note",
+        "type": "string"
+      },
+      "evidence": {
+        "items": {
+          "$ref": "#/$defs/EvidenceCitation"
+        },
+        "title": "Evidence",
+        "type": "array"
+      },
+      "record_id": {
+        "minLength": 1,
+        "title": "Record Id",
+        "type": "string"
+      },
+      "replacement_id": {
+        "minLength": 1,
+        "title": "Replacement Id",
+        "type": "string"
+      },
+      "statement": {
+        "minLength": 1,
+        "title": "Statement",
+        "type": "string"
+      },
+      "value": {
+        "$ref": "#/$defs/ValueInput"
+      }
+    },
+    "required": [
+      "record_id",
+      "replacement_id",
+      "statement",
+      "value",
+      "correction_note"
+    ],
+    "title": "ReviseRecordInput",
+    "type": "object"
+  }
+}
