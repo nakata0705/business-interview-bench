@@ -14,10 +14,12 @@ from typing import Any
 import pytest
 from inspect_ai.model import ChatMessageAssistant, ModelOutput, get_model
 from inspect_ai.tool import ToolCall
+from jsonschema import Draft202012Validator
 
 from business_interview_bench.interview_agent import (
     InterviewAgentError,
     InterviewStateAgent,
+    _agent_tool_schema,
     candidate_id_for_utterance,
     load_checkpoint,
     render_interview_report,
@@ -59,6 +61,141 @@ def _state_context(input_messages: list[Any]) -> tuple[str, dict[str, Any]]:
         if "Current InterviewState snapshot" in message.text
     )
     return text, json.loads(text.rsplit("\n", 1)[-1])
+
+
+def _revise_record_payload(field: str, value: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "record_id": "step:review",
+        "change": {"field": field, "value": value},
+        "replacement_id": "claim:step:review:actor",
+        "statement": "公開発言に基づく記録です。",
+        "correction_note": "公開発言で明示された値を記録する。",
+        "evidence": [
+            {
+                "candidate_id": "candidate:u2:full",
+                "semantic_support": "supports",
+            }
+        ],
+        "claim_status": "provisional",
+        "expected_claim_id": None,
+    }
+
+
+def _assert_schema_accepts(schema: dict[str, Any], payload: dict[str, Any]) -> None:
+    errors = list(Draft202012Validator(schema).iter_errors(payload))
+    assert not errors, "\n".join(error.message for error in errors)
+
+
+def test_revise_record_final_schema_preserves_typed_change_discriminators() -> None:
+    agent = _agent([ModelOutput.from_content("mockllm", "ack")])
+    revise = next(item for item in agent.tools if item.name == "revise_record")
+    schema = revise.parameters.model_dump(mode="json", exclude_none=True)
+    variants = schema["properties"]["change"]["anyOf"]
+
+    expected_fields = {
+        "activity",
+        "actor",
+        "inputs",
+        "outputs",
+        "condition",
+        "crud",
+        "system",
+        "data_type",
+    }
+    assert {tuple(variant["properties"]["field"]["enum"]) for variant in variants} == {
+        (field,) for field in expected_fields
+    }
+    assert all("const" not in variant["properties"]["field"] for variant in variants)
+
+    values = {
+        "activity": {"state": "value", "value": "申請を確認する"},
+        "actor": {"state": "value", "id": "actor:accounting", "label": "経理"},
+        "inputs": {
+            "state": "value",
+            "items": [{"state": "value", "id": "data:application", "label": "申請書"}],
+        },
+        "outputs": {
+            "state": "value",
+            "items": [{"state": "value", "id": "data:result", "label": "確認結果"}],
+        },
+        "condition": {"state": "value", "value": "内容が不足していない"},
+        "crud": {"operation": "unknown"},
+        "system": {
+            "state": "value",
+            "id": "system:application",
+            "label": "申請システム",
+            "kind": "named",
+        },
+        "data_type": {
+            "state": "value",
+            "id": "data:application",
+            "label": "申請書",
+        },
+    }
+    for field, value in values.items():
+        _assert_schema_accepts(schema, _revise_record_payload(field, value))
+
+    invalid_combinations = (
+        _revise_record_payload("actor", values["system"]),
+        _revise_record_payload("actor", values["crud"]),
+        _revise_record_payload("inputs", values["actor"]),
+        _revise_record_payload("not_a_revision_field", values["actor"]),
+    )
+    for payload in invalid_combinations:
+        assert list(Draft202012Validator(schema).iter_errors(payload))
+
+    extra_property = _revise_record_payload(
+        "actor", {**values["actor"], "kind": "named"}
+    )
+    assert list(Draft202012Validator(schema).iter_errors(extra_property))
+    _assert_schema_accepts(
+        schema,
+        _revise_record_payload(
+            "actor",
+            {"state": "value", "id": "actor:accounting", "label": None},
+        ),
+    )
+    _assert_schema_accepts(
+        schema,
+        _revise_record_payload("activity", {"state": "unset", "value": None}),
+    )
+
+
+def test_agent_schema_handles_const_and_enum_without_widening_or_overwriting() -> None:
+    compatible = _agent_tool_schema(
+        "custom",
+        {
+            "type": "object",
+            "properties": {
+                "field": {
+                    "type": "string",
+                    "const": "actor",
+                    "enum": ["actor", "system"],
+                }
+            },
+        },
+        strict_provider_schema=False,
+    )
+    assert compatible["properties"]["field"] == {
+        "type": "string",
+        "enum": ["actor"],
+    }
+
+    with pytest.raises(ValueError, match="contradictory const/enum"):
+        _agent_tool_schema(
+            "custom",
+            {
+                "type": "object",
+                "properties": {
+                    "field": {
+                        "type": "string",
+                        "const": "actor",
+                        "enum": ["system"],
+                    }
+                },
+            },
+            strict_provider_schema=False,
+        )
 
 
 def test_provider_tool_definitions_use_candidate_evidence_and_inline_refs() -> None:
@@ -347,7 +484,7 @@ def test_failed_revise_invocation_records_invalid_typed_arguments() -> None:
     assert invocation.arguments["change"]["value"]["kind"] == "named"
     assert invocation.receipt is None
     assert invocation.error
-    assert "extra" in invocation.error
+    assert "not valid under any of the given schemas" in invocation.error
     assert agent.state.business_model.process_steps[0].actor.state == "unset"
 
 

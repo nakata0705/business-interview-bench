@@ -1,0 +1,1349 @@
+{
+  "schema_version": "business_interview.interview_agent.v3",
+  "tools": [
+    {
+      "name": "inspect_interview_state",
+      "description": "Read the current business understanding, active claims, evidence, open questions, and contradictions; the result is context, not new evidence.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "target_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "include_evidence": {
+            "type": "boolean",
+            "default": true
+          }
+        },
+        "required": [
+          "target_ids",
+          "include_evidence"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "record_process_step",
+      "description": "Record only a newly explicit process action with public evidence. For an existing action's later actor, activity, input, output, or condition, use revise_record instead; leave an unmentioned actor null and data lists unset, and do not turn an activity noun into an input or output.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "step_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "activity": {
+            "type": "object",
+            "description": "Typed tool input for a scalar that may be unset, absent, or unknown.",
+            "properties": {
+              "state": {
+                "type": "string",
+                "default": "unset",
+                "enum": [
+                  "unset",
+                  "value",
+                  "absent",
+                  "dont_know"
+                ]
+              },
+              "value": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "state",
+              "value"
+            ]
+          },
+          "actor": {
+            "anyOf": [
+              {
+                "type": "object",
+                "description": "Create or reuse a local actor/data entity, or state why it is unknown.",
+                "properties": {
+                  "state": {
+                    "type": "string",
+                    "default": "value",
+                    "enum": [
+                      "value",
+                      "absent",
+                      "dont_know"
+                    ]
+                  },
+                  "id": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "label": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "state",
+                  "id",
+                  "label"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "inputs": {
+            "type": "object",
+            "description": "Inputs/outputs of a step with an explicit empty/unknown distinction.",
+            "properties": {
+              "state": {
+                "type": "string",
+                "default": "unset",
+                "enum": [
+                  "unset",
+                  "value",
+                  "absent",
+                  "dont_know"
+                ]
+              },
+              "items": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "description": "Create or reuse a local actor/data entity, or state why it is unknown.",
+                  "properties": {
+                    "state": {
+                      "type": "string",
+                      "default": "value",
+                      "enum": [
+                        "value",
+                        "absent",
+                        "dont_know"
+                      ]
+                    },
+                    "id": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "label": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "state",
+                    "id",
+                    "label"
+                  ]
+                }
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "state",
+              "items"
+            ]
+          },
+          "outputs": {
+            "type": "object",
+            "description": "Inputs/outputs of a step with an explicit empty/unknown distinction.",
+            "properties": {
+              "state": {
+                "type": "string",
+                "default": "unset",
+                "enum": [
+                  "unset",
+                  "value",
+                  "absent",
+                  "dont_know"
+                ]
+              },
+              "items": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "description": "Create or reuse a local actor/data entity, or state why it is unknown.",
+                  "properties": {
+                    "state": {
+                      "type": "string",
+                      "default": "value",
+                      "enum": [
+                        "value",
+                        "absent",
+                        "dont_know"
+                      ]
+                    },
+                    "id": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "label": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "state",
+                    "id",
+                    "label"
+                  ]
+                }
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "state",
+              "items"
+            ]
+          },
+          "evidence": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "description": "Select one harness-issued candidate ID; the adapter supplies the exact quote and Unicode range.",
+              "properties": {
+                "candidate_id": {
+                  "type": "string",
+                  "description": "Stable evidence candidate ID from the public ledger.",
+                  "minLength": 1
+                },
+                "semantic_support": {
+                  "type": "string",
+                  "default": "unassessed",
+                  "enum": [
+                    "unassessed",
+                    "supports",
+                    "contradicts"
+                  ]
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "candidate_id",
+                "semantic_support"
+              ]
+            }
+          },
+          "claim_status": {
+            "type": "string",
+            "description": "Automatic model extraction always records provisional claims.",
+            "default": "provisional",
+            "enum": [
+              "provisional"
+            ]
+          }
+        },
+        "required": [
+          "step_id",
+          "activity",
+          "actor",
+          "inputs",
+          "outputs",
+          "evidence",
+          "claim_status"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "connect_process_steps",
+      "description": "Record an explicitly stated ordered, conditional, or exception flow between existing steps with public evidence; after recording a newly explicit step that follows an existing step, use this to record that order, but do not infer an unstated order.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "flow_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "from_step_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "to_step_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "kind": {
+            "type": "string",
+            "default": "normal",
+            "enum": [
+              "normal",
+              "branch",
+              "exception",
+              "source_boundary",
+              "sink_boundary"
+            ]
+          },
+          "condition": {
+            "type": "object",
+            "description": "Typed tool input for a scalar that may be unset, absent, or unknown.",
+            "properties": {
+              "state": {
+                "type": "string",
+                "default": "unset",
+                "enum": [
+                  "unset",
+                  "value",
+                  "absent",
+                  "dont_know"
+                ]
+              },
+              "value": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "state",
+              "value"
+            ]
+          },
+          "evidence": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "description": "Select one harness-issued candidate ID; the adapter supplies the exact quote and Unicode range.",
+              "properties": {
+                "candidate_id": {
+                  "type": "string",
+                  "description": "Stable evidence candidate ID from the public ledger.",
+                  "minLength": 1
+                },
+                "semantic_support": {
+                  "type": "string",
+                  "default": "unassessed",
+                  "enum": [
+                    "unassessed",
+                    "supports",
+                    "contradicts"
+                  ]
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "candidate_id",
+                "semantic_support"
+              ]
+            }
+          },
+          "claim_status": {
+            "type": "string",
+            "description": "Automatic model extraction always records provisional claims.",
+            "default": "provisional",
+            "enum": [
+              "provisional"
+            ]
+          }
+        },
+        "required": [
+          "flow_id",
+          "from_step_id",
+          "to_step_id",
+          "kind",
+          "condition",
+          "evidence",
+          "claim_status"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "record_resource_usage",
+      "description": "Link an existing process step to a publicly named system and data type with explicit CRUD; use unknown CRUD when the operation cannot be distinguished and do not infer a system.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "usage_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "process_step_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "system": {
+            "type": "object",
+            "properties": {
+              "state": {
+                "type": "string",
+                "default": "value",
+                "enum": [
+                  "value",
+                  "absent",
+                  "dont_know"
+                ]
+              },
+              "id": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "label": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "kind": {
+                "type": "string",
+                "default": "named",
+                "enum": [
+                  "named",
+                  "manual"
+                ]
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "state",
+              "id",
+              "label",
+              "kind"
+            ]
+          },
+          "data_type": {
+            "type": "object",
+            "description": "Create or reuse a local actor/data entity, or state why it is unknown.",
+            "properties": {
+              "state": {
+                "type": "string",
+                "default": "value",
+                "enum": [
+                  "value",
+                  "absent",
+                  "dont_know"
+                ]
+              },
+              "id": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "label": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "state",
+              "id",
+              "label"
+            ]
+          },
+          "crud": {
+            "type": "string",
+            "enum": [
+              "create",
+              "read",
+              "update",
+              "delete",
+              "unknown"
+            ]
+          },
+          "evidence": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "description": "Select one harness-issued candidate ID; the adapter supplies the exact quote and Unicode range.",
+              "properties": {
+                "candidate_id": {
+                  "type": "string",
+                  "description": "Stable evidence candidate ID from the public ledger.",
+                  "minLength": 1
+                },
+                "semantic_support": {
+                  "type": "string",
+                  "default": "unassessed",
+                  "enum": [
+                    "unassessed",
+                    "supports",
+                    "contradicts"
+                  ]
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "candidate_id",
+                "semantic_support"
+              ]
+            }
+          },
+          "claim_status": {
+            "type": "string",
+            "description": "Automatic model extraction always records provisional claims.",
+            "default": "provisional",
+            "enum": [
+              "provisional"
+            ]
+          }
+        },
+        "required": [
+          "usage_id",
+          "process_step_id",
+          "system",
+          "data_type",
+          "crud",
+          "evidence",
+          "claim_status"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "record_issue",
+      "description": "Record an open question, contradiction, exception, or business rule with its target and public evidence.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "issue_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "unknown",
+              "contradiction",
+              "exception",
+              "business_rule"
+            ]
+          },
+          "information_state": {
+            "type": "string",
+            "default": "unset",
+            "enum": [
+              "unset",
+              "value",
+              "absent",
+              "dont_know"
+            ]
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1
+          },
+          "target_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "claim_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "question": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "contradiction_status": {
+            "type": "string",
+            "default": "open",
+            "enum": [
+              "open",
+              "resolved"
+            ]
+          },
+          "resolution_claim_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "evidence": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "description": "Select one harness-issued candidate ID; the adapter supplies the exact quote and Unicode range.",
+              "properties": {
+                "candidate_id": {
+                  "type": "string",
+                  "description": "Stable evidence candidate ID from the public ledger.",
+                  "minLength": 1
+                },
+                "semantic_support": {
+                  "type": "string",
+                  "default": "unassessed",
+                  "enum": [
+                    "unassessed",
+                    "supports",
+                    "contradicts"
+                  ]
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "candidate_id",
+                "semantic_support"
+              ]
+            }
+          }
+        },
+        "required": [
+          "issue_id",
+          "kind",
+          "information_state",
+          "description",
+          "target_ids",
+          "claim_ids",
+          "question",
+          "contradiction_status",
+          "resolution_claim_id",
+          "evidence"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "revise_record",
+      "description": "Add or replace one typed field on an existing business record for a later detail or correction, preserving superseded claims. Put exactly one field/value pair in change: activity or condition=ValueInput, actor or data_type=EntityInput, inputs or outputs=DataListInput, crud=CrudInput, system=SystemInput. Use the same record_id and the current claim for that same field as expected_claim_id when available; use null for a first addition, never an activity claim for an actor change.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "record_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "change": {
+            "description": "Choose exactly one typed change: activity/condition use ValueInput; actor/data_type use EntityInput; inputs/outputs use DataListInput; crud uses CrudInput; system uses SystemInput.",
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "field": {
+                    "type": "string",
+                    "enum": [
+                      "activity"
+                    ]
+                  },
+                  "value": {
+                    "type": "object",
+                    "description": "Typed tool input for a scalar that may be unset, absent, or unknown.",
+                    "properties": {
+                      "state": {
+                        "type": "string",
+                        "default": "unset",
+                        "enum": [
+                          "unset",
+                          "value",
+                          "absent",
+                          "dont_know"
+                        ]
+                      },
+                      "value": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      }
+                    },
+                    "additionalProperties": false,
+                    "required": [
+                      "state",
+                      "value"
+                    ]
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "field",
+                  "value"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "field": {
+                    "type": "string",
+                    "enum": [
+                      "actor"
+                    ]
+                  },
+                  "value": {
+                    "type": "object",
+                    "description": "Create or reuse a local actor/data entity, or state why it is unknown.",
+                    "properties": {
+                      "state": {
+                        "type": "string",
+                        "default": "value",
+                        "enum": [
+                          "value",
+                          "absent",
+                          "dont_know"
+                        ]
+                      },
+                      "id": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "label": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      }
+                    },
+                    "additionalProperties": false,
+                    "required": [
+                      "state",
+                      "id",
+                      "label"
+                    ]
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "field",
+                  "value"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "field": {
+                    "type": "string",
+                    "enum": [
+                      "inputs"
+                    ]
+                  },
+                  "value": {
+                    "type": "object",
+                    "description": "Inputs/outputs of a step with an explicit empty/unknown distinction.",
+                    "properties": {
+                      "state": {
+                        "type": "string",
+                        "default": "unset",
+                        "enum": [
+                          "unset",
+                          "value",
+                          "absent",
+                          "dont_know"
+                        ]
+                      },
+                      "items": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "description": "Create or reuse a local actor/data entity, or state why it is unknown.",
+                          "properties": {
+                            "state": {
+                              "type": "string",
+                              "default": "value",
+                              "enum": [
+                                "value",
+                                "absent",
+                                "dont_know"
+                              ]
+                            },
+                            "id": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "label": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            }
+                          },
+                          "additionalProperties": false,
+                          "required": [
+                            "state",
+                            "id",
+                            "label"
+                          ]
+                        }
+                      }
+                    },
+                    "additionalProperties": false,
+                    "required": [
+                      "state",
+                      "items"
+                    ]
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "field",
+                  "value"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "field": {
+                    "type": "string",
+                    "enum": [
+                      "outputs"
+                    ]
+                  },
+                  "value": {
+                    "type": "object",
+                    "description": "Inputs/outputs of a step with an explicit empty/unknown distinction.",
+                    "properties": {
+                      "state": {
+                        "type": "string",
+                        "default": "unset",
+                        "enum": [
+                          "unset",
+                          "value",
+                          "absent",
+                          "dont_know"
+                        ]
+                      },
+                      "items": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "description": "Create or reuse a local actor/data entity, or state why it is unknown.",
+                          "properties": {
+                            "state": {
+                              "type": "string",
+                              "default": "value",
+                              "enum": [
+                                "value",
+                                "absent",
+                                "dont_know"
+                              ]
+                            },
+                            "id": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "label": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            }
+                          },
+                          "additionalProperties": false,
+                          "required": [
+                            "state",
+                            "id",
+                            "label"
+                          ]
+                        }
+                      }
+                    },
+                    "additionalProperties": false,
+                    "required": [
+                      "state",
+                      "items"
+                    ]
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "field",
+                  "value"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "field": {
+                    "type": "string",
+                    "enum": [
+                      "condition"
+                    ]
+                  },
+                  "value": {
+                    "type": "object",
+                    "description": "Typed tool input for a scalar that may be unset, absent, or unknown.",
+                    "properties": {
+                      "state": {
+                        "type": "string",
+                        "default": "unset",
+                        "enum": [
+                          "unset",
+                          "value",
+                          "absent",
+                          "dont_know"
+                        ]
+                      },
+                      "value": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      }
+                    },
+                    "additionalProperties": false,
+                    "required": [
+                      "state",
+                      "value"
+                    ]
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "field",
+                  "value"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "field": {
+                    "type": "string",
+                    "enum": [
+                      "crud"
+                    ]
+                  },
+                  "value": {
+                    "type": "object",
+                    "description": "Typed CRUD value used when revising a resource-usage record.",
+                    "properties": {
+                      "operation": {
+                        "type": "string",
+                        "enum": [
+                          "create",
+                          "read",
+                          "update",
+                          "delete",
+                          "unknown"
+                        ]
+                      }
+                    },
+                    "additionalProperties": false,
+                    "required": [
+                      "operation"
+                    ]
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "field",
+                  "value"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "field": {
+                    "type": "string",
+                    "enum": [
+                      "system"
+                    ]
+                  },
+                  "value": {
+                    "type": "object",
+                    "properties": {
+                      "state": {
+                        "type": "string",
+                        "default": "value",
+                        "enum": [
+                          "value",
+                          "absent",
+                          "dont_know"
+                        ]
+                      },
+                      "id": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "label": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "kind": {
+                        "type": "string",
+                        "default": "named",
+                        "enum": [
+                          "named",
+                          "manual"
+                        ]
+                      }
+                    },
+                    "additionalProperties": false,
+                    "required": [
+                      "state",
+                      "id",
+                      "label",
+                      "kind"
+                    ]
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "field",
+                  "value"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "field": {
+                    "type": "string",
+                    "enum": [
+                      "data_type"
+                    ]
+                  },
+                  "value": {
+                    "type": "object",
+                    "description": "Create or reuse a local actor/data entity, or state why it is unknown.",
+                    "properties": {
+                      "state": {
+                        "type": "string",
+                        "default": "value",
+                        "enum": [
+                          "value",
+                          "absent",
+                          "dont_know"
+                        ]
+                      },
+                      "id": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "label": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      }
+                    },
+                    "additionalProperties": false,
+                    "required": [
+                      "state",
+                      "id",
+                      "label"
+                    ]
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "field",
+                  "value"
+                ]
+              }
+            ],
+            "examples": [
+              {
+                "field": "actor",
+                "value": {
+                  "state": "value",
+                  "id": "actor:sales",
+                  "label": "営業"
+                }
+              },
+              {
+                "field": "inputs",
+                "value": {
+                  "state": "value",
+                  "items": [
+                    {
+                      "id": "data:application",
+                      "label": "申請書"
+                    }
+                  ]
+                }
+              },
+              {
+                "field": "crud",
+                "value": {
+                  "operation": "unknown"
+                }
+              }
+            ]
+          },
+          "replacement_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "statement": {
+            "type": "string",
+            "minLength": 1
+          },
+          "correction_note": {
+            "type": "string",
+            "minLength": 1
+          },
+          "evidence": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "description": "Select one harness-issued candidate ID; the adapter supplies the exact quote and Unicode range.",
+              "properties": {
+                "candidate_id": {
+                  "type": "string",
+                  "description": "Stable evidence candidate ID from the public ledger.",
+                  "minLength": 1
+                },
+                "semantic_support": {
+                  "type": "string",
+                  "default": "unassessed",
+                  "enum": [
+                    "unassessed",
+                    "supports",
+                    "contradicts"
+                  ]
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "candidate_id",
+                "semantic_support"
+              ]
+            }
+          },
+          "claim_status": {
+            "type": "string",
+            "description": "Automatic model extraction always records provisional claims.",
+            "default": "provisional",
+            "enum": [
+              "provisional"
+            ]
+          },
+          "expected_claim_id": {
+            "description": "Current active claim for the same record and same changed field; use null when adding that field for the first time.",
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "record_id",
+          "change",
+          "replacement_id",
+          "statement",
+          "correction_note",
+          "evidence",
+          "claim_status",
+          "expected_claim_id"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "complete_interview",
+      "description": "Record termination separately from stakeholder confirmation and content completeness.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "termination_reason": {
+            "type": "string",
+            "minLength": 1
+          },
+          "unresolved_question_ids": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "stakeholder_confirmed": {
+            "type": "boolean",
+            "default": false
+          },
+          "confirmation_evidence": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "description": "Select one harness-issued candidate ID; the adapter supplies the exact quote and Unicode range.",
+              "properties": {
+                "candidate_id": {
+                  "type": "string",
+                  "description": "Stable evidence candidate ID from the public ledger.",
+                  "minLength": 1
+                },
+                "semantic_support": {
+                  "type": "string",
+                  "default": "unassessed",
+                  "enum": [
+                    "unassessed",
+                    "supports",
+                    "contradicts"
+                  ]
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "candidate_id",
+                "semantic_support"
+              ]
+            }
+          },
+          "content_completeness": {
+            "type": "string",
+            "default": "unknown",
+            "enum": [
+              "unknown",
+              "complete",
+              "incomplete"
+            ]
+          }
+        },
+        "required": [
+          "termination_reason",
+          "unresolved_question_ids",
+          "stakeholder_confirmed",
+          "confirmation_evidence",
+          "content_completeness"
+        ],
+        "additionalProperties": false
+      }
+    }
+  ]
+}

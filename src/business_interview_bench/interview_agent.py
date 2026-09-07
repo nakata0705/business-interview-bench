@@ -1045,6 +1045,7 @@ def _agent_tool_schema(
     strict_provider_schema: bool = True,
 ) -> dict[str, Any]:
     transformed = _inline_json_schema(schema)
+    _normalize_const_constraints(transformed)
     _replace_evidence_properties(transformed)
     if strict_provider_schema:
         _require_all_object_properties(transformed)
@@ -1089,6 +1090,56 @@ def _agent_tool_schema(
                     "use null when adding that field for the first time."
                 )
     return transformed
+
+
+def _normalize_const_constraints(schema: dict[str, Any]) -> None:
+    """Represent string ``const`` constraints in Inspect's schema vocabulary.
+
+    ``ToolParams`` preserves ``enum`` but drops the JSON Schema ``const``
+    keyword during model validation.  A singleton enum has the same meaning
+    for the string literals emitted by Pydantic and survives that boundary.
+    """
+    missing = object()
+
+    def visit(value: Any, path: str) -> None:
+        if isinstance(value, list):
+            for index, item in enumerate(value):
+                visit(item, f"{path}[{index}]")
+            return
+        if not isinstance(value, dict):
+            return
+
+        const = value.get("const", missing)
+        if const is not missing:
+            if not isinstance(const, str):
+                raise ValueError(f"unsupported non-string JSON Schema const at {path}")
+            if "enum" in value:
+                enum = value["enum"]
+                if not isinstance(enum, list) or not all(
+                    isinstance(item, str) for item in enum
+                ):
+                    raise ValueError(f"unsupported const/enum combination at {path}")
+                if const not in enum:
+                    raise ValueError(f"contradictory const/enum constraints at {path}")
+            value["enum"] = [const]
+            del value["const"]
+
+        for key, child in value.items():
+            if key in {
+                "const",
+                "enum",
+                "default",
+                "description",
+                "examples",
+                "format",
+                "required",
+                "title",
+                "type",
+            }:
+                continue
+            visit(child, f"{path}.{key}")
+
+    visit(schema, "$")
 
 
 def _replace_evidence_properties(schema: dict[str, Any]) -> None:

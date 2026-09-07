@@ -1,0 +1,22 @@
+{
+  "utterance_id": "u2",
+  "kind": "model_call_limit",
+  "error": "model call limit exhausted before a natural response or completion",
+  "state_identifiers": {
+    "utterance_ids": [
+      "u1",
+      "u2"
+    ],
+    "claim_ids": [
+      "claim:step:check_application:activity"
+    ],
+    "process_step_ids": [
+      "step:check_application"
+    ],
+    "flow_ids": [],
+    "actor_ids": [],
+    "system_ids": [],
+    "data_type_ids": [],
+    "data_operation_ids": []
+  }
+}
