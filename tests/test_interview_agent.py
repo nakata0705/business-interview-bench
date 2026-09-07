@@ -284,6 +284,13 @@ def test_model_can_add_a_field_then_correct_it_in_conversation_order() -> None:
         "revise_record",
         "complete_interview",
     ]
+    revision_invocation = result.invocations[1]
+    assert revision_invocation.arguments["change"] == {
+        "field": "actor",
+        "value": {"id": "actor:sales", "label": "営業"},
+    }
+    assert "field" not in revision_invocation.arguments
+    assert "value" not in revision_invocation.arguments
     assert [item.id for item in result.state.utterances] == ["u1", "u2"]
     assert result.state.business_model.process_steps[0].actor.entity_id == "actor:sales"
     actor_claim = next(
@@ -293,6 +300,55 @@ def test_model_can_add_a_field_then_correct_it_in_conversation_order() -> None:
     )
     assert actor_claim.status == "provisional"
     assert actor_claim.evidence[0].utterance_id == "u2"
+
+
+def test_failed_revise_invocation_records_invalid_typed_arguments() -> None:
+    agent = _agent(
+        [
+            ModelOutput.for_tool_call(
+                "mockllm",
+                "record_process_step",
+                {
+                    "step_id": "step:review",
+                    "activity": {"state": "value", "value": "申請を確認"},
+                    "evidence": [_candidate("u1")],
+                },
+            ),
+            ModelOutput.from_content("mockllm", "確認処理を記録しました。"),
+            ModelOutput.for_tool_call(
+                "mockllm",
+                "revise_record",
+                {
+                    "record_id": "step:review",
+                    "change": {
+                        "field": "actor",
+                        "value": {
+                            "id": "actor:accounting",
+                            "label": "経理",
+                            "kind": "named",
+                        },
+                    },
+                    "replacement_id": "claim:step:review:actor",
+                    "statement": "担当は経理です。",
+                    "correction_note": "担当者を追記する。",
+                    "evidence": [_candidate("u2")],
+                },
+            ),
+            ModelOutput.from_content("mockllm", "担当者の記録に失敗しました。"),
+        ]
+    )
+
+    asyncio.run(agent.process_utterance("申請内容を確認します"))
+    turn = asyncio.run(agent.process_utterance("担当は経理です"))
+
+    assert len(turn.invocations) == 1
+    invocation = turn.invocations[0]
+    assert invocation.tool_name == "revise_record"
+    assert invocation.arguments["change"]["value"]["kind"] == "named"
+    assert invocation.receipt is None
+    assert invocation.error
+    assert "extra" in invocation.error
+    assert agent.state.business_model.process_steps[0].actor.state == "unset"
 
 
 def test_unknown_candidate_and_confirmed_claim_are_rejected_without_state_change() -> (
