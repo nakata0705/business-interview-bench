@@ -506,12 +506,14 @@
       "tool": "revise_record",
       "arguments": {
         "record_id": "human_review_tracker",
-        "field": "crud",
+        "change": {
+          "field": "crud",
+          "value": {
+            "operation": "read"
+          }
+        },
         "replacement_id": "claim:human_review_tracker:crud:revision1",
         "statement": "During review the tracker is read; the coordinator performs the later update.",
-        "value": {
-          "operation": "read"
-        },
         "correction_note": "The stakeholder explicitly corrected the earlier update description.",
         "evidence": [
           {

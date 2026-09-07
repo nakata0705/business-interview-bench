@@ -97,9 +97,12 @@ def test_provider_tool_definitions_use_candidate_evidence_and_inline_refs() -> N
 
     revise = next(item for item in agent.tools if item.name == "revise_record")
     revise_schema = revise.parameters.model_dump(mode="json")
-    assert "activity/condition" in revise_schema["properties"]["field"]["description"]
+    change_schema = revise_schema["properties"]["change"]
+    assert "activity/condition" in change_schema["description"]
     assert revise_schema["properties"]["claim_status"]["enum"] == ["provisional"]
-    assert revise_schema["properties"]["value"]["examples"][1]["id"] == "actor:sales"
+    assert change_schema["examples"][1]["value"]["items"][0]["id"] == (
+        "data:application"
+    )
     assert "same record_id" in revise.description
     assert "newly explicit" in record.description
 
@@ -138,10 +141,12 @@ def test_each_generation_receives_a_fresh_typed_state_snapshot() -> None:
                 "revise_record",
                 {
                     "record_id": "step:review",
-                    "field": "actor",
+                    "change": {
+                        "field": "actor",
+                        "value": {"id": "actor:accounting", "label": "経理"},
+                    },
                     "replacement_id": "claim:step:review:actor",
                     "statement": "担当は経理です。",
-                    "value": {"id": "actor:accounting", "label": "経理"},
                     "correction_note": "後続発言で担当者が判明した。",
                     "evidence": [_candidate("u2")],
                 },
@@ -253,10 +258,12 @@ def test_model_can_add_a_field_then_correct_it_in_conversation_order() -> None:
                 "revise_record",
                 {
                     "record_id": "step:review",
-                    "field": "actor",
+                    "change": {
+                        "field": "actor",
+                        "value": {"id": "actor:sales", "label": "営業"},
+                    },
                     "replacement_id": "claim:step:review:actor",
                     "statement": "担当は営業です。",
-                    "value": {"id": "actor:sales", "label": "営業"},
                     "correction_note": "公開発言で担当者が判明した。",
                     "evidence": [_candidate("u2")],
                 },
@@ -504,10 +511,12 @@ def test_checkpoint_round_trip_stores_public_conversation_without_provider_histo
                 "revise_record",
                 {
                     "record_id": "step:review",
-                    "field": "actor",
+                    "change": {
+                        "field": "actor",
+                        "value": {"id": "actor:sales", "label": "営業"},
+                    },
                     "replacement_id": "claim:step:review:actor",
                     "statement": "担当は営業です。",
-                    "value": {"id": "actor:sales", "label": "営業"},
                     "correction_note": "追加入力で担当者が判明した。",
                     "evidence": [_candidate("u2")],
                 },
@@ -630,10 +639,12 @@ def test_checkpoint_resume_reaches_executor_for_correction_with_short_answer(
                 "revise_record",
                 {
                     "record_id": "step:review",
-                    "field": "actor",
+                    "change": {
+                        "field": "actor",
+                        "value": {"id": "actor:sales", "label": "営業"},
+                    },
                     "replacement_id": "claim:step:review:actor:sales",
                     "statement": "担当は営業です。",
-                    "value": {"id": "actor:sales", "label": "営業"},
                     "correction_note": "短い回答で担当者を訂正した。",
                     "evidence": [_candidate("u2")],
                 },
@@ -830,10 +841,12 @@ def test_fixed_followup_conversation_revises_one_step_and_records_explicit_order
                 "revise_record",
                 {
                     "record_id": "step:review",
-                    "field": "actor",
+                    "change": {
+                        "field": "actor",
+                        "value": {"id": "actor:accounting", "label": "経理"},
+                    },
                     "replacement_id": "claim:step:review:actor:accounting",
                     "statement": "確認の担当は経理です。",
-                    "value": {"id": "actor:accounting", "label": "経理"},
                     "correction_note": "補足発言で担当者が判明した。",
                     "evidence": [_candidate("u2")],
                 },
@@ -844,10 +857,12 @@ def test_fixed_followup_conversation_revises_one_step_and_records_explicit_order
                 "revise_record",
                 {
                     "record_id": "step:review",
-                    "field": "actor",
+                    "change": {
+                        "field": "actor",
+                        "value": {"id": "actor:sales", "label": "営業"},
+                    },
                     "replacement_id": "claim:step:review:actor:sales",
                     "statement": "確認の担当は営業です。",
-                    "value": {"id": "actor:sales", "label": "営業"},
                     "correction_note": "訂正発言で担当者を更新した。",
                     "expected_claim_id": "claim:step:review:actor:accounting",
                     "evidence": [_candidate("u3")],

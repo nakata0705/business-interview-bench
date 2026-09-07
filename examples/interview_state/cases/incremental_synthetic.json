@@ -45,13 +45,15 @@
           "tool": "revise_record",
           "arguments": {
             "record_id": "review",
-            "field": "actor",
+            "change": {
+              "field": "actor",
+              "value": {
+                "id": "accounting",
+                "label": "経理"
+              }
+            },
             "replacement_id": "claim:review:actor",
             "statement": "reviewの担当は経理です。",
-            "value": {
-              "id": "accounting",
-              "label": "経理"
-            },
             "correction_note": "追加回答で担当者が判明した。",
             "evidence": [
               {
@@ -69,18 +71,20 @@
           "tool": "revise_record",
           "arguments": {
             "record_id": "review",
-            "field": "inputs",
+            "change": {
+              "field": "inputs",
+              "value": {
+                "state": "value",
+                "items": [
+                  {
+                    "id": "application",
+                    "label": "申請書"
+                  }
+                ]
+              }
+            },
             "replacement_id": "claim:review:inputs",
             "statement": "reviewの入力は申請書です。",
-            "value": {
-              "state": "value",
-              "items": [
-                {
-                  "id": "application",
-                  "label": "申請書"
-                }
-              ]
-            },
             "correction_note": "追加回答で入力データが判明した。",
             "evidence": [
               {
@@ -107,18 +111,20 @@
           "tool": "revise_record",
           "arguments": {
             "record_id": "review",
-            "field": "outputs",
+            "change": {
+              "field": "outputs",
+              "value": {
+                "state": "value",
+                "items": [
+                  {
+                    "id": "review_result",
+                    "label": "確認結果"
+                  }
+                ]
+              }
+            },
             "replacement_id": "claim:review:outputs",
             "statement": "reviewの出力は確認結果です。",
-            "value": {
-              "state": "value",
-              "items": [
-                {
-                  "id": "review_result",
-                  "label": "確認結果"
-                }
-              ]
-            },
             "correction_note": "追加回答で出力データが判明した。",
             "evidence": [
               {
@@ -145,13 +151,15 @@
           "tool": "revise_record",
           "arguments": {
             "record_id": "review",
-            "field": "actor",
+            "change": {
+              "field": "actor",
+              "value": {
+                "id": "sales",
+                "label": "営業"
+              }
+            },
             "replacement_id": "claim:review:actor:revision1",
             "statement": "reviewの担当は営業です。",
-            "value": {
-              "id": "sales",
-              "label": "営業"
-            },
             "correction_note": "訂正回答で担当者が営業だと判明した。",
             "evidence": [
               {

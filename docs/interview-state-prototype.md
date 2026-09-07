@@ -52,14 +52,14 @@ JSON Schema は `interview_tools.py` の入力Pydanticモデルから `get_tool_
 | `connect_process_steps` | flow ID、既存stepまたは `SOURCE`/`SINK`、kind、条件、evidence | endpoint参照を検証。境界は専用kind。 | 更新flow、claim IDs |
 | `record_resource_usage` | usage ID、既存step、system、data type、CRUD、evidence | system/data type はIDで再参照、label付きで作成。systemは named/manual または `dont_know`。CRUDは `create/read/update/delete/unknown` のいずれかで、writesから推測しない。 | 更新data operation、claim IDs |
 | `record_issue` | issue kind、対象、説明、必要ならclaim IDs/question、矛盾の解決claim、evidence | unknown は open question、contradiction は既存claim 2件以上を参照し、必要なら resolved と解決claimを明示。 | issue、質問/矛盾 IDs |
-| `revise_record` | 対象レコードID、`field`、fieldに対応したPydantic値、replacement ID、更新理由、evidence | `activity` / `actor` / `inputs` / `outputs` / `condition` / `crud` / `system` / `data_type` の1フィールドだけを扱う。現在claimがなければ初回追記、あれば旧claimを`rejected`にして新claimの`supersedes`で訂正する。actor/system/data typeはID再利用または同じ操作内でlabel付き作成、inputs/outputsは型付きリスト全体置換。任意JSON Patchではない。 | 対象レコード、新claim、`revised_from`、作成/再利用entity IDs |
+| `revise_record` | 対象レコードID、1つの型付き`change`（`field`と対応するPydantic値）、replacement ID、更新理由、evidence | `activity` / `actor` / `inputs` / `outputs` / `condition` / `crud` / `system` / `data_type` の1フィールドだけを扱う。現在claimがなければ初回追記、あれば旧claimを`rejected`にして新claimの`supersedes`で訂正する。actor/system/data typeはID再利用または同じ操作内でlabel付き作成、inputs/outputsは型付きリスト全体置換。任意JSON Patchではない。 | 対象レコード、新claim、`revised_from`、作成/再利用entity IDs |
 | `complete_interview` | 終了理由、未解決質問、確認有無/根拠、内容完全性 | unresolved省略時はopen questionを保持。confirmation=trueには支持根拠が必要。終了後は編集不可。 | completion receipt |
 
 operation ID の生成は仕様上の暗黙の重複回避にしない。呼び出し側が安定IDを渡し、同じIDにlabelを添えれば再参照、別labelならエラーとする。発言保存やevidence発行のtoolは公開しない。
 
 ## 追記・訂正の回帰適合例
 
-レビューで再現した問題は、担当者・入出力を未指定のまま`record_process_step`で登録した後、同じstep IDを再送して重複エラーになり、未作成の`claim:review:actor`を旧形式の`revise_record`で指定して失敗することだった。`revise_record`はレコードIDとフィールドを指定する契約に変更し、この経路を解消した。
+レビューで再現した問題は、担当者・入出力を未指定のまま`record_process_step`で登録した後、同じstep IDを再送して重複エラーになり、未作成の`claim:review:actor`を旧形式の`revise_record`で指定して失敗することだった。`revise_record`はレコードIDと型付き`change`を指定する契約に変更し、この経路を解消した。
 
 `incremental_synthetic` は合成・手動ツール呼び出しによる適合例であり、モデルによる自動抽出や人間評価の成功を示さない。再生器はこのcaseだけ、未来の発言を先に登録せず、次の順で発言登録と操作を交互に実行する。
 

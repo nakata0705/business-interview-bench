@@ -94,11 +94,13 @@ _AGENT_SYSTEM_PROMPT = """business-interview-bench InterviewState agent
   ツール成功後の次の生成には更新済みsnapshotが渡されるので、常にそれを最新の状態として扱います。
 - 新しい業務行為が利用者発言で明示された場合だけrecord_process_stepを使います。
   既存処理の担当者、活動、入出力、条件などが後から判明した場合は、stepを再登録せず、
-  既存のrecord_idと一つのfield/valueを指定したrevise_recordを使います。後続発言で変更するのは、
+  既存のrecord_idと一つのfield/valueをchangeオブジェクトに入れたrevise_recordを使います。
+  後続発言で変更するのは、
   その発言が明示または明確に参照しているフィールドだけです。過去発言やsnapshotだけから別の
   フィールドを追加しません。
-- 既存情報が訂正された場合も同じrecord_idへrevise_recordを使い、snapshotの現在claimを
-  expected_claim_idに指定できるなら指定します。古いclaimを消したり上書きしたりせず、訂正履歴を残します。
+- 既存情報が訂正された場合も同じrecord_idへrevise_recordを使い、同じ対象・同じfieldの
+  snapshotの現在claimをexpected_claim_idに指定します。初回追記でそのfieldのclaimがなければnullにします。
+  activityのclaimをactor変更のexpected_claim_idには使いません。古いclaimを消したり上書きしたりせず、訂正履歴を残します。
 - 活動の文中に現れる対象名だけではinputs/outputsを確定しません。「対象を確認する」のような
   活動表現から入力を、「結果を保管する」のような活動表現から出力・データ型・CRUDを推測せず、
   入力・出力として明示された場合だけ対応するfieldを記録します。
@@ -1055,27 +1057,37 @@ def _agent_tool_schema(
                 "Automatic model extraction always records provisional claims."
             )
         if tool_name == "revise_record":
-            field = properties.get("field")
-            if isinstance(field, dict):
-                field["description"] = (
-                    "One field only: activity/condition use ValueInput; actor and "
-                    "data_type use EntityInput; inputs/outputs use DataListInput; "
-                    "crud uses CrudInput; system uses SystemInput."
+            change = properties.get("change")
+            if isinstance(change, dict):
+                change["description"] = (
+                    "Choose exactly one typed change: activity/condition use "
+                    "ValueInput; actor/data_type use EntityInput; inputs/outputs "
+                    "use DataListInput; crud uses CrudInput; system uses SystemInput."
                 )
-            value = properties.get("value")
-            if isinstance(value, dict):
-                value["description"] = (
-                    "Match the typed value object to field; do not send an arbitrary patch."
-                )
-                value["examples"] = [
-                    {"state": "value", "value": "review request"},
-                    {"id": "actor:sales", "label": "営業"},
+                change["examples"] = [
                     {
-                        "state": "value",
-                        "items": [{"id": "data:application", "label": "申請書"}],
+                        "field": "actor",
+                        "value": {
+                            "state": "value",
+                            "id": "actor:sales",
+                            "label": "営業",
+                        },
                     },
-                    {"operation": "unknown"},
+                    {
+                        "field": "inputs",
+                        "value": {
+                            "state": "value",
+                            "items": [{"id": "data:application", "label": "申請書"}],
+                        },
+                    },
+                    {"field": "crud", "value": {"operation": "unknown"}},
                 ]
+            expected_claim_id = properties.get("expected_claim_id")
+            if isinstance(expected_claim_id, dict):
+                expected_claim_id["description"] = (
+                    "Current active claim for the same record and same changed field; "
+                    "use null when adding that field for the first time."
+                )
     return transformed
 
 

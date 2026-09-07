@@ -209,7 +209,64 @@ RevisionField = Literal[
     "system",
     "data_type",
 ]
-RevisionValue = ValueInput | DataListInput | SystemInput | EntityInput | CrudInput
+
+
+class _RevisionChange(BaseModel):
+    """Base for the field-discriminated revise_record change variants."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+
+class ActivityChange(_RevisionChange):
+    field: Literal["activity"]
+    value: ValueInput
+
+
+class ActorChange(_RevisionChange):
+    field: Literal["actor"]
+    value: EntityInput
+
+
+class InputsChange(_RevisionChange):
+    field: Literal["inputs"]
+    value: DataListInput
+
+
+class OutputsChange(_RevisionChange):
+    field: Literal["outputs"]
+    value: DataListInput
+
+
+class ConditionChange(_RevisionChange):
+    field: Literal["condition"]
+    value: ValueInput
+
+
+class CrudChange(_RevisionChange):
+    field: Literal["crud"]
+    value: CrudInput
+
+
+class SystemChange(_RevisionChange):
+    field: Literal["system"]
+    value: SystemInput
+
+
+class DataTypeChange(_RevisionChange):
+    field: Literal["data_type"]
+    value: EntityInput
+
+
+RevisionChange = (
+    ActivityChange
+    | ActorChange
+    | InputsChange
+    | OutputsChange
+    | ConditionChange
+    | CrudChange
+    | SystemChange
+    | DataTypeChange
+)
 
 
 class ReviseRecordInput(BaseModel):
@@ -218,50 +275,13 @@ class ReviseRecordInput(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     record_id: str = Field(min_length=1)
-    field: RevisionField
+    change: RevisionChange
     replacement_id: str = Field(min_length=1)
     statement: str = Field(min_length=1)
-    value: RevisionValue
     correction_note: str = Field(min_length=1)
     evidence: tuple[EvidenceCitation, ...] = Field(default_factory=tuple)
     claim_status: ClaimStatus = "provisional"
     expected_claim_id: str | None = Field(default=None, min_length=1)
-
-    @model_validator(mode="before")
-    @classmethod
-    def _parse_field_value(cls, data: object) -> object:
-        if not isinstance(data, dict):
-            return data
-        field = data.get("field")
-        if not isinstance(field, str):
-            return data
-        expected = _REVISION_VALUE_TYPES.get(field)
-        if expected is None or isinstance(data.get("value"), BaseModel):
-            return data
-        parsed = dict(data)
-        parsed["value"] = expected.model_validate(parsed.get("value"))
-        return parsed
-
-    @model_validator(mode="after")
-    def _value_matches_field(self) -> ReviseRecordInput:
-        expected = _REVISION_VALUE_TYPES[self.field]
-        if not isinstance(self.value, expected):
-            raise ValueError(
-                f"field {self.field!r} requires a {expected.__name__} value"
-            )
-        return self
-
-
-_REVISION_VALUE_TYPES: dict[str, type[BaseModel]] = {
-    "activity": ValueInput,
-    "actor": EntityInput,
-    "inputs": DataListInput,
-    "outputs": DataListInput,
-    "condition": ValueInput,
-    "crud": CrudInput,
-    "system": SystemInput,
-    "data_type": EntityInput,
-}
 
 
 class CompleteInterviewInput(BaseModel):
@@ -680,17 +700,18 @@ class InterviewToolExecutor:
             self._require_active()
             self._require_evidence(request.evidence, operation)
             evidence = self._resolve_evidence(request.evidence)
+            change = request.change
 
             def build(state: InterviewState) -> tuple[InterviewState, tuple[str, ...]]:
                 record_type = _revision_record_type(
-                    state.business_model, request.record_id, request.field
+                    state.business_model, request.record_id, change.field
                 )
                 matching = [
                     (index, item)
                     for index, item in enumerate(state.claims)
                     if item.record_type == record_type
                     and item.target_id == request.record_id
-                    and item.predicate == request.field
+                    and item.predicate == change.field
                     and item.status != "rejected"
                 ]
                 if len(matching) > 1:
@@ -724,7 +745,7 @@ class InterviewToolExecutor:
                         expected.record_type,
                         expected.target_id,
                         expected.predicate,
-                    ) != (record_type, request.record_id, request.field):
+                    ) != (record_type, request.record_id, change.field):
                         raise InterviewStateError(
                             "expected claim does not target the requested record field"
                         )
@@ -745,7 +766,7 @@ class InterviewToolExecutor:
                     id=request.replacement_id,
                     record_type=record_type,
                     target_id=request.record_id,
-                    predicate=request.field,
+                    predicate=change.field,
                     statement=request.statement,
                     value=value,
                     evidence=evidence,
@@ -1026,18 +1047,19 @@ def _revision_entity_refs(
 ) -> tuple[tuple[str, str], ...]:
     if request.claim_status == "rejected":
         return ()
-    value = request.value
-    if request.field == "actor" and isinstance(value, EntityInput):
+    change = request.change
+    value = change.value
+    if change.field == "actor" and isinstance(value, EntityInput):
         return (("actor", value.id),) if value.state == "value" and value.id else ()
-    if request.field in {"inputs", "outputs"} and isinstance(value, DataListInput):
+    if change.field in {"inputs", "outputs"} and isinstance(value, DataListInput):
         return tuple(
             ("data_type", item.id)
             for item in value.items
             if value.state == "value" and item.id is not None
         )
-    if request.field == "system" and isinstance(value, SystemInput):
+    if change.field == "system" and isinstance(value, SystemInput):
         return (("system", value.id),) if value.state == "value" and value.id else ()
-    if request.field == "data_type" and isinstance(value, EntityInput):
+    if change.field == "data_type" and isinstance(value, EntityInput):
         return (("data_type", value.id),) if value.state == "value" and value.id else ()
     return ()
 
@@ -1064,33 +1086,32 @@ def _prepare_revision_value(
     model: BusinessModel,
     request: ReviseRecordInput,
 ) -> tuple[BusinessModel, InformationValue]:
-    value = request.value
-    if request.field in {"activity", "condition"}:
+    change = request.change
+    value = change.value
+    if change.field in {"activity", "condition"}:
         if not isinstance(value, ValueInput):
-            raise InterviewStateError(
-                f"field {request.field!r} requires a scalar value"
-            )
+            raise InterviewStateError(f"field {change.field!r} requires a scalar value")
         return model, InformationValue.model_validate(value.model_dump())
-    if request.field == "actor":
+    if change.field == "actor":
         if not isinstance(value, EntityInput):
             raise InterviewStateError("actor revision requires an entity value")
         actors, link = _ensure_actor(model.actors, value)
         return model.model_copy(update={"actors": actors}), _link_value(link)
-    if request.field in {"inputs", "outputs"}:
+    if change.field in {"inputs", "outputs"}:
         if not isinstance(value, DataListInput):
             raise InterviewStateError(
-                f"field {request.field!r} requires a typed data list"
+                f"field {change.field!r} requires a typed data list"
             )
         data_types, entity_list = _ensure_data_list(model.data_types, value)
         return (
             model.model_copy(update={"data_types": data_types}),
             _entity_list_value(entity_list),
         )
-    if request.field == "crud":
+    if change.field == "crud":
         if not isinstance(value, CrudInput):
             raise InterviewStateError("CRUD revision requires a typed CRUD value")
         return model, InformationValue(state="value", value=value.operation)
-    if request.field == "system":
+    if change.field == "system":
         if not isinstance(value, SystemInput):
             raise InterviewStateError("system revision requires a typed system value")
         systems, link = _ensure_system(model.systems, value)
@@ -1531,7 +1552,7 @@ _DESCRIPTIONS: dict[ToolName, str] = {
     "connect_process_steps": "Record an explicitly stated ordered, conditional, or exception flow between existing steps with public evidence; after recording a newly explicit step that follows an existing step, use this to record that order, but do not infer an unstated order.",
     "record_resource_usage": "Link an existing process step to a publicly named system and data type with explicit CRUD; use unknown CRUD when the operation cannot be distinguished and do not infer a system.",
     "record_issue": "Record an open question, contradiction, exception, or business rule with its target and public evidence.",
-    "revise_record": "Add or replace one typed field on an existing business record for a later detail or correction, preserving superseded claims. Use the same record_id and expected_claim_id for the current claim when available; change only a field supported by the current public utterance. Match field/value types: activity or condition=ValueInput, actor or data_type=EntityInput, inputs or outputs=DataListInput, crud=CrudInput, system=SystemInput.",
+    "revise_record": "Add or replace one typed field on an existing business record for a later detail or correction, preserving superseded claims. Put exactly one field/value pair in change: activity or condition=ValueInput, actor or data_type=EntityInput, inputs or outputs=DataListInput, crud=CrudInput, system=SystemInput. Use the same record_id and the current claim for that same field as expected_claim_id when available; use null for a first addition, never an activity claim for an actor change.",
     "complete_interview": "Record termination separately from stakeholder confirmation and content completeness.",
 }
 
@@ -1571,8 +1592,16 @@ __all__ = [
     "RecordProcessStepInput",
     "RecordResourceUsageInput",
     "ReviseRecordInput",
+    "RevisionChange",
     "RevisionField",
-    "RevisionValue",
+    "ActivityChange",
+    "ActorChange",
+    "ConditionChange",
+    "CrudChange",
+    "DataTypeChange",
+    "InputsChange",
+    "OutputsChange",
+    "SystemChange",
     "SystemInput",
     "ToolDefinition",
     "ToolError",

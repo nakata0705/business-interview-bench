@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import cast
 
 import pytest
 
@@ -27,6 +28,7 @@ from business_interview.interview_tools import (
     RecordProcessStepInput,
     RecordResourceUsageInput,
     ReviseRecordInput,
+    RevisionChange,
     SystemInput,
     ValueInput,
     get_tool_definitions,
@@ -175,10 +177,11 @@ def test_correction_preserves_old_claim_but_current_projection_is_unique() -> No
     revised = executor.revise_record(
         ReviseRecordInput(
             record_id="usage1",
-            field="crud",
+            change=cast(
+                RevisionChange, {"field": "crud", "value": CrudInput(operation="read")}
+            ),
             replacement_id="claim:usage1:crud:revision1",
             statement="The tracker is read during review.",
-            value=CrudInput(operation="read"),
             correction_note="The stakeholder corrected the CRUD description.",
             evidence=(_citation(),),
             claim_status="confirmed",
@@ -217,10 +220,17 @@ def test_existing_revision_paths_remain_typed() -> None:
     activity = executor.revise_record(
         ReviseRecordInput(
             record_id="step1",
-            field="activity",
+            change=cast(
+                RevisionChange,
+                {
+                    "field": "activity",
+                    "value": ValueInput(
+                        state="value", value="review submitted request"
+                    ),
+                },
+            ),
             replacement_id="claim:step1:activity:revision1",
             statement="The step reviews the submitted request.",
-            value=ValueInput(state="value", value="review submitted request"),
             correction_note="The activity wording was corrected.",
             evidence=(_citation(),),
         )
@@ -241,10 +251,15 @@ def test_existing_revision_paths_remain_typed() -> None:
     condition = executor.revise_record(
         ReviseRecordInput(
             record_id="flow1",
-            field="condition",
+            change=cast(
+                RevisionChange,
+                {
+                    "field": "condition",
+                    "value": ValueInput(state="value", value="request complete"),
+                },
+            ),
             replacement_id="claim:flow1:condition:revision1",
             statement="The boundary applies when the request is complete.",
-            value=ValueInput(state="value", value="request complete"),
             correction_note="The flow condition was corrected.",
             evidence=(_citation(),),
         )
@@ -265,10 +280,15 @@ def test_existing_revision_paths_remain_typed() -> None:
     system = executor.revise_record(
         ReviseRecordInput(
             record_id="usage1",
-            field="system",
+            change=cast(
+                RevisionChange,
+                {
+                    "field": "system",
+                    "value": SystemInput(id="archive", label="archive"),
+                },
+            ),
             replacement_id="claim:usage1:system:revision1",
             statement="The usage is in the archive system.",
-            value=SystemInput(id="archive", label="archive"),
             correction_note="The system was clarified.",
             evidence=(_citation(),),
         )
@@ -276,10 +296,17 @@ def test_existing_revision_paths_remain_typed() -> None:
     data_type = executor.revise_record(
         ReviseRecordInput(
             record_id="usage1",
-            field="data_type",
+            change=cast(
+                RevisionChange,
+                {
+                    "field": "data_type",
+                    "value": EntityInput(
+                        id="archived_request", label="archived request"
+                    ),
+                },
+            ),
             replacement_id="claim:usage1:data_type:revision1",
             statement="The usage handles the archived request.",
-            value=EntityInput(id="archived_request", label="archived request"),
             correction_note="The data type was clarified.",
             evidence=(_citation(),),
         )
@@ -328,10 +355,15 @@ def test_incremental_process_fields_add_and_correct_in_conversation_order() -> N
     actor = executor.revise_record(
         ReviseRecordInput(
             record_id="review",
-            field="actor",
+            change=cast(
+                RevisionChange,
+                {
+                    "field": "actor",
+                    "value": EntityInput(id="accounting", label="経理"),
+                },
+            ),
             replacement_id="claim:review:actor",
             statement="reviewの担当は経理です。",
-            value=EntityInput(id="accounting", label="経理"),
             correction_note="追加回答で担当者が判明した。",
             evidence=(second_citation,),
             claim_status="confirmed",
@@ -340,13 +372,18 @@ def test_incremental_process_fields_add_and_correct_in_conversation_order() -> N
     inputs = executor.revise_record(
         ReviseRecordInput(
             record_id="review",
-            field="inputs",
+            change=cast(
+                RevisionChange,
+                {
+                    "field": "inputs",
+                    "value": DataListInput(
+                        state="value",
+                        items=(EntityInput(id="application", label="申請書"),),
+                    ),
+                },
+            ),
             replacement_id="claim:review:inputs",
             statement="reviewの入力は申請書です。",
-            value=DataListInput(
-                state="value",
-                items=(EntityInput(id="application", label="申請書"),),
-            ),
             correction_note="追加回答で入力データが判明した。",
             evidence=(second_citation,),
             claim_status="confirmed",
@@ -361,13 +398,18 @@ def test_incremental_process_fields_add_and_correct_in_conversation_order() -> N
     outputs = executor.revise_record(
         ReviseRecordInput(
             record_id="review",
-            field="outputs",
+            change=cast(
+                RevisionChange,
+                {
+                    "field": "outputs",
+                    "value": DataListInput(
+                        state="value",
+                        items=(EntityInput(id="review_result", label="確認結果"),),
+                    ),
+                },
+            ),
             replacement_id="claim:review:outputs",
             statement="reviewの出力は確認結果です。",
-            value=DataListInput(
-                state="value",
-                items=(EntityInput(id="review_result", label="確認結果"),),
-            ),
             correction_note="追加回答で出力データが判明した。",
             evidence=(third_citation,),
             claim_status="confirmed",
@@ -383,10 +425,12 @@ def test_incremental_process_fields_add_and_correct_in_conversation_order() -> N
     correction = executor.revise_record(
         ReviseRecordInput(
             record_id="review",
-            field="actor",
+            change=cast(
+                RevisionChange,
+                {"field": "actor", "value": EntityInput(id="sales", label="営業")},
+            ),
             replacement_id="claim:review:actor:revision1",
             statement="reviewの担当は営業です。",
-            value=EntityInput(id="sales", label="営業"),
             correction_note="訂正回答で担当者が営業だと判明した。",
             evidence=(fourth_citation,),
             claim_status="confirmed",
@@ -419,11 +463,13 @@ def test_incremental_process_fields_add_and_correct_in_conversation_order() -> N
     stale = executor.revise_record(
         ReviseRecordInput(
             record_id="review",
-            field="actor",
+            change=cast(
+                RevisionChange,
+                {"field": "actor", "value": EntityInput(id="accounting")},
+            ),
             expected_claim_id="claim:review:actor",
             replacement_id="claim:review:actor:stale",
             statement="The stale owner claim is used.",
-            value=EntityInput(id="accounting"),
             correction_note="stale claim must be rejected",
             evidence=(fourth_citation,),
         )
@@ -441,10 +487,17 @@ def test_incremental_process_fields_add_and_correct_in_conversation_order() -> N
     continued = InterviewToolExecutor(continued_harness).revise_record(
         ReviseRecordInput(
             record_id="review",
-            field="inputs",
+            change=cast(
+                RevisionChange,
+                {
+                    "field": "inputs",
+                    "value": DataListInput(
+                        state="value", items=(EntityInput(id="application"),)
+                    ),
+                },
+            ),
             replacement_id="claim:review:inputs:revision1",
             statement="reviewの入力は既存の申請書です。",
-            value=DataListInput(state="value", items=(EntityInput(id="application"),)),
             correction_note="保存後の追回答で入力を確認した。",
             evidence=(
                 EvidenceCitation(
@@ -479,10 +532,15 @@ def test_dont_know_fields_can_become_typed_values() -> None:
     actor = executor.revise_record(
         ReviseRecordInput(
             record_id="review",
-            field="actor",
+            change=cast(
+                RevisionChange,
+                {
+                    "field": "actor",
+                    "value": EntityInput(id="actor1", label="coordinator"),
+                },
+            ),
             replacement_id="claim:review:actor:known",
             statement="The review owner is the coordinator.",
-            value=EntityInput(id="actor1", label="coordinator"),
             correction_note="The owner became known.",
             evidence=(_citation(),),
         )
@@ -490,12 +548,17 @@ def test_dont_know_fields_can_become_typed_values() -> None:
     inputs = executor.revise_record(
         ReviseRecordInput(
             record_id="review",
-            field="inputs",
+            change=cast(
+                RevisionChange,
+                {
+                    "field": "inputs",
+                    "value": DataListInput(
+                        state="value", items=(EntityInput(id="data1", label="request"),)
+                    ),
+                },
+            ),
             replacement_id="claim:review:inputs:known",
             statement="The review input is the request.",
-            value=DataListInput(
-                state="value", items=(EntityInput(id="data1", label="request"),)
-            ),
             correction_note="The input became known.",
             evidence=(_citation(),),
         )
@@ -527,10 +590,12 @@ def test_failed_incremental_update_does_not_partially_create_entities() -> None:
     invalid_quote = executor.revise_record(
         ReviseRecordInput(
             record_id="review",
-            field="actor",
+            change=cast(
+                RevisionChange,
+                {"field": "actor", "value": EntityInput(id="sales", label="sales")},
+            ),
             replacement_id="claim:review:actor:bad",
             statement="The owner is sales.",
-            value=EntityInput(id="sales", label="sales"),
             correction_note="bad citation",
             evidence=(
                 EvidenceCitation(utterance_id="u1", start=0, end=3, quote="wrong"),
@@ -544,10 +609,12 @@ def test_failed_incremental_update_does_not_partially_create_entities() -> None:
     label_conflict = executor.revise_record(
         ReviseRecordInput(
             record_id="review",
-            field="actor",
+            change=cast(
+                RevisionChange,
+                {"field": "actor", "value": EntityInput(id="accounting", label="別名")},
+            ),
             replacement_id="claim:review:actor:conflict",
             statement="The owner is accounting.",
-            value=EntityInput(id="accounting", label="別名"),
             correction_note="conflicting label",
             evidence=(_citation(),),
         )
@@ -563,10 +630,12 @@ def test_rejected_revision_does_not_change_the_current_projection() -> None:
     rejected = executor.revise_record(
         ReviseRecordInput(
             record_id="step1",
-            field="actor",
+            change=cast(
+                RevisionChange,
+                {"field": "actor", "value": EntityInput(id="sales", label="sales")},
+            ),
             replacement_id="claim:step1:actor:rejected",
             statement="The owner might be sales.",
-            value=EntityInput(id="sales", label="sales"),
             correction_note="The candidate value was rejected.",
             evidence=(_citation(),),
             claim_status="rejected",
@@ -591,29 +660,71 @@ def test_revise_record_schema_parses_field_specific_typed_values() -> None:
         "revise_record",
         {
             "record_id": "review",
-            "field": "inputs",
+            "change": {
+                "field": "inputs",
+                "value": {
+                    "state": "value",
+                    "items": [{"id": "request", "label": "request"}],
+                },
+            },
             "replacement_id": "claim:review:inputs",
             "statement": "The input is the request.",
-            "value": {
-                "state": "value",
-                "items": [{"id": "request", "label": "request"}],
-            },
             "correction_note": "The input was identified.",
             "evidence": [],
         },
     )
     assert isinstance(parsed, ReviseRecordInput)
-    assert isinstance(parsed.value, DataListInput)
-    assert parsed.value.items[0].id == "request"
+    assert parsed.change.field == "inputs"
+    assert isinstance(parsed.change.value, DataListInput)
+    assert parsed.change.value.items[0].id == "request"
+
+    revise_schema = tool_schemas()["revise_record"]
+    assert "field" not in revise_schema["properties"]
+    assert "value" not in revise_schema["properties"]
+    change_schema = revise_schema["properties"]["change"]
+    assert len(change_schema["anyOf"]) == 8
+    assert (
+        revise_schema["$defs"]["ActorChange"]["properties"]["value"]["$ref"]
+        == "#/$defs/EntityInput"
+    )
+    assert (
+        revise_schema["$defs"]["SystemChange"]["properties"]["value"]["$ref"]
+        == "#/$defs/SystemInput"
+    )
+    with pytest.raises(ValueError, match="extra"):
+        parse_tool_input(
+            "revise_record",
+            {
+                "record_id": "review",
+                "change": {
+                    "field": "actor",
+                    "value": {
+                        "id": "actor:accounting",
+                        "label": "経理",
+                        "kind": "named",
+                    },
+                },
+                "replacement_id": "claim:review:actor:bad-kind",
+                "statement": "The owner is accounting.",
+                "correction_note": "Wrong entity shape.",
+                "evidence": [],
+            },
+        )
     with pytest.raises(ValueError, match="field"):
         ReviseRecordInput(
             record_id="review",
-            field="actor",
+            change=cast(
+                RevisionChange,
+                {
+                    "field": "actor",
+                    "value": DataListInput(
+                        state="value",
+                        items=(EntityInput(id="request", label="request"),),
+                    ),
+                },
+            ),
             replacement_id="claim:review:actor",
             statement="The owner is known.",
-            value=DataListInput(
-                state="value", items=(EntityInput(id="request", label="request"),)
-            ),
             correction_note="wrong type",
         )
 

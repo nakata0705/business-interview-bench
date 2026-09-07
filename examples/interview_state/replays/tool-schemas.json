@@ -791,6 +791,82 @@
   },
   "revise_record": {
     "$defs": {
+      "ActivityChange": {
+        "additionalProperties": false,
+        "properties": {
+          "field": {
+            "const": "activity",
+            "title": "Field",
+            "type": "string"
+          },
+          "value": {
+            "$ref": "#/$defs/ValueInput"
+          }
+        },
+        "required": [
+          "field",
+          "value"
+        ],
+        "title": "ActivityChange",
+        "type": "object"
+      },
+      "ActorChange": {
+        "additionalProperties": false,
+        "properties": {
+          "field": {
+            "const": "actor",
+            "title": "Field",
+            "type": "string"
+          },
+          "value": {
+            "$ref": "#/$defs/EntityInput"
+          }
+        },
+        "required": [
+          "field",
+          "value"
+        ],
+        "title": "ActorChange",
+        "type": "object"
+      },
+      "ConditionChange": {
+        "additionalProperties": false,
+        "properties": {
+          "field": {
+            "const": "condition",
+            "title": "Field",
+            "type": "string"
+          },
+          "value": {
+            "$ref": "#/$defs/ValueInput"
+          }
+        },
+        "required": [
+          "field",
+          "value"
+        ],
+        "title": "ConditionChange",
+        "type": "object"
+      },
+      "CrudChange": {
+        "additionalProperties": false,
+        "properties": {
+          "field": {
+            "const": "crud",
+            "title": "Field",
+            "type": "string"
+          },
+          "value": {
+            "$ref": "#/$defs/CrudInput"
+          }
+        },
+        "required": [
+          "field",
+          "value"
+        ],
+        "title": "CrudChange",
+        "type": "object"
+      },
       "CrudInput": {
         "additionalProperties": false,
         "description": "Typed CRUD value used when revising a resource-usage record.",
@@ -837,6 +913,25 @@
           }
         },
         "title": "DataListInput",
+        "type": "object"
+      },
+      "DataTypeChange": {
+        "additionalProperties": false,
+        "properties": {
+          "field": {
+            "const": "data_type",
+            "title": "Field",
+            "type": "string"
+          },
+          "value": {
+            "$ref": "#/$defs/EntityInput"
+          }
+        },
+        "required": [
+          "field",
+          "value"
+        ],
+        "title": "DataTypeChange",
         "type": "object"
       },
       "EntityInput": {
@@ -925,6 +1020,63 @@
         "title": "EvidenceCitation",
         "type": "object"
       },
+      "InputsChange": {
+        "additionalProperties": false,
+        "properties": {
+          "field": {
+            "const": "inputs",
+            "title": "Field",
+            "type": "string"
+          },
+          "value": {
+            "$ref": "#/$defs/DataListInput"
+          }
+        },
+        "required": [
+          "field",
+          "value"
+        ],
+        "title": "InputsChange",
+        "type": "object"
+      },
+      "OutputsChange": {
+        "additionalProperties": false,
+        "properties": {
+          "field": {
+            "const": "outputs",
+            "title": "Field",
+            "type": "string"
+          },
+          "value": {
+            "$ref": "#/$defs/DataListInput"
+          }
+        },
+        "required": [
+          "field",
+          "value"
+        ],
+        "title": "OutputsChange",
+        "type": "object"
+      },
+      "SystemChange": {
+        "additionalProperties": false,
+        "properties": {
+          "field": {
+            "const": "system",
+            "title": "Field",
+            "type": "string"
+          },
+          "value": {
+            "$ref": "#/$defs/SystemInput"
+          }
+        },
+        "required": [
+          "field",
+          "value"
+        ],
+        "title": "SystemChange",
+        "type": "object"
+      },
       "SystemInput": {
         "additionalProperties": false,
         "properties": {
@@ -1010,6 +1162,35 @@
     "additionalProperties": false,
     "description": "Add or replace one typed field claim on an existing business record.",
     "properties": {
+      "change": {
+        "anyOf": [
+          {
+            "$ref": "#/$defs/ActivityChange"
+          },
+          {
+            "$ref": "#/$defs/ActorChange"
+          },
+          {
+            "$ref": "#/$defs/InputsChange"
+          },
+          {
+            "$ref": "#/$defs/OutputsChange"
+          },
+          {
+            "$ref": "#/$defs/ConditionChange"
+          },
+          {
+            "$ref": "#/$defs/CrudChange"
+          },
+          {
+            "$ref": "#/$defs/SystemChange"
+          },
+          {
+            "$ref": "#/$defs/DataTypeChange"
+          }
+        ],
+        "title": "Change"
+      },
       "claim_status": {
         "default": "provisional",
         "enum": [
@@ -1045,20 +1226,6 @@
         "default": null,
         "title": "Expected Claim Id"
       },
-      "field": {
-        "enum": [
-          "activity",
-          "actor",
-          "inputs",
-          "outputs",
-          "condition",
-          "crud",
-          "system",
-          "data_type"
-        ],
-        "title": "Field",
-        "type": "string"
-      },
       "record_id": {
         "minLength": 1,
         "title": "Record Id",
@@ -1073,34 +1240,13 @@
         "minLength": 1,
         "title": "Statement",
         "type": "string"
-      },
-      "value": {
-        "anyOf": [
-          {
-            "$ref": "#/$defs/ValueInput"
-          },
-          {
-            "$ref": "#/$defs/DataListInput"
-          },
-          {
-            "$ref": "#/$defs/SystemInput"
-          },
-          {
-            "$ref": "#/$defs/EntityInput"
-          },
-          {
-            "$ref": "#/$defs/CrudInput"
-          }
-        ],
-        "title": "Value"
       }
     },
     "required": [
       "record_id",
-      "field",
+      "change",
       "replacement_id",
       "statement",
-      "value",
       "correction_note"
     ],
     "title": "ReviseRecordInput",

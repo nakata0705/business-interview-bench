@@ -22,11 +22,11 @@ synthetic; generated state does not include simulator-private information.
 
 The human script can be copied to an authorized local directory and replayed
 without committing confidential utterances. The incremental case demonstrates
-that `revise_record` targets an existing record plus one typed field, rather than
+that `revise_record` targets an existing record plus one typed `change`, rather than
 re-sending the whole process step:
 
-- first addition: `record_id=review`, `field=actor|inputs|outputs`, no `supersedes`
-- correction: the same target and field, with the prior active claim in
+- first addition: `record_id=review`, one typed `change` for `actor|inputs|outputs`, no `supersedes`
+- correction: the same target and field inside `change`, with the prior active claim in
   `revised_from` and the new claim's `supersedes`
 
 ```bash
