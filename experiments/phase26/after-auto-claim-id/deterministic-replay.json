@@ -1,0 +1,38 @@
+{
+  "source_invocation": "experiments/phase25/after-schema/invocations.json",
+  "source_call_order": 2,
+  "adaptation": "removed only arguments.replacement_id; preserved record_id, change, statement, correction_note, evidence, claim_status, expected_claim_id",
+  "receipt": {
+    "operation": "revise_record",
+    "ok": true,
+    "updated_ids": [
+      "step:check_application"
+    ],
+    "claim_ids": [
+      "claim:step:check_application:actor"
+    ],
+    "question_ids": [],
+    "contradiction_ids": [],
+    "revised_from": [],
+    "created_entity_ids": [
+      "actor:accounting"
+    ],
+    "reused_entity_ids": [],
+    "errors": [],
+    "snapshot": null,
+    "completion": null
+  },
+  "state_identifiers": {
+    "claim_ids": [
+      "claim:step:check_application:activity",
+      "claim:step:check_application:actor"
+    ],
+    "process_step_ids": [
+      "step:check_application"
+    ],
+    "actor_ids": [
+      "actor:accounting"
+    ],
+    "actor_entity_id": "actor:accounting"
+  }
+}

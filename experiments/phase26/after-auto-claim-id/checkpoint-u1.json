@@ -1,0 +1,116 @@
+{
+  "schema_version": "business_interview.interview_agent.v3",
+  "state": {
+    "schema_version": "business_interview.interview_state.v2",
+    "utterances": [
+      {
+        "id": "u1",
+        "speaker": "stakeholder",
+        "text": "申請内容を確認する業務です。"
+      }
+    ],
+    "claims": [
+      {
+        "id": "claim:step:check_application:activity",
+        "record_type": "process_step",
+        "target_id": "step:check_application",
+        "predicate": "activity",
+        "statement": "Process step step:check_application has the recorded activity.",
+        "value": {
+          "state": "value",
+          "value": "申請内容を確認する業務です。"
+        },
+        "evidence": [
+          {
+            "utterance_id": "u1",
+            "start": 0,
+            "end": 14,
+            "quote": "申請内容を確認する業務です。",
+            "semantic_support": "unassessed",
+            "evidence_id": "ev_0001"
+          }
+        ],
+        "status": "provisional",
+        "supersedes": null,
+        "change_reason": null
+      }
+    ],
+    "business_model": {
+      "actors": [],
+      "process_steps": [
+        {
+          "id": "step:check_application",
+          "activity": {
+            "state": "value",
+            "value": "申請内容を確認する業務です。"
+          },
+          "actor": {
+            "state": "unset",
+            "entity_id": null
+          },
+          "inputs": {
+            "state": "unset",
+            "entity_ids": []
+          },
+          "outputs": {
+            "state": "unset",
+            "entity_ids": []
+          }
+        }
+      ],
+      "flows": [],
+      "systems": [],
+      "data_types": [],
+      "data_operations": []
+    },
+    "open_questions": [],
+    "contradictions": [],
+    "issues": [],
+    "completion": {
+      "status": "active",
+      "termination_reason": null,
+      "unresolved_question_ids": [],
+      "stakeholder_confirmed": false,
+      "confirmation_evidence": [],
+      "content_completeness": "unknown"
+    }
+  },
+  "public_messages": [
+    {
+      "id": "public:user:u1",
+      "role": "user",
+      "content": "申請内容を確認する業務です。",
+      "sequence": 0,
+      "utterance_id": "u1",
+      "reply_to": null
+    },
+    {
+      "id": "public:assistant:0001",
+      "role": "assistant",
+      "content": "「申請内容を確認する業務です。」という発言をもとに、業務プロセスのステップ「check_application」を登録しました。今後、他に確認したいことはありますか？",
+      "sequence": 1,
+      "utterance_id": null,
+      "reply_to": null
+    }
+  ],
+  "next_utterance_number": 2,
+  "metadata": {
+    "model_id": "openai/gpt-4o-mini",
+    "endpoint": null,
+    "prompt_version": "interview-state-agent.ja.v5",
+    "max_model_calls": 4,
+    "max_tool_calls": 8,
+    "request_timeout_seconds": 60,
+    "max_tokens": 1024,
+    "generation_config": {
+      "max_tokens": 1024,
+      "timeout": 60,
+      "max_retries": 0,
+      "parallel_tool_calls": false
+    },
+    "execution_status": "active",
+    "last_failure_kind": null,
+    "last_failure_message": null,
+    "resumed_from_model_id": null
+  }
+}

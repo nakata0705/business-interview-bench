@@ -67,7 +67,6 @@ def _revise_record_payload(field: str, value: dict[str, Any]) -> dict[str, Any]:
     return {
         "record_id": "step:review",
         "change": {"field": field, "value": value},
-        "replacement_id": "claim:step:review:actor",
         "statement": "公開発言に基づく記録です。",
         "correction_note": "公開発言で明示された値を記録する。",
         "evidence": [
@@ -235,6 +234,8 @@ def test_provider_tool_definitions_use_candidate_evidence_and_inline_refs() -> N
     revise = next(item for item in agent.tools if item.name == "revise_record")
     revise_schema = revise.parameters.model_dump(mode="json")
     change_schema = revise_schema["properties"]["change"]
+    assert "replacement_id" not in revise_schema["properties"]
+    assert "replacement_id" not in revise_schema["required"]
     assert "activity/condition" in change_schema["description"]
     assert revise_schema["properties"]["claim_status"]["enum"] == ["provisional"]
     assert change_schema["examples"][1]["value"]["items"][0]["id"] == (
@@ -282,7 +283,6 @@ def test_each_generation_receives_a_fresh_typed_state_snapshot() -> None:
                         "field": "actor",
                         "value": {"id": "actor:accounting", "label": "経理"},
                     },
-                    "replacement_id": "claim:step:review:actor",
                     "statement": "担当は経理です。",
                     "correction_note": "後続発言で担当者が判明した。",
                     "evidence": [_candidate("u2")],
@@ -399,7 +399,6 @@ def test_model_can_add_a_field_then_correct_it_in_conversation_order() -> None:
                         "field": "actor",
                         "value": {"id": "actor:sales", "label": "営業"},
                     },
-                    "replacement_id": "claim:step:review:actor",
                     "statement": "担当は営業です。",
                     "correction_note": "公開発言で担当者が判明した。",
                     "evidence": [_candidate("u2")],
@@ -465,7 +464,6 @@ def test_failed_revise_invocation_records_invalid_typed_arguments() -> None:
                             "kind": "named",
                         },
                     },
-                    "replacement_id": "claim:step:review:actor",
                     "statement": "担当は経理です。",
                     "correction_note": "担当者を追記する。",
                     "evidence": [_candidate("u2")],
@@ -708,7 +706,6 @@ def test_checkpoint_round_trip_stores_public_conversation_without_provider_histo
                         "field": "actor",
                         "value": {"id": "actor:sales", "label": "営業"},
                     },
-                    "replacement_id": "claim:step:review:actor",
                     "statement": "担当は営業です。",
                     "correction_note": "追加入力で担当者が判明した。",
                     "evidence": [_candidate("u2")],
@@ -836,7 +833,6 @@ def test_checkpoint_resume_reaches_executor_for_correction_with_short_answer(
                         "field": "actor",
                         "value": {"id": "actor:sales", "label": "営業"},
                     },
-                    "replacement_id": "claim:step:review:actor:sales",
                     "statement": "担当は営業です。",
                     "correction_note": "短い回答で担当者を訂正した。",
                     "evidence": [_candidate("u2")],
@@ -1038,7 +1034,6 @@ def test_fixed_followup_conversation_revises_one_step_and_records_explicit_order
                         "field": "actor",
                         "value": {"id": "actor:accounting", "label": "経理"},
                     },
-                    "replacement_id": "claim:step:review:actor:accounting",
                     "statement": "確認の担当は経理です。",
                     "correction_note": "補足発言で担当者が判明した。",
                     "evidence": [_candidate("u2")],
@@ -1054,10 +1049,8 @@ def test_fixed_followup_conversation_revises_one_step_and_records_explicit_order
                         "field": "actor",
                         "value": {"id": "actor:sales", "label": "営業"},
                     },
-                    "replacement_id": "claim:step:review:actor:sales",
                     "statement": "確認の担当は営業です。",
                     "correction_note": "訂正発言で担当者を更新した。",
-                    "expected_claim_id": "claim:step:review:actor:accounting",
                     "evidence": [_candidate("u3")],
                 },
             ),

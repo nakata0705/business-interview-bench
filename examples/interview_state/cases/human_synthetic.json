@@ -512,7 +512,6 @@
             "operation": "read"
           }
         },
-        "replacement_id": "claim:human_review_tracker:crud:revision1",
         "statement": "During review the tracker is read; the coordinator performs the later update.",
         "correction_note": "The stakeholder explicitly corrected the earlier update description.",
         "evidence": [

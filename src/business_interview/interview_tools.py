@@ -276,7 +276,6 @@ class ReviseRecordInput(BaseModel):
 
     record_id: str = Field(min_length=1)
     change: RevisionChange
-    replacement_id: str = Field(min_length=1)
     statement: str = Field(min_length=1)
     correction_note: str = Field(min_length=1)
     evidence: tuple[EvidenceCitation, ...] = Field(default_factory=tuple)
@@ -754,16 +753,13 @@ class InterviewToolExecutor:
                             "expected claim is not the unique current claim"
                         )
 
-                if any(item.id == request.replacement_id for item in state.claims):
-                    raise InterviewStateError(
-                        f"replacement claim ID already exists: {request.replacement_id!r}"
-                    )
+                replacement_id = _next_claim_id(state, request.record_id, change.field)
 
                 model_with_entities, value = _prepare_revision_value(
                     state.business_model, request
                 )
                 replacement = Claim(
-                    id=request.replacement_id,
+                    id=replacement_id,
                     record_type=record_type,
                     target_id=request.record_id,
                     predicate=change.field,
@@ -1062,6 +1058,18 @@ def _revision_entity_refs(
     if change.field == "data_type" and isinstance(value, EntityInput):
         return (("data_type", value.id),) if value.state == "value" and value.id else ()
     return ()
+
+
+def _next_claim_id(state: InterviewState, record_id: str, field: RevisionField) -> str:
+    """Return the first deterministic claim ID absent from the entire history."""
+    used = {claim.id for claim in state.claims}
+    base = f"claim:{record_id}:{field}"
+    if base not in used:
+        return base
+    revision = 1
+    while f"{base}:revision{revision}" in used:
+        revision += 1
+    return f"{base}:revision{revision}"
 
 
 def _revision_record_type(

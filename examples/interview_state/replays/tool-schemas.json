@@ -1231,11 +1231,6 @@
         "title": "Record Id",
         "type": "string"
       },
-      "replacement_id": {
-        "minLength": 1,
-        "title": "Replacement Id",
-        "type": "string"
-      },
       "statement": {
         "minLength": 1,
         "title": "Statement",
@@ -1245,7 +1240,6 @@
     "required": [
       "record_id",
       "change",
-      "replacement_id",
       "statement",
       "correction_note"
     ],

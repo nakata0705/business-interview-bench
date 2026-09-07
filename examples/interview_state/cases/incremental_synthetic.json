@@ -52,7 +52,6 @@
                 "label": "経理"
               }
             },
-            "replacement_id": "claim:review:actor",
             "statement": "reviewの担当は経理です。",
             "correction_note": "追加回答で担当者が判明した。",
             "evidence": [
@@ -83,7 +82,6 @@
                 ]
               }
             },
-            "replacement_id": "claim:review:inputs",
             "statement": "reviewの入力は申請書です。",
             "correction_note": "追加回答で入力データが判明した。",
             "evidence": [
@@ -123,7 +121,6 @@
                 ]
               }
             },
-            "replacement_id": "claim:review:outputs",
             "statement": "reviewの出力は確認結果です。",
             "correction_note": "追加回答で出力データが判明した。",
             "evidence": [
@@ -158,7 +155,6 @@
                 "label": "営業"
               }
             },
-            "replacement_id": "claim:review:actor:revision1",
             "statement": "reviewの担当は営業です。",
             "correction_note": "訂正回答で担当者が営業だと判明した。",
             "evidence": [

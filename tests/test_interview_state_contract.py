@@ -36,11 +36,13 @@ from business_interview.interview_tools import (
     tool_schemas,
 )
 from business_interview.prototype import replay_case_file
+from business_interview_bench.interview_agent import _resolve_agent_arguments
 
 # pyright: reportMissingImports=false
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 CASE_DIR = PROJECT_ROOT / "examples" / "interview_state" / "cases"
+PHASE25_ARTIFACT_DIR = PROJECT_ROOT / "experiments" / "phase25" / "after-schema"
 
 
 def _harness(text: str = "The coordinator updates the tracker.") -> InterviewHarness:
@@ -159,6 +161,46 @@ def test_invalid_reference_or_quote_does_not_partially_apply() -> None:
     assert executor.state.model_dump(mode="json") == before
 
 
+def test_phase25_failed_revision_replays_without_model_claim_id() -> None:
+    invocations = json.loads(
+        (PHASE25_ARTIFACT_DIR / "invocations.json").read_text(encoding="utf-8")
+    )
+    saved = next(
+        item
+        for item in invocations
+        if item["utterance_id"] == "u2"
+        and item["tool_name"] == "revise_record"
+        and item["arguments"]["change"]["field"] == "actor"
+    )
+    arguments = dict(saved["arguments"])
+    arguments.pop("replacement_id")
+
+    state = InterviewState.model_validate_json(
+        (PHASE25_ARTIFACT_DIR / "state-u1.json").read_text(encoding="utf-8")
+    )
+    harness = InterviewHarness(state)
+    harness.register_utterance(
+        Utterance(
+            id="u2", speaker="stakeholder", text="その確認を担当するのは経理です。"
+        )
+    )
+    executor = InterviewToolExecutor(harness)
+    resolved = _resolve_agent_arguments("revise_record", arguments, harness)
+    request = cast(ReviseRecordInput, parse_tool_input("revise_record", resolved))
+    receipt = executor.revise_record(request)
+
+    assert receipt.ok
+    assert receipt.revised_from == ()
+    assert len(receipt.claim_ids) == 1
+    assert receipt.claim_ids[0].startswith("claim:step:check_application:actor")
+    assert receipt.claim_ids[0] not in {item.id for item in state.claims}
+    assert executor.state.business_model.process_steps[0].actor.entity_id == (
+        "actor:accounting"
+    )
+    assert executor.state.claims[0].predicate == "activity"
+    assert len({item.id for item in executor.state.claims}) == 2
+
+
 def test_correction_preserves_old_claim_but_current_projection_is_unique() -> None:
     harness = _harness()
     executor = InterviewToolExecutor(harness)
@@ -180,7 +222,6 @@ def test_correction_preserves_old_claim_but_current_projection_is_unique() -> No
             change=cast(
                 RevisionChange, {"field": "crud", "value": CrudInput(operation="read")}
             ),
-            replacement_id="claim:usage1:crud:revision1",
             statement="The tracker is read during review.",
             correction_note="The stakeholder corrected the CRUD description.",
             evidence=(_citation(),),
@@ -188,11 +229,9 @@ def test_correction_preserves_old_claim_but_current_projection_is_unique() -> No
         )
     )
     assert revised.ok
-    old = next(item for item in executor.state.claims if item.id == "claim:usage1:crud")
+    old = next(item for item in executor.state.claims if item.id == usage.claim_ids[0])
     current = next(
-        item
-        for item in executor.state.claims
-        if item.id == "claim:usage1:crud:revision1"
+        item for item in executor.state.claims if item.id == revised.claim_ids[0]
     )
     assert old.status == "rejected"
     assert current.supersedes == old.id
@@ -229,7 +268,6 @@ def test_existing_revision_paths_remain_typed() -> None:
                     ),
                 },
             ),
-            replacement_id="claim:step1:activity:revision1",
             statement="The step reviews the submitted request.",
             correction_note="The activity wording was corrected.",
             evidence=(_citation(),),
@@ -258,7 +296,6 @@ def test_existing_revision_paths_remain_typed() -> None:
                     "value": ValueInput(state="value", value="request complete"),
                 },
             ),
-            replacement_id="claim:flow1:condition:revision1",
             statement="The boundary applies when the request is complete.",
             correction_note="The flow condition was corrected.",
             evidence=(_citation(),),
@@ -287,7 +324,6 @@ def test_existing_revision_paths_remain_typed() -> None:
                     "value": SystemInput(id="archive", label="archive"),
                 },
             ),
-            replacement_id="claim:usage1:system:revision1",
             statement="The usage is in the archive system.",
             correction_note="The system was clarified.",
             evidence=(_citation(),),
@@ -305,7 +341,6 @@ def test_existing_revision_paths_remain_typed() -> None:
                     ),
                 },
             ),
-            replacement_id="claim:usage1:data_type:revision1",
             statement="The usage handles the archived request.",
             correction_note="The data type was clarified.",
             evidence=(_citation(),),
@@ -362,7 +397,6 @@ def test_incremental_process_fields_add_and_correct_in_conversation_order() -> N
                     "value": EntityInput(id="accounting", label="経理"),
                 },
             ),
-            replacement_id="claim:review:actor",
             statement="reviewの担当は経理です。",
             correction_note="追加回答で担当者が判明した。",
             evidence=(second_citation,),
@@ -382,7 +416,6 @@ def test_incremental_process_fields_add_and_correct_in_conversation_order() -> N
                     ),
                 },
             ),
-            replacement_id="claim:review:inputs",
             statement="reviewの入力は申請書です。",
             correction_note="追加回答で入力データが判明した。",
             evidence=(second_citation,),
@@ -408,7 +441,6 @@ def test_incremental_process_fields_add_and_correct_in_conversation_order() -> N
                     ),
                 },
             ),
-            replacement_id="claim:review:outputs",
             statement="reviewの出力は確認結果です。",
             correction_note="追加回答で出力データが判明した。",
             evidence=(third_citation,),
@@ -429,7 +461,6 @@ def test_incremental_process_fields_add_and_correct_in_conversation_order() -> N
                 RevisionChange,
                 {"field": "actor", "value": EntityInput(id="sales", label="営業")},
             ),
-            replacement_id="claim:review:actor:revision1",
             statement="reviewの担当は営業です。",
             correction_note="訂正回答で担当者が営業だと判明した。",
             evidence=(fourth_citation,),
@@ -437,7 +468,7 @@ def test_incremental_process_fields_add_and_correct_in_conversation_order() -> N
         )
     )
     assert correction.ok
-    assert correction.revised_from == ("claim:review:actor",)
+    assert correction.revised_from == (actor.claim_ids[0],)
     assert correction.created_entity_ids == ("sales",)
     step = executor.state.business_model.process_steps[0]
     assert len(executor.state.business_model.process_steps) == 1
@@ -446,12 +477,10 @@ def test_incremental_process_fields_add_and_correct_in_conversation_order() -> N
     assert step.outputs.entity_ids == ("review_result",)
 
     old_actor = next(
-        item for item in executor.state.claims if item.id == "claim:review:actor"
+        item for item in executor.state.claims if item.id == actor.claim_ids[0]
     )
     current_actor = next(
-        item
-        for item in executor.state.claims
-        if item.id == "claim:review:actor:revision1"
+        item for item in executor.state.claims if item.id == correction.claim_ids[0]
     )
     assert old_actor.status == "rejected"
     assert old_actor.evidence[0].utterance_id == "u2"
@@ -467,8 +496,7 @@ def test_incremental_process_fields_add_and_correct_in_conversation_order() -> N
                 RevisionChange,
                 {"field": "actor", "value": EntityInput(id="accounting")},
             ),
-            expected_claim_id="claim:review:actor",
-            replacement_id="claim:review:actor:stale",
+            expected_claim_id=actor.claim_ids[0],
             statement="The stale owner claim is used.",
             correction_note="stale claim must be rejected",
             evidence=(fourth_citation,),
@@ -496,7 +524,6 @@ def test_incremental_process_fields_add_and_correct_in_conversation_order() -> N
                     ),
                 },
             ),
-            replacement_id="claim:review:inputs:revision1",
             statement="reviewの入力は既存の申請書です。",
             correction_note="保存後の追回答で入力を確認した。",
             evidence=(
@@ -513,6 +540,83 @@ def test_incremental_process_fields_add_and_correct_in_conversation_order() -> N
     assert continued.ok
     assert continued.created_entity_ids == ()
     assert continued.reused_entity_ids == ("application",)
+
+
+def test_generated_revision_ids_survive_state_round_trip_and_rejected_history() -> None:
+    harness = _harness("The coordinator reviews the request.")
+    executor = InterviewToolExecutor(harness)
+    created = executor.record_process_step(
+        RecordProcessStepInput(
+            step_id="review",
+            activity=ValueInput(state="value", value="review request"),
+            evidence=(_citation("The coordinator reviews the request."),),
+        )
+    )
+    assert created.ok
+
+    first = executor.revise_record(
+        ReviseRecordInput(
+            record_id="review",
+            change=cast(
+                RevisionChange,
+                {
+                    "field": "actor",
+                    "value": EntityInput(id="accounting", label="accounting"),
+                },
+            ),
+            statement="The owner is accounting.",
+            correction_note="The owner became known.",
+            evidence=(_citation("The coordinator reviews the request."),),
+        )
+    )
+    assert first.ok
+
+    second = executor.revise_record(
+        ReviseRecordInput(
+            record_id="review",
+            change=cast(
+                RevisionChange,
+                {
+                    "field": "actor",
+                    "value": EntityInput(id="sales", label="sales"),
+                },
+            ),
+            expected_claim_id=first.claim_ids[0],
+            statement="The owner is sales.",
+            correction_note="The owner was corrected.",
+            evidence=(_citation("The coordinator reviews the request."),),
+        )
+    )
+    assert second.ok
+    first_id = first.claim_ids[0]
+    second_id = second.claim_ids[0]
+    assert first_id != second_id
+    assert second.revised_from == (first_id,)
+
+    restored = InterviewState.model_validate_json(
+        json.dumps(executor.state.model_dump(mode="json"), ensure_ascii=False)
+    )
+    continued = InterviewToolExecutor(InterviewHarness(restored)).revise_record(
+        ReviseRecordInput(
+            record_id="review",
+            change=cast(
+                RevisionChange,
+                {
+                    "field": "actor",
+                    "value": EntityInput(id="general_affairs", label="general affairs"),
+                },
+            ),
+            expected_claim_id=second_id,
+            statement="The owner is general affairs.",
+            correction_note="The owner was corrected again after restore.",
+            evidence=(_citation("The coordinator reviews the request."),),
+        )
+    )
+    assert continued.ok
+    third_id = continued.claim_ids[0]
+    assert third_id not in {item.id for item in restored.claims}
+    assert continued.revised_from == (second_id,)
+    assert len({item.id for item in restored.claims} | {third_id}) == 4
 
 
 def test_dont_know_fields_can_become_typed_values() -> None:
@@ -539,7 +643,6 @@ def test_dont_know_fields_can_become_typed_values() -> None:
                     "value": EntityInput(id="actor1", label="coordinator"),
                 },
             ),
-            replacement_id="claim:review:actor:known",
             statement="The review owner is the coordinator.",
             correction_note="The owner became known.",
             evidence=(_citation(),),
@@ -557,15 +660,20 @@ def test_dont_know_fields_can_become_typed_values() -> None:
                     ),
                 },
             ),
-            replacement_id="claim:review:inputs:known",
             statement="The review input is the request.",
             correction_note="The input became known.",
             evidence=(_citation(),),
         )
     )
     assert actor.ok and inputs.ok
-    assert actor.revised_from == ("claim:review:actor",)
-    assert inputs.revised_from == ("claim:review:inputs",)
+    initial_actor_claim_id = next(
+        claim_id for claim_id in initial.claim_ids if claim_id.endswith(":actor")
+    )
+    initial_inputs_claim_id = next(
+        claim_id for claim_id in initial.claim_ids if claim_id.endswith(":inputs")
+    )
+    assert actor.revised_from == (initial_actor_claim_id,)
+    assert inputs.revised_from == (initial_inputs_claim_id,)
     assert executor.state.business_model.process_steps[0].actor.entity_id == "actor1"
     assert executor.state.business_model.process_steps[0].inputs.entity_ids == (
         "data1",
@@ -594,7 +702,6 @@ def test_failed_incremental_update_does_not_partially_create_entities() -> None:
                 RevisionChange,
                 {"field": "actor", "value": EntityInput(id="sales", label="sales")},
             ),
-            replacement_id="claim:review:actor:bad",
             statement="The owner is sales.",
             correction_note="bad citation",
             evidence=(
@@ -613,7 +720,6 @@ def test_failed_incremental_update_does_not_partially_create_entities() -> None:
                 RevisionChange,
                 {"field": "actor", "value": EntityInput(id="accounting", label="別名")},
             ),
-            replacement_id="claim:review:actor:conflict",
             statement="The owner is accounting.",
             correction_note="conflicting label",
             evidence=(_citation(),),
@@ -634,7 +740,6 @@ def test_rejected_revision_does_not_change_the_current_projection() -> None:
                 RevisionChange,
                 {"field": "actor", "value": EntityInput(id="sales", label="sales")},
             ),
-            replacement_id="claim:step1:actor:rejected",
             statement="The owner might be sales.",
             correction_note="The candidate value was rejected.",
             evidence=(_citation(),),
@@ -647,9 +752,7 @@ def test_rejected_revision_does_not_change_the_current_projection() -> None:
     assert executor.state.business_model.process_steps[0].actor.entity_id == "actor1"
     assert not any(item.id == "sales" for item in executor.state.business_model.actors)
     candidate = next(
-        item
-        for item in executor.state.claims
-        if item.id == "claim:step1:actor:rejected"
+        item for item in executor.state.claims if item.id == rejected.claim_ids[0]
     )
     assert candidate.status == "rejected"
     assert candidate.supersedes is None
@@ -667,7 +770,6 @@ def test_revise_record_schema_parses_field_specific_typed_values() -> None:
                     "items": [{"id": "request", "label": "request"}],
                 },
             },
-            "replacement_id": "claim:review:inputs",
             "statement": "The input is the request.",
             "correction_note": "The input was identified.",
             "evidence": [],
@@ -677,6 +779,11 @@ def test_revise_record_schema_parses_field_specific_typed_values() -> None:
     assert parsed.change.field == "inputs"
     assert isinstance(parsed.change.value, DataListInput)
     assert parsed.change.value.items[0].id == "request"
+
+    legacy_arguments = parsed.model_dump(mode="python")
+    legacy_arguments["replacement_id"] = "claim:legacy"
+    with pytest.raises(ValueError, match="extra"):
+        parse_tool_input("revise_record", legacy_arguments)
 
     revise_schema = tool_schemas()["revise_record"]
     assert "field" not in revise_schema["properties"]
@@ -704,7 +811,6 @@ def test_revise_record_schema_parses_field_specific_typed_values() -> None:
                         "kind": "named",
                     },
                 },
-                "replacement_id": "claim:review:actor:bad-kind",
                 "statement": "The owner is accounting.",
                 "correction_note": "Wrong entity shape.",
                 "evidence": [],
@@ -723,7 +829,6 @@ def test_revise_record_schema_parses_field_specific_typed_values() -> None:
                     ),
                 },
             ),
-            replacement_id="claim:review:actor",
             statement="The owner is known.",
             correction_note="wrong type",
         )
@@ -874,4 +979,6 @@ def test_replays_use_the_same_update_path_and_round_trip_json() -> None:
     assert incremental_step.actor.entity_id == "sales"
     assert incremental_step.inputs.entity_ids == ("application",)
     assert incremental_step.outputs.entity_ids == ("review_result",)
-    assert incremental.receipts[-1].revised_from == ("claim:review:actor",)
+    assert incremental.receipts[-1].revised_from == (
+        incremental.receipts[1].claim_ids[0],
+    )

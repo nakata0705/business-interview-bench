@@ -1,0 +1,365 @@
+[
+  {
+    "utterance_id": "u1",
+    "call_order": 1,
+    "tool_name": "record_process_step",
+    "call_id": "call_3L3Jn5fZliGY2tr9Qaljz8vD",
+    "arguments": {
+      "step_id": "step:check_application",
+      "activity": {
+        "state": "value",
+        "value": "申請内容を確認する業務です。"
+      },
+      "actor": null,
+      "inputs": {
+        "state": "unset",
+        "items": []
+      },
+      "outputs": {
+        "state": "unset",
+        "items": []
+      },
+      "evidence": [
+        {
+          "candidate_id": "candidate:u1:full",
+          "semantic_support": "unassessed"
+        }
+      ],
+      "claim_status": "provisional"
+    },
+    "success": true,
+    "receipt": {
+      "operation": "record_process_step",
+      "ok": true,
+      "updated_ids": [
+        "step:check_application"
+      ],
+      "claim_ids": [
+        "claim:step:check_application:activity"
+      ],
+      "question_ids": [],
+      "contradiction_ids": [],
+      "revised_from": [],
+      "created_entity_ids": [],
+      "reused_entity_ids": [],
+      "errors": [],
+      "snapshot": null,
+      "completion": null
+    },
+    "error": null,
+    "state_identifiers_after_turn": {
+      "utterance_ids": [
+        "u1"
+      ],
+      "claim_ids": [
+        "claim:step:check_application:activity"
+      ],
+      "process_step_ids": [
+        "step:check_application"
+      ],
+      "flow_ids": [],
+      "actor_ids": [],
+      "system_ids": [],
+      "data_type_ids": [],
+      "data_operation_ids": []
+    }
+  },
+  {
+    "utterance_id": "u2",
+    "call_order": 2,
+    "tool_name": "revise_record",
+    "call_id": "call_uqdolJJbrsc0ua15NhOTwVUH",
+    "arguments": {
+      "record_id": "step:check_application",
+      "change": {
+        "field": "actor",
+        "value": {
+          "state": "value",
+          "id": "actor:accounting",
+          "label": "経理"
+        }
+      },
+      "statement": "担当者を経理に変更します。",
+      "correction_note": "経理が確認を担当することが明示されたため。",
+      "evidence": [
+        {
+          "candidate_id": "candidate:u2:full",
+          "semantic_support": "supports"
+        }
+      ],
+      "claim_status": "provisional",
+      "expected_claim_id": null
+    },
+    "success": true,
+    "receipt": {
+      "operation": "revise_record",
+      "ok": true,
+      "updated_ids": [
+        "step:check_application"
+      ],
+      "claim_ids": [
+        "claim:step:check_application:actor"
+      ],
+      "question_ids": [],
+      "contradiction_ids": [],
+      "revised_from": [],
+      "created_entity_ids": [
+        "actor:accounting"
+      ],
+      "reused_entity_ids": [],
+      "errors": [],
+      "snapshot": null,
+      "completion": null
+    },
+    "error": null,
+    "state_identifiers_after_turn": {
+      "utterance_ids": [
+        "u1",
+        "u2"
+      ],
+      "claim_ids": [
+        "claim:step:check_application:activity",
+        "claim:step:check_application:actor"
+      ],
+      "process_step_ids": [
+        "step:check_application"
+      ],
+      "flow_ids": [],
+      "actor_ids": [
+        "actor:accounting"
+      ],
+      "system_ids": [],
+      "data_type_ids": [],
+      "data_operation_ids": []
+    }
+  },
+  {
+    "utterance_id": "u2",
+    "call_order": 3,
+    "tool_name": "record_process_step",
+    "call_id": "call_Hdqb05vKf5J2ppyD1g1b81Z4",
+    "arguments": {
+      "step_id": "step:check_application",
+      "activity": {
+        "state": "value",
+        "value": "申請内容を確認する業務です。"
+      },
+      "actor": null,
+      "inputs": {
+        "state": "unset",
+        "items": []
+      },
+      "outputs": {
+        "state": "unset",
+        "items": []
+      },
+      "evidence": [
+        {
+          "candidate_id": "candidate:u1:full",
+          "semantic_support": "supports"
+        }
+      ],
+      "claim_status": "provisional"
+    },
+    "success": false,
+    "receipt": {
+      "operation": "record_process_step",
+      "ok": false,
+      "updated_ids": [],
+      "claim_ids": [],
+      "question_ids": [],
+      "contradiction_ids": [],
+      "revised_from": [],
+      "created_entity_ids": [],
+      "reused_entity_ids": [],
+      "errors": [
+        {
+          "code": "InterviewStateError",
+          "message": "process step ID already exists: 'step:check_application'",
+          "fields": []
+        }
+      ],
+      "snapshot": null,
+      "completion": null
+    },
+    "error": null,
+    "state_identifiers_after_turn": {
+      "utterance_ids": [
+        "u1",
+        "u2"
+      ],
+      "claim_ids": [
+        "claim:step:check_application:activity",
+        "claim:step:check_application:actor"
+      ],
+      "process_step_ids": [
+        "step:check_application"
+      ],
+      "flow_ids": [],
+      "actor_ids": [
+        "actor:accounting"
+      ],
+      "system_ids": [],
+      "data_type_ids": [],
+      "data_operation_ids": []
+    }
+  },
+  {
+    "utterance_id": "u3",
+    "call_order": 4,
+    "tool_name": "revise_record",
+    "call_id": "call_ZgPydMiFryoORLX5ZpbnttkN",
+    "arguments": {
+      "record_id": "step:check_application",
+      "change": {
+        "field": "actor",
+        "value": {
+          "state": "value",
+          "id": "actor:sales",
+          "label": "営業"
+        }
+      },
+      "statement": "担当者を営業に変更します。",
+      "correction_note": "経理ではなく営業が担当であることが明示されたため。",
+      "evidence": [
+        {
+          "candidate_id": "candidate:u3:full",
+          "semantic_support": "supports"
+        }
+      ],
+      "claim_status": "provisional",
+      "expected_claim_id": "claim:step:check_application:actor"
+    },
+    "success": true,
+    "receipt": {
+      "operation": "revise_record",
+      "ok": true,
+      "updated_ids": [
+        "step:check_application"
+      ],
+      "claim_ids": [
+        "claim:step:check_application:actor:revision1"
+      ],
+      "question_ids": [],
+      "contradiction_ids": [],
+      "revised_from": [
+        "claim:step:check_application:actor"
+      ],
+      "created_entity_ids": [
+        "actor:sales"
+      ],
+      "reused_entity_ids": [],
+      "errors": [],
+      "snapshot": null,
+      "completion": null
+    },
+    "error": null,
+    "state_identifiers_after_turn": {
+      "utterance_ids": [
+        "u1",
+        "u2",
+        "u3"
+      ],
+      "claim_ids": [
+        "claim:step:check_application:activity",
+        "claim:step:check_application:actor",
+        "claim:step:check_application:actor:revision1"
+      ],
+      "process_step_ids": [
+        "step:check_application"
+      ],
+      "flow_ids": [],
+      "actor_ids": [
+        "actor:accounting",
+        "actor:sales"
+      ],
+      "system_ids": [],
+      "data_type_ids": [],
+      "data_operation_ids": []
+    }
+  },
+  {
+    "utterance_id": "u4",
+    "call_order": 5,
+    "tool_name": "record_process_step",
+    "call_id": "call_KNx0xelfO3bynH4FVUO2ixSx",
+    "arguments": {
+      "step_id": "step:store_results",
+      "activity": {
+        "state": "value",
+        "value": "結果を保管する業務です。"
+      },
+      "actor": {
+        "state": "value",
+        "id": "actor:general_affairs",
+        "label": "総務"
+      },
+      "inputs": {
+        "state": "unset",
+        "items": []
+      },
+      "outputs": {
+        "state": "unset",
+        "items": []
+      },
+      "evidence": [
+        {
+          "candidate_id": "candidate:u4:full",
+          "semantic_support": "supports"
+        }
+      ],
+      "claim_status": "provisional"
+    },
+    "success": true,
+    "receipt": {
+      "operation": "record_process_step",
+      "ok": true,
+      "updated_ids": [
+        "step:store_results"
+      ],
+      "claim_ids": [
+        "claim:step:store_results:activity",
+        "claim:step:store_results:actor"
+      ],
+      "question_ids": [],
+      "contradiction_ids": [],
+      "revised_from": [],
+      "created_entity_ids": [
+        "actor:general_affairs"
+      ],
+      "reused_entity_ids": [],
+      "errors": [],
+      "snapshot": null,
+      "completion": null
+    },
+    "error": null,
+    "state_identifiers_after_turn": {
+      "utterance_ids": [
+        "u1",
+        "u2",
+        "u3",
+        "u4"
+      ],
+      "claim_ids": [
+        "claim:step:check_application:activity",
+        "claim:step:check_application:actor",
+        "claim:step:check_application:actor:revision1",
+        "claim:step:store_results:activity",
+        "claim:step:store_results:actor"
+      ],
+      "process_step_ids": [
+        "step:check_application",
+        "step:store_results"
+      ],
+      "flow_ids": [],
+      "actor_ids": [
+        "actor:accounting",
+        "actor:sales",
+        "actor:general_affairs"
+      ],
+      "system_ids": [],
+      "data_type_ids": [],
+      "data_operation_ids": []
+    }
+  }
+]
